@@ -24,11 +24,11 @@ export function handleApiError(error: unknown): AppError {
     const status = axiosError.response?.status;
     const responseData = axiosError.response?.data;
     const message =
-      responseData?.message || axiosError.message || 'An unexpected error occurred';
+      responseData?.message || axiosError.message || 'Đã xảy ra lỗi không xác định.';
 
     if (!axiosError.response) {
       // Network timeout / offline
-      return new NetworkError(axiosError.message || 'Unable to connect to server');
+      return new NetworkError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.');
     }
 
     switch (status) {
@@ -54,5 +54,5 @@ export function handleApiError(error: unknown): AppError {
     return new AppError(error.message, 'UNKNOWN_ERROR');
   }
 
-  return new AppError('An unknown error occurred', 'UNKNOWN_ERROR');
+  return new AppError('Đã xảy ra lỗi không xác định. Vui lòng thử lại.', 'UNKNOWN_ERROR');
 }

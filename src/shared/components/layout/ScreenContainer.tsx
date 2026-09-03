@@ -27,6 +27,7 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
           style={styles.container}
           contentContainerStyle={[styles.contentContainer, contentContainerStyle]}
           keyboardShouldPersistTaps="handled"
+          contentInsetAdjustmentBehavior="automatic"
           showsVerticalScrollIndicator={false}
         >
           {children}

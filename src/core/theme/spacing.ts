@@ -15,6 +15,14 @@ export const spacing = {
   xxxl: 40,
   huge: 48,
   massive: 64,
+
+  // Layout context helpers
+  screenHorizontal: 16,
+  screenHorizontalLg: 20,
+  screenVertical: 16,
+  cardPadding: 16,
+  sectionGap: 24,
 } as const;
 
 export type Spacing = typeof spacing;
+export type SpacingKey = keyof typeof spacing;

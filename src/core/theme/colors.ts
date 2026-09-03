@@ -1,10 +1,11 @@
 /**
- * Application Color Palette
- * Designed specifically for the SmartMush MCMS Mobile ecosystem.
+ * Application Color System
+ * Tailored for the SmartMush MCMS Mobile ecosystem (Smart Mushroom & IoT monitoring).
+ * Features rich botanical greens, spore amber accents, crisp slate neutrals, and accessible semantic roles.
  */
 
 export const colors = {
-  // Brand / Primary (Earthy mushroom & botanical greens)
+  // Brand / Primary Palette (Botanical & chamber greens)
   primary: {
     50: '#E8F5E9',
     100: '#C8E6C9',
@@ -18,7 +19,7 @@ export const colors = {
     900: '#0E3012',
   },
 
-  // Secondary / Accent (Warm spore golden amber)
+  // Secondary / Accent Palette (Warm spore golden amber)
   secondary: {
     50: '#FFF8E1',
     100: '#FFECB3',
@@ -32,7 +33,7 @@ export const colors = {
     900: '#E65100',
   },
 
-  // Neutrals / Grays
+  // Neutrals / Slate Scale
   neutral: {
     0: '#FFFFFF',
     50: '#F8FAFC',
@@ -82,7 +83,7 @@ export const colors = {
     subtle: '#F1F5F9',
   },
 
-  // Text
+  // Text Roles
   text: {
     primary: '#0F172A',
     secondary: '#475569',
@@ -99,9 +100,35 @@ export const colors = {
     dark: '#CBD5E1',
   },
 
-  // Transparent / Utility
+  // Semantic Shortcut Tokens
+  surface: '#FFFFFF',
+  surfaceSecondary: '#F1F5F9',
+  surfaceElevated: '#FFFFFF',
+  textPrimary: '#0F172A',
+  textSecondary: '#475569',
+  textMuted: '#94A3B8',
+  textInverse: '#FFFFFF',
+  textDisabled: '#CBD5E1',
+  borderDefault: '#E2E8F0',
+  borderLight: '#F1F5F9',
+  borderFocus: '#2E7D32',
+  primaryMain: '#2E7D32',
+  primaryPressed: '#1F5A23',
+  primaryLight: '#E8F5E9',
+  secondaryMain: '#FFA000',
+  secondaryPressed: '#F57C00',
+  secondaryLight: '#FFF8E1',
+
+  // Disabled State Tokens
+  disabled: {
+    background: '#F1F5F9',
+    text: '#94A3B8',
+    border: '#E2E8F0',
+  },
+
+  // Utilities
   transparent: 'transparent',
-  overlay: 'rgba(15, 23, 42, 0.5)',
+  overlay: 'rgba(15, 23, 42, 0.45)',
 } as const;
 
 export type Colors = typeof colors;
