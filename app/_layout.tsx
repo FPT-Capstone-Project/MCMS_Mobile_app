@@ -27,6 +27,18 @@ export default function RootLayout() {
             headerShown: false,
           }}
         />
+        <Stack.Screen
+          name="rental/index"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="camera/[trayId]"
+          options={{
+            headerShown: false,
+          }}
+        />
       </Stack>
     </AppProvider>
   );

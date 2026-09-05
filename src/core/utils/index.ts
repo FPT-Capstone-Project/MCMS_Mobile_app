@@ -1,4 +1,4 @@
 /**
- * Core utility functions placeholder
+ * Core utility functions
  */
-export {};
+export * from './currency';
