@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, StyleSheet, View } from 'react-native';
 import { theme } from '../../src/core/theme';
+import { useAuth } from '../../src/features/auth';
 import {
   AppButton,
   AppCard,
@@ -12,10 +13,36 @@ import {
 } from '../../src/shared/components';
 
 /**
- * Profile Tab Shell
- * Placeholder screen for customer profile and application settings in Vietnamese.
+ * Profile Tab Screen
+ * Displays authenticated customer information, settings options, and connected logout.
  */
 export default function ProfileScreen() {
+  const { user, logout } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = () => {
+    Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản SmartMush?', [
+      {
+        text: 'Hủy',
+        style: 'cancel',
+      },
+      {
+        text: 'Đăng xuất',
+        style: 'destructive',
+        onPress: async () => {
+          setIsLoggingOut(true);
+          try {
+            await logout();
+          } catch {
+            // Logout cleanup completes locally regardless of network
+          } finally {
+            setIsLoggingOut(false);
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <ScreenContainer scrollable edges={['left', 'right']}>
       <AppHeader
@@ -32,14 +59,14 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.userInfo}>
               <AppText variant="title" weight="bold">
-                Khách hàng
+                {user?.fullName || 'Khách hàng'}
               </AppText>
               <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-                Gói Nuôi Trồng Thông Minh
+                {user?.email || 'khachhang@smartmush.vn'}
               </AppText>
               <View style={styles.badge}>
                 <AppText variant="overline" color={theme.colors.primary[700]}>
-                  Đã kết nối
+                  {user?.role === 'CUSTOMER' ? 'Khách hàng' : 'Đã xác thực'}
                 </AppText>
               </View>
             </View>
@@ -95,6 +122,8 @@ export default function ProfileScreen() {
           title="Đăng xuất"
           variant="outline"
           size="md"
+          loading={isLoggingOut}
+          onPress={handleLogout}
           leftIcon={<Ionicons name="log-out-outline" size={18} color={theme.colors.primary[500]} />}
         />
       </View>

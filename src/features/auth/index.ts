@@ -1,2 +1,3 @@
-// Auth feature scaffold - clean architecture (domain, data, presentation)
-export {};
+export * from './domain';
+export * from './data';
+export * from './presentation';

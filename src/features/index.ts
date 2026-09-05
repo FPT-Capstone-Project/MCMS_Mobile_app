@@ -6,6 +6,7 @@
  * - presentation/ (screens, components, hooks)
  */
 
+export * from './auth';
 export * from './tray';
 export * from './rental';
 export * from './monitoring';

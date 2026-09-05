@@ -11,6 +11,8 @@ export const API_ENDPOINTS = {
     REFRESH: '/auth/refresh-token',
     LOGOUT: '/auth/logout',
     ME: '/auth/me',
+    FORGOT_PASSWORD: '/auth/forgot-password',
+    RESET_PASSWORD: '/auth/reset-password',
   },
   // Trays
   TRAYS: {

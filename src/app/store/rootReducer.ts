@@ -1,5 +1,6 @@
 import { combineReducers } from '@reduxjs/toolkit';
 import { baseApi } from '../../core/api/baseApi';
+import { authReducer } from '../../features/auth/presentation/slices/authSlice';
 
 /**
  * Root Reducer
@@ -7,7 +8,7 @@ import { baseApi } from '../../core/api/baseApi';
  */
 export const rootReducer = combineReducers({
   [baseApi.reducerPath]: baseApi.reducer,
-  // Future global client slices (e.g. auth, settings, globalUI) will be registered here.
+  auth: authReducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;
