@@ -11,7 +11,7 @@ import { AppLoading } from '../src/shared/components';
 function NavigationGuard() {
   const segments = useSegments();
   const router = useRouter();
-  const { status, isInitializing, initialize } = useAuth();
+  const { status, user, isShipper, isInitializing, initialize } = useAuth();
 
   useEffect(() => {
     initialize();
@@ -20,16 +20,34 @@ function NavigationGuard() {
   useEffect(() => {
     if (isInitializing) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
+    const currentSegment = segments[0] as string | undefined;
+    const inAuthGroup = currentSegment === '(auth)';
+    const inCustomerRoutes =
+      currentSegment === '(tabs)' || currentSegment === 'rental' || currentSegment === 'camera';
+    const inShipperRoutes = currentSegment === '(shipper)';
 
     if (status === 'unauthenticated' && !inAuthGroup) {
-      // Route unauthenticated visitors to login
+      // Route unauthenticated visitors to login screen
       router.replace('/(auth)/login' as Href);
-    } else if (status === 'authenticated' && inAuthGroup) {
-      // Route logged-in customers away from auth screens into the main app shell
-      router.replace('/(tabs)' as Href);
+    } else if (status === 'authenticated') {
+      const shipperActive = isShipper || user?.role === 'SHIPPER';
+
+      if (inAuthGroup) {
+        // Route away from auth screens based on authenticated role
+        if (shipperActive) {
+          router.replace('/(shipper)' as Href);
+        } else {
+          router.replace('/(tabs)' as Href);
+        }
+      } else if (shipperActive && inCustomerRoutes) {
+        // Enforce role boundary: Shippers cannot view Customer screens
+        router.replace('/(shipper)' as Href);
+      } else if (!shipperActive && inShipperRoutes) {
+        // Enforce role boundary: Customers cannot view Shipper screens
+        router.replace('/(tabs)' as Href);
+      }
     }
-  }, [status, isInitializing, segments, router]);
+  }, [status, user, isShipper, isInitializing, segments, router]);
 
   if (isInitializing) {
     return <AppLoading fullscreen message="Đang khởi tạo SmartMush..." />;
@@ -56,6 +74,12 @@ function NavigationGuard() {
       />
       <Stack.Screen
         name="(tabs)"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="(shipper)"
         options={{
           headerShown: false,
         }}

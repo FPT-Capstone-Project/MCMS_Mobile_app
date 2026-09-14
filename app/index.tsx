@@ -8,13 +8,16 @@ import { AppLoading } from '../src/shared/components';
  * Redirects to /(tabs) if authenticated, or /(auth)/login if unauthenticated.
  */
 export default function Index() {
-  const { isAuthenticated, isInitializing } = useAuth();
+  const { isAuthenticated, isInitializing, isShipper } = useAuth();
 
   if (isInitializing) {
     return <AppLoading fullscreen message="Đang khởi tạo SmartMush..." />;
   }
 
   if (isAuthenticated) {
+    if (isShipper) {
+      return <Redirect href="/(shipper)" />;
+    }
     return <Redirect href="/(tabs)" />;
   }
 

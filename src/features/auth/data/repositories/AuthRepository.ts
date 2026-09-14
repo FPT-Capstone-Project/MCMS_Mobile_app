@@ -17,6 +17,11 @@ import {
 } from '../../domain/entities/AuthUser';
 import { IAuthRepository } from '../../domain/repositories/IAuthRepository';
 import { MOCK_AUTH_SESSION } from '../datasources/authMockData';
+import {
+  getDemoShipperSession,
+  isDemoShipperEmail,
+  validateDemoShipperCredentials,
+} from '../datasources/authDemoCredentials';
 
 /**
  * Authentication Repository Implementation
@@ -48,9 +53,26 @@ export class AuthRepository implements IAuthRepository {
   }
 
   /**
-   * Authenticate customer with email and password
+   * Authenticate customer or demo shipper with email and password
    */
   async login(credentials: LoginCredentials): Promise<AuthSession> {
+    // ========================================================================
+    // DEMO ONLY — REMOVE BEFORE PRODUCTION
+    // Intercept hard-coded demo Shipper account for local evaluation
+    // ========================================================================
+    if (isDemoShipperEmail(credentials.email)) {
+      if (validateDemoShipperCredentials(credentials)) {
+        const demoSession = getDemoShipperSession();
+        await this.persistSession(demoSession);
+        return demoSession;
+      }
+      throw new AppError(
+        'Mật khẩu không chính xác. Vui lòng kiểm tra lại.',
+        'INVALID_CREDENTIALS',
+        400
+      );
+    }
+
     try {
       const response = await axiosClient.post<AuthResponseDto | AuthSession>(
         API_ENDPOINTS.AUTH.LOGIN,

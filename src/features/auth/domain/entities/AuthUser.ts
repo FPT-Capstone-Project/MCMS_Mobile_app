@@ -10,12 +10,14 @@ export interface AuthTokens {
   expiresIn?: number;
 }
 
+export type UserRole = 'CUSTOMER' | 'SHIPPER' | 'FARM_OPERATOR' | 'ADMIN';
+
 export interface AuthUser {
   id: string;
   email: string;
   fullName: string;
   phoneNumber?: string;
-  role?: string;
+  role?: UserRole;
   avatarUrl?: string;
   createdAt?: string;
 }

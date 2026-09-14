@@ -42,9 +42,13 @@ export const LoginScreen: React.FC = () => {
     setErrorMessage(null);
     clearError();
     try {
-      await login(data);
-      // On success, RootLayout/Navigation guard will transition to /(tabs)
-      router.replace('/(tabs)' as Href);
+      const session = await login(data);
+      // Route based on authenticated user role
+      if (session.user?.role === 'SHIPPER') {
+        router.replace('/(shipper)' as Href);
+      } else {
+        router.replace('/(tabs)' as Href);
+      }
     } catch (err: unknown) {
       const msg =
         typeof err === 'string'
