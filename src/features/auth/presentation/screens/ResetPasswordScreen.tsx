@@ -42,7 +42,8 @@ export const ResetPasswordScreen: React.FC = () => {
       newPassword: '',
       confirmPassword: '',
     },
-    mode: 'onTouched',
+    mode: 'onSubmit',
+    reValidateMode: 'onChange',
   });
 
   const onSubmit = async (data: ResetPasswordFormData) => {

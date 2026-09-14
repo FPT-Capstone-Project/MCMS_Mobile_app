@@ -24,124 +24,146 @@ export interface AppInputProps extends Omit<TextInputProps, 'style'> {
   disabled?: boolean;
 }
 
-export const AppInput: React.FC<AppInputProps> = ({
-  label,
-  error,
-  helperText,
-  leftIcon,
-  rightIcon,
-  containerStyle,
-  inputStyle,
-  style,
-  disabled = false,
-  secureTextEntry,
-  placeholder,
-  value,
-  onChangeText,
-  onFocus,
-  onBlur,
-  ...rest
-}) => {
-  const [isFocused, setIsFocused] = useState(false);
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+export const AppInput = React.forwardRef<TextInput, AppInputProps>(
+  (
+    {
+      label,
+      error,
+      helperText,
+      leftIcon,
+      rightIcon,
+      containerStyle,
+      inputStyle,
+      style,
+      disabled = false,
+      secureTextEntry,
+      placeholder,
+      value,
+      onChangeText,
+      onFocus,
+      onBlur,
+      ...rest
+    },
+    ref
+  ) => {
+    const innerRef = React.useRef<TextInput>(null);
+    React.useImperativeHandle(ref, () => innerRef.current as TextInput);
 
-  const isSecure = secureTextEntry && !isPasswordVisible;
-  const hasError = Boolean(error);
+    const [isFocused, setIsFocused] = useState(false);
+    const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
-  const getBorderColor = (): string => {
-    if (hasError) return theme.colors.error.main;
-    if (isFocused) return theme.colors.primary[500];
-    return theme.colors.border.default;
-  };
+    const isSecure = secureTextEntry && !isPasswordVisible;
+    const hasError = Boolean(error);
 
-  const getBackgroundColor = (): string => {
-    if (disabled) return theme.colors.neutral[100];
-    return theme.colors.background.paper;
-  };
+    const handleContainerPress = () => {
+      if (!disabled && innerRef.current) {
+        innerRef.current.focus();
+      }
+    };
 
-  return (
-    <View style={[styles.wrapper, containerStyle]}>
-      {label ? (
-        <AppText variant="label" style={styles.label}>
-          {label}
-        </AppText>
-      ) : null}
+    const getBorderColor = (): string => {
+      if (hasError) return theme.colors.error.main;
+      if (isFocused) return theme.colors.primary[500];
+      return theme.colors.border.default;
+    };
 
-      <View
-        style={[
-          styles.inputContainer,
-          {
-            borderColor: getBorderColor(),
-            backgroundColor: getBackgroundColor(),
-          },
-          isFocused && styles.inputFocused,
-          hasError && styles.inputError,
-          disabled && styles.inputDisabled,
-          style,
-        ]}
-      >
-        {leftIcon ? <View style={styles.leftIconWrapper}>{leftIcon}</View> : null}
+    const getBackgroundColor = (): string => {
+      if (disabled) return theme.colors.neutral[100];
+      return theme.colors.background.paper;
+    };
 
-        <TextInput
-          style={[styles.textInput, inputStyle]}
-          placeholder={placeholder}
-          placeholderTextColor={theme.colors.text.muted}
-          value={value}
-          onChangeText={onChangeText}
-          editable={!disabled}
-          secureTextEntry={isSecure}
-          onFocus={(e) => {
-            setIsFocused(true);
-            onFocus?.(e);
-          }}
-          onBlur={(e) => {
-            setIsFocused(false);
-            onBlur?.(e);
-          }}
-          accessibilityLabel={label || placeholder}
-          accessibilityState={{ disabled }}
-          {...rest}
-        />
+    return (
+      <View style={[styles.wrapper, containerStyle]}>
+        {label ? (
+          <AppText variant="label" style={styles.label}>
+            {label}
+          </AppText>
+        ) : null}
 
-        {secureTextEntry ? (
-          <Pressable
-            onPress={() => setIsPasswordVisible((prev) => !prev)}
-            style={styles.eyeButton}
-            accessibilityRole="button"
-            accessibilityLabel={isPasswordVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-            hitSlop={8}
-          >
+        <Pressable
+          onPress={handleContainerPress}
+          style={[
+            styles.inputContainer,
+            {
+              borderColor: getBorderColor(),
+              backgroundColor: getBackgroundColor(),
+            },
+            isFocused && styles.inputFocused,
+            hasError && styles.inputError,
+            disabled && styles.inputDisabled,
+            style,
+          ]}
+        >
+          {leftIcon ? (
+            <Pressable onPress={handleContainerPress} style={styles.leftIconWrapper}>
+              {leftIcon}
+            </Pressable>
+          ) : null}
+
+          <TextInput
+            ref={innerRef}
+            style={[styles.textInput, inputStyle]}
+            placeholder={placeholder}
+            placeholderTextColor={theme.colors.text.muted}
+            value={value}
+            onChangeText={onChangeText}
+            editable={!disabled}
+            secureTextEntry={isSecure}
+            onFocus={(e) => {
+              setIsFocused(true);
+              onFocus?.(e);
+            }}
+            onBlur={(e) => {
+              setIsFocused(false);
+              onBlur?.(e);
+            }}
+            accessibilityLabel={label || placeholder}
+            accessibilityState={{ disabled }}
+            {...rest}
+          />
+
+          {secureTextEntry ? (
+            <Pressable
+              onPress={() => setIsPasswordVisible((prev) => !prev)}
+              style={styles.eyeButton}
+              accessibilityRole="button"
+              accessibilityLabel={isPasswordVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              hitSlop={8}
+            >
+              <Ionicons
+                name={isPasswordVisible ? 'eye-off-outline' : 'eye-outline'}
+                size={20}
+                color={theme.colors.text.muted}
+              />
+            </Pressable>
+          ) : rightIcon ? (
+            <View style={styles.rightIconWrapper}>{rightIcon}</View>
+          ) : null}
+        </Pressable>
+
+        {hasError ? (
+          <View style={styles.messageRow}>
             <Ionicons
-              name={isPasswordVisible ? 'eye-off-outline' : 'eye-outline'}
-              size={20}
-              color={theme.colors.text.muted}
+              name="alert-circle-outline"
+              size={14}
+              color={theme.colors.error.main}
+              style={styles.errorIcon}
             />
-          </Pressable>
-        ) : rightIcon ? (
-          <View style={styles.rightIconWrapper}>{rightIcon}</View>
+            <AppText variant="caption" color={theme.colors.error.main} style={styles.helperText}>
+              {error}
+            </AppText>
+          </View>
+        ) : helperText ? (
+          <AppText variant="caption" color={theme.colors.text.secondary} style={styles.helperText}>
+            {helperText}
+          </AppText>
         ) : null}
       </View>
+    );
+  }
+);
 
-      {hasError ? (
-        <View style={styles.messageRow}>
-          <Ionicons
-            name="alert-circle-outline"
-            size={14}
-            color={theme.colors.error.main}
-            style={styles.errorIcon}
-          />
-          <AppText variant="caption" color={theme.colors.error.main} style={styles.helperText}>
-            {error}
-          </AppText>
-        </View>
-      ) : helperText ? (
-        <AppText variant="caption" color={theme.colors.text.secondary} style={styles.helperText}>
-          {helperText}
-        </AppText>
-      ) : null}
-    </View>
-  );
-};
+AppInput.displayName = 'AppInput';
 
 const styles = StyleSheet.create({
   wrapper: {

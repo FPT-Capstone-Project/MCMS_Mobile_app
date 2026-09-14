@@ -38,7 +38,8 @@ export const RegisterScreen: React.FC = () => {
       password: '',
       confirmPassword: '',
     },
-    mode: 'onTouched',
+    mode: 'onSubmit',
+    reValidateMode: 'onChange',
   });
 
   const onSubmit = async (data: RegisterFormData) => {

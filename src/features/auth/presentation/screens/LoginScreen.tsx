@@ -34,7 +34,8 @@ export const LoginScreen: React.FC = () => {
       email: '',
       password: '',
     },
-    mode: 'onTouched',
+    mode: 'onSubmit',
+    reValidateMode: 'onChange',
   });
 
   const onSubmit = async (data: LoginFormData) => {
@@ -68,7 +69,7 @@ export const LoginScreen: React.FC = () => {
   const displayError = errorMessage || error;
 
   return (
-    <ScreenContainer scrollable edges={['top', 'bottom', 'left', 'right']}>
+    <ScreenContainer scrollable edges={['top', 'left', 'right']}>
       <View style={styles.container}>
         {/* Branding & Welcome Header */}
         <AuthBrandingHeader
@@ -197,9 +198,8 @@ export const LoginScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: theme.spacing.screenHorizontal,
-    paddingTop: theme.spacing.xl,
+    paddingTop: theme.spacing.lg,
     paddingBottom: theme.spacing.xxl,
-    justifyContent: 'center',
   },
   card: {
     padding: theme.spacing.lg,

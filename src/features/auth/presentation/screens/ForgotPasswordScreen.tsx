@@ -39,7 +39,8 @@ export const ForgotPasswordScreen: React.FC = () => {
     defaultValues: {
       email: '',
     },
-    mode: 'onTouched',
+    mode: 'onSubmit',
+    reValidateMode: 'onChange',
   });
 
   const onSubmit = async (data: ForgotPasswordFormData) => {
