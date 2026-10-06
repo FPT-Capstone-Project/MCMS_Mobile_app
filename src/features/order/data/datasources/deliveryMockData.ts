@@ -44,5 +44,7 @@ export const MOCK_DELIVERY_ORDERS: DeliveryOrder[] = [
     createdAt: '2026-09-14T14:00:00Z',
     deliveredAt: '2026-09-14T16:30:00Z',
     notes: 'Khách hàng đã nhận và kiểm tra khay nuôi trồng.',
+    proofOfDeliveryImage:
+      'https://images.unsplash.com/photo-1543362906-acfc16c67564?w=800&auto=format&fit=crop&q=80',
   },
 ];

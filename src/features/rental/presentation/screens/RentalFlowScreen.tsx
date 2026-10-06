@@ -27,6 +27,7 @@ import {
   RentalOrder,
   RentalPriceBreakdown,
   RentalStep,
+  getMinimumWeeksForMushroom,
 } from '../../domain/entities/Rental';
 import { rentalRepository } from '../../data/repositories/RentalRepository';
 import { DurationSelector } from '../components/DurationSelector';
@@ -89,6 +90,15 @@ export const RentalFlowScreen: React.FC = () => {
     }
   }, [selectedDuration, selectedMushroom]);
 
+  // Handle mushroom selection & reset duration if no longer compatible
+  const handleSelectMushroom = (variety: MushroomVariety) => {
+    setSelectedMushroom(variety);
+    const minWeeks = getMinimumWeeksForMushroom(variety.harvestDays);
+    if (selectedDuration && selectedDuration.weeks < minWeeks) {
+      setSelectedDuration(null);
+    }
+  };
+
   // Handle non-available tray click
   const handleDisabledTrayPress = (tray: Tray) => {
     if (tray.status === 'MY_RENTED_TRAY') {
@@ -113,16 +123,32 @@ export const RentalFlowScreen: React.FC = () => {
         Alert.alert('Chưa chọn khay', 'Vui lòng chọn một khay còn trống trên giá đỡ.');
         return;
       }
+      setCurrentStep('SELECT_MUSHROOM');
+    } else if (currentStep === 'SELECT_MUSHROOM') {
+      if (!selectedMushroom) {
+        Alert.alert('Chưa chọn phôi nấm', 'Vui lòng chọn một loại giống phôi nấm.');
+        return;
+      }
+      const minWeeks = getMinimumWeeksForMushroom(selectedMushroom.harvestDays);
+      if (selectedDuration && selectedDuration.weeks < minWeeks) {
+        setSelectedDuration(null);
+      }
       setCurrentStep('SELECT_DURATION');
     } else if (currentStep === 'SELECT_DURATION') {
       if (!selectedDuration) {
         Alert.alert('Chưa chọn thời gian', 'Vui lòng chọn gói thời gian thuê khay.');
         return;
       }
-      setCurrentStep('SELECT_MUSHROOM');
-    } else if (currentStep === 'SELECT_MUSHROOM') {
-      if (!selectedMushroom) {
-        Alert.alert('Chưa chọn phôi nấm', 'Vui lòng chọn một loại giống phôi nấm.');
+      if (
+        selectedMushroom &&
+        selectedDuration.weeks < getMinimumWeeksForMushroom(selectedMushroom.harvestDays)
+      ) {
+        Alert.alert(
+          'Thời gian không đủ',
+          `Giống nấm ${selectedMushroom.name} cần tối thiểu ${getMinimumWeeksForMushroom(
+            selectedMushroom.harvestDays
+          )} tuần cho 1 đợt thu hoạch.`
+        );
         return;
       }
       setCurrentStep('CONFIRM_SUMMARY');
@@ -130,12 +156,12 @@ export const RentalFlowScreen: React.FC = () => {
   };
 
   const handleBackStep = () => {
-    if (currentStep === 'SELECT_DURATION') {
+    if (currentStep === 'SELECT_MUSHROOM') {
       setCurrentStep('SELECT_TRAY');
-    } else if (currentStep === 'SELECT_MUSHROOM') {
-      setCurrentStep('SELECT_DURATION');
-    } else if (currentStep === 'CONFIRM_SUMMARY') {
+    } else if (currentStep === 'SELECT_DURATION') {
       setCurrentStep('SELECT_MUSHROOM');
+    } else if (currentStep === 'CONFIRM_SUMMARY') {
+      setCurrentStep('SELECT_DURATION');
     } else {
       router.back();
     }
@@ -154,8 +180,12 @@ export const RentalFlowScreen: React.FC = () => {
       });
       setConfirmedOrder(order);
       setSuccessModalVisible(true);
-    } catch {
-      Alert.alert('Thất bại', 'Không thể hoàn tất đơn thuê khay. Vui lòng thử lại.');
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : 'Không thể hoàn tất đơn thuê khay. Vui lòng thử lại.';
+      Alert.alert('Thất bại', errorMessage);
     } finally {
       setConfirming(false);
     }
@@ -184,6 +214,15 @@ export const RentalFlowScreen: React.FC = () => {
     );
   }
 
+  const isNextDisabled =
+    (currentStep === 'SELECT_TRAY' && !selectedTrayId) ||
+    (currentStep === 'SELECT_MUSHROOM' && !selectedMushroom) ||
+    (currentStep === 'SELECT_DURATION' &&
+      (!selectedDuration ||
+        (selectedMushroom !== null &&
+          selectedDuration.weeks <
+            getMinimumWeeksForMushroom(selectedMushroom.harvestDays))));
+
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
       {/* Navigation Header */}
@@ -192,10 +231,10 @@ export const RentalFlowScreen: React.FC = () => {
         subtitle={
           currentStep === 'SELECT_TRAY'
             ? 'Bước 1: Chọn vị trí khay'
-            : currentStep === 'SELECT_DURATION'
-            ? 'Bước 2: Chọn thời gian thuê'
             : currentStep === 'SELECT_MUSHROOM'
-            ? 'Bước 3: Chọn phôi nấm'
+            ? 'Bước 2: Chọn phôi nấm'
+            : currentStep === 'SELECT_DURATION'
+            ? 'Bước 3: Chọn thời gian thuê'
             : 'Bước 4: Xác nhận thông tin'
         }
         showBack
@@ -257,8 +296,8 @@ export const RentalFlowScreen: React.FC = () => {
           </View>
         )}
 
-        {/* STEP 2: Select Duration */}
-        {currentStep === 'SELECT_DURATION' && (
+        {/* STEP 2: Select Mushroom Spawn */}
+        {currentStep === 'SELECT_MUSHROOM' && (
           <View style={styles.stepContainer}>
             {/* Tray Context Bar */}
             <View style={styles.contextBar}>
@@ -268,30 +307,32 @@ export const RentalFlowScreen: React.FC = () => {
               </AppText>
             </View>
 
-            <DurationSelector
-              durations={durations}
-              selectedDuration={selectedDuration}
-              onSelectDuration={setSelectedDuration}
+            <MushroomSelector
+              varieties={varieties}
+              selectedMushroom={selectedMushroom}
+              onSelectMushroom={handleSelectMushroom}
             />
           </View>
         )}
 
-        {/* STEP 3: Select Mushroom Spawn */}
-        {currentStep === 'SELECT_MUSHROOM' && (
+        {/* STEP 3: Select Duration */}
+        {currentStep === 'SELECT_DURATION' && (
           <View style={styles.stepContainer}>
             {/* Context Bar */}
             <View style={styles.contextBar}>
-              <Ionicons name="time" size={18} color={theme.colors.primary[500]} />
+              <Ionicons name="leaf" size={18} color={theme.colors.primary[500]} />
               <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-                Khay <AppText weight="bold">{selectedTrayId}</AppText> • Gói thuê{' '}
-                <AppText weight="bold">{selectedDuration?.label}</AppText>
+                Khay <AppText weight="bold">{selectedTrayId}</AppText> • Giống:{' '}
+                <AppText weight="bold">{selectedMushroom?.name}</AppText> (~
+                {selectedMushroom?.harvestDays} ngày)
               </AppText>
             </View>
 
-            <MushroomSelector
-              varieties={varieties}
+            <DurationSelector
+              durations={durations}
+              selectedDuration={selectedDuration}
               selectedMushroom={selectedMushroom}
-              onSelectMushroom={setSelectedMushroom}
+              onSelectDuration={setSelectedDuration}
             />
           </View>
         )}
@@ -331,11 +372,7 @@ export const RentalFlowScreen: React.FC = () => {
             variant="primary"
             size="md"
             style={styles.actionBtn}
-            disabled={
-              (currentStep === 'SELECT_TRAY' && !selectedTrayId) ||
-              (currentStep === 'SELECT_DURATION' && !selectedDuration) ||
-              (currentStep === 'SELECT_MUSHROOM' && !selectedMushroom)
-            }
+            disabled={isNextDisabled}
             rightIcon={<Ionicons name="arrow-forward" size={18} color="#FFFFFF" />}
             onPress={handleNextStep}
           />

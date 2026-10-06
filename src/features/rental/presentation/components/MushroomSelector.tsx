@@ -100,8 +100,8 @@ export const MushroomSelector: React.FC<MushroomSelectorProps> = ({
                 <View style={styles.metaRow}>
                   <View style={styles.metaPill}>
                     <Ionicons name="time-outline" size={13} color={theme.colors.neutral[600]} />
-                    <AppText variant="caption" color={theme.colors.neutral[600]}>
-                      ~{variety.harvestDays} ngày thu hoạch
+                    <AppText variant="caption" color={theme.colors.neutral[700]} weight="medium">
+                      ~{variety.harvestDays} ngày (~{Math.ceil(variety.harvestDays / 7)} tuần)
                     </AppText>
                   </View>
                   <View style={styles.metaPill}>

@@ -6,5 +6,10 @@ import { DeliveryOrder, DeliveryStatus } from '../entities/DeliveryOrder';
 export interface IDeliveryRepository {
   getDeliveryOrders(): Promise<DeliveryOrder[]>;
   getOrderById(id: string): Promise<DeliveryOrder | null>;
-  updateDeliveryStatus(orderId: string, status: DeliveryStatus, notes?: string): Promise<DeliveryOrder>;
+  updateDeliveryStatus(
+    orderId: string,
+    status: DeliveryStatus,
+    notes?: string,
+    proofOfDeliveryImage?: string
+  ): Promise<DeliveryOrder>;
 }

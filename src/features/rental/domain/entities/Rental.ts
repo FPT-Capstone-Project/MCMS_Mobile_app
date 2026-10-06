@@ -4,7 +4,19 @@ import { TrayId } from '../../../tray/domain/entities/Tray';
  * Rental Domain Entities & Types
  */
 
-export type RentalStep = 'SELECT_TRAY' | 'SELECT_DURATION' | 'SELECT_MUSHROOM' | 'CONFIRM_SUMMARY';
+export type RentalStep =
+  | 'SELECT_TRAY'
+  | 'SELECT_MUSHROOM'
+  | 'SELECT_DURATION'
+  | 'CONFIRM_SUMMARY';
+
+/**
+ * Calculates the minimum number of weeks required for 1 full harvest cycle
+ * based on mushroom harvest days.
+ */
+export function getMinimumWeeksForMushroom(harvestDays: number): number {
+  return Math.max(1, Math.ceil(harvestDays / 7));
+}
 
 export interface RentalDuration {
   id: string; // '1w' | '2w' | '3w' | '4w'

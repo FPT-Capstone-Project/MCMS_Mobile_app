@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  Image,
   Linking,
   Pressable,
   RefreshControl,
@@ -23,12 +24,14 @@ import {
 } from '../../../../shared/components';
 import { DeliveryOrder, DeliveryStatus } from '../../domain/entities/DeliveryOrder';
 import { deliveryRepository } from '../../data/repositories/DeliveryRepository';
+import { ProofOfDeliveryModal } from '../components/ProofOfDeliveryModal';
+import { ProofOfDeliveryViewerModal } from '../components/ProofOfDeliveryViewerModal';
 
 type FilterTab = 'ALL' | 'ACTIVE' | 'COMPLETED';
 
 /**
  * Shipper Deliveries Screen ("Đơn giao hàng")
- * Provides dedicated delivery management, status transition controls, and isolated Shipper session controls.
+ * Provides dedicated delivery management, status transition controls, Proof of Delivery photo upload, and isolated Shipper session controls.
  */
 export const ShipperDeliveriesScreen: React.FC = () => {
   const { user, logout } = useAuth();
@@ -38,6 +41,14 @@ export const ShipperDeliveriesScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<FilterTab>('ALL');
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Proof of Delivery Modal state
+  const [selectedOrderForPod, setSelectedOrderForPod] = useState<DeliveryOrder | null>(null);
+  const [podModalVisible, setPodModalVisible] = useState(false);
+
+  // Proof of Delivery Viewer Modal state
+  const [viewingOrderPhoto, setViewingOrderPhoto] = useState<DeliveryOrder | null>(null);
+  const [viewerModalVisible, setViewerModalVisible] = useState(false);
 
   // Initial load
   useEffect(() => {
@@ -107,13 +118,11 @@ export const ShipperDeliveriesScreen: React.FC = () => {
     );
   };
 
-  // Status transition action handler
+  // Status transition action handler for standard transitions
   const handleStatusUpdate = async (order: DeliveryOrder, nextStatus: DeliveryStatus) => {
     const actionLabel =
       nextStatus === 'IN_TRANSIT'
         ? 'bắt đầu giao đơn hàng'
-        : nextStatus === 'DELIVERED'
-        ? 'xác nhận đã giao đơn hàng'
         : 'cập nhật trạng thái đơn hàng';
 
     Alert.alert(
@@ -139,6 +148,33 @@ export const ShipperDeliveriesScreen: React.FC = () => {
         },
       ]
     );
+  };
+
+  // Open Proof of Delivery Modal for IN_TRANSIT orders
+  const handleOpenPodModal = (order: DeliveryOrder) => {
+    setSelectedOrderForPod(order);
+    setPodModalVisible(true);
+  };
+
+  // Submit Proof of Delivery
+  const handlePodSubmit = async (orderId: string, imageUri: string, notes?: string) => {
+    const updated = await deliveryRepository.updateDeliveryStatus(
+      orderId,
+      'DELIVERED',
+      notes,
+      imageUri
+    );
+    setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+    Alert.alert(
+      'Giao hàng thành công!',
+      `Đơn hàng ${updated.orderCode} đã được xác nhận hoàn tất kèm ảnh chụp xác nhận.`
+    );
+  };
+
+  // Open Photo Viewer
+  const handleViewPhoto = (order: DeliveryOrder) => {
+    setViewingOrderPhoto(order);
+    setViewerModalVisible(true);
   };
 
   // Direct phone call handler
@@ -420,6 +456,43 @@ export const ShipperDeliveriesScreen: React.FC = () => {
                   </View>
                 ) : null}
 
+                {/* Proof of Delivery Image Attachment (if DELIVERED) */}
+                {order.status === 'DELIVERED' && order.proofOfDeliveryImage ? (
+                  <View style={styles.podAttachmentCard}>
+                    <View style={styles.podAttachmentHeader}>
+                      <View style={styles.podHeaderLeft}>
+                        <Ionicons name="camera" size={14} color={theme.colors.primary[600]} />
+                        <AppText variant="captionMedium" weight="bold" color={theme.colors.primary[700]}>
+                          Ảnh xác nhận đã giao hàng (POD)
+                        </AppText>
+                      </View>
+                      <Pressable
+                        onPress={() => handleViewPhoto(order)}
+                        style={styles.viewPhotoBtn}
+                      >
+                        <AppText variant="overline" color={theme.colors.primary[600]} weight="bold">
+                          Xem toàn màn hình
+                        </AppText>
+                        <Ionicons name="chevron-forward" size={12} color={theme.colors.primary[600]} />
+                      </Pressable>
+                    </View>
+
+                    <Pressable
+                      onPress={() => handleViewPhoto(order)}
+                      style={styles.podThumbnailContainer}
+                    >
+                      <Image
+                        source={{ uri: order.proofOfDeliveryImage }}
+                        style={styles.podThumbnail}
+                        resizeMode="cover"
+                      />
+                      <View style={styles.podThumbnailOverlay}>
+                        <Ionicons name="expand-outline" size={18} color="#FFFFFF" />
+                      </View>
+                    </Pressable>
+                  </View>
+                ) : null}
+
                 {/* Actions based on delivery status */}
                 <View style={styles.actionsRow}>
                   {order.status === 'READY_FOR_PICKUP' && (
@@ -436,13 +509,13 @@ export const ShipperDeliveriesScreen: React.FC = () => {
 
                   {order.status === 'IN_TRANSIT' && (
                     <AppButton
-                      title="Xác nhận đã giao hàng"
+                      title="Chụp ảnh & Xác nhận đã giao"
                       variant="primary"
                       size="sm"
                       fullWidth
                       loading={isUpdating}
-                      leftIcon={<Ionicons name="checkmark-done" size={16} color="#FFFFFF" />}
-                      onPress={() => handleStatusUpdate(order, 'DELIVERED')}
+                      leftIcon={<Ionicons name="camera" size={16} color="#FFFFFF" />}
+                      onPress={() => handleOpenPodModal(order)}
                     />
                   )}
 
@@ -458,7 +531,7 @@ export const ShipperDeliveriesScreen: React.FC = () => {
                         weight="bold"
                         color={theme.colors.success.dark}
                       >
-                        Đơn hàng đã được bàn giao thành công
+                        Đã giao thành công
                       </AppText>
                     </View>
                   )}
@@ -468,6 +541,27 @@ export const ShipperDeliveriesScreen: React.FC = () => {
           })
         )}
       </ScrollView>
+
+      {/* Proof of Delivery Action Modal */}
+      <ProofOfDeliveryModal
+        visible={podModalVisible}
+        order={selectedOrderForPod}
+        onClose={() => {
+          setPodModalVisible(false);
+          setSelectedOrderForPod(null);
+        }}
+        onSubmit={handlePodSubmit}
+      />
+
+      {/* Proof of Delivery Fullscreen Photo Viewer */}
+      <ProofOfDeliveryViewerModal
+        visible={viewerModalVisible}
+        order={viewingOrderPhoto}
+        onClose={() => {
+          setViewerModalVisible(false);
+          setViewingOrderPhoto(null);
+        }}
+      />
     </ScreenContainer>
   );
 };
@@ -578,6 +672,51 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     marginTop: theme.spacing.xs,
+  },
+  podAttachmentCard: {
+    backgroundColor: theme.colors.primary[50],
+    borderColor: theme.colors.primary[200],
+    borderWidth: 1,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.sm,
+    gap: theme.spacing.xs,
+    marginVertical: 2,
+  },
+  podAttachmentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  podHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  viewPhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  podThumbnailContainer: {
+    height: 140,
+    borderRadius: theme.borderRadius.base,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#000000',
+  },
+  podThumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  podThumbnailOverlay: {
+    position: 'absolute',
+    right: 8,
+    bottom: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    padding: 6,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   completedBanner: {
     flexDirection: 'row',

@@ -4,6 +4,7 @@ import {
   RentalOrder,
   RentalPriceBreakdown,
   RentalSelection,
+  getMinimumWeeksForMushroom,
 } from '../../domain/entities/Rental';
 import { IRentalRepository } from '../../domain/repositories/IRentalRepository';
 import { trayRepository } from '../../../tray/data/repositories/TrayRepository';
@@ -49,6 +50,13 @@ export class RentalRepository implements IRentalRepository {
   async confirmRental(selection: RentalSelection): Promise<RentalOrder> {
     if (!selection.trayId || !selection.duration || !selection.mushroom) {
       throw new Error('Vui lòng chọn đầy đủ khay, thời gian thuê và phôi nấm.');
+    }
+
+    const minWeeks = getMinimumWeeksForMushroom(selection.mushroom.harvestDays);
+    if (selection.duration.weeks < minWeeks) {
+      throw new Error(
+        `Thời gian thuê không đủ chu kỳ sinh trưởng của giống ${selection.mushroom.name} (cần tối thiểu ${minWeeks} tuần).`
+      );
     }
 
     const pricing = await this.calculatePrice(selection.duration, selection.mushroom);

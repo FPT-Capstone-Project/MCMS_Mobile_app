@@ -17,8 +17,8 @@ interface StepMeta {
 
 const STEPS: StepMeta[] = [
   { key: 'SELECT_TRAY', stepNumber: 1, label: 'Chọn khay' },
-  { key: 'SELECT_DURATION', stepNumber: 2, label: 'Thời gian' },
-  { key: 'SELECT_MUSHROOM', stepNumber: 3, label: 'Phôi nấm' },
+  { key: 'SELECT_MUSHROOM', stepNumber: 2, label: 'Phôi nấm' },
+  { key: 'SELECT_DURATION', stepNumber: 3, label: 'Thời gian' },
   { key: 'CONFIRM_SUMMARY', stepNumber: 4, label: 'Xác nhận' },
 ];
 

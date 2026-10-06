@@ -32,7 +32,8 @@ export class DeliveryRepository implements IDeliveryRepository {
   async updateDeliveryStatus(
     orderId: string,
     status: DeliveryStatus,
-    notes?: string
+    notes?: string,
+    proofOfDeliveryImage?: string
   ): Promise<DeliveryOrder> {
     await new Promise((resolve) => setTimeout(resolve, 300));
     const index = this.orders.findIndex((o) => o.id === orderId);
@@ -58,6 +59,10 @@ export class DeliveryRepository implements IDeliveryRepository {
       statusText,
       deliveredAt: deliveredAt || this.orders[index].deliveredAt,
       notes: notes !== undefined ? notes : this.orders[index].notes,
+      proofOfDeliveryImage:
+        proofOfDeliveryImage !== undefined
+          ? proofOfDeliveryImage
+          : this.orders[index].proofOfDeliveryImage,
     };
 
     this.orders[index] = updatedOrder;

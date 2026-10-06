@@ -18,10 +18,12 @@ export interface DeliveryOrder {
   createdAt: string;
   deliveredAt?: string;
   notes?: string;
+  proofOfDeliveryImage?: string;
 }
 
 export interface UpdateDeliveryStatusDto {
   orderId: string;
   status: DeliveryStatus;
   notes?: string;
+  proofOfDeliveryImage?: string;
 }
