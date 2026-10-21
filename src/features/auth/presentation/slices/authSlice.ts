@@ -5,11 +5,13 @@ import {
   AuthSession,
   AuthTokens,
   AuthUser,
+  ChangePasswordOtpData,
   ForgotPasswordData,
   GenericAuthResponse,
   LoginCredentials,
-  RegisterData,
+  RegisterOtpData,
   ResetPasswordData,
+  VerifyRegistrationOtpData,
 } from '../../domain/entities/AuthUser';
 import { authRepository } from '../../data/repositories/AuthRepository';
 
@@ -21,6 +23,7 @@ export interface AuthState {
   tokens: AuthTokens | null;
   loading: boolean;
   error: string | null;
+  registrationSuccessMessage: string | null;
 }
 
 const initialState: AuthState = {
@@ -29,10 +32,11 @@ const initialState: AuthState = {
   tokens: null,
   loading: false,
   error: null,
+  registrationSuccessMessage: null,
 };
 
 /**
- * Async Thunk: Restore session from SecureStore on startup
+ * Async Thunk: Restore session from SecureStore on startup and verify with GET /api/auth/me
  */
 export const initializeAuth = createAsyncThunk<AuthSession | null, void, { rejectValue: string }>(
   'auth/initializeAuth',
@@ -64,20 +68,35 @@ export const loginUser = createAsyncThunk<AuthSession, LoginCredentials, { rejec
 );
 
 /**
- * Async Thunk: Register new account
+ * Async Thunk: Request email registration OTP
  */
-export const registerUser = createAsyncThunk<AuthSession, RegisterData, { rejectValue: string }>(
-  'auth/registerUser',
+export const registerOtpUser = createAsyncThunk<GenericAuthResponse, RegisterOtpData, { rejectValue: string }>(
+  'auth/registerOtpUser',
   async (data, { rejectWithValue }) => {
     try {
-      const session = await authRepository.register(data);
-      return session;
+      return await authRepository.registerOtp(data);
     } catch (error) {
       const msg = error instanceof AppError ? error.message : 'Đăng ký không thành công. Vui lòng thử lại.';
       return rejectWithValue(msg);
     }
   }
 );
+
+/**
+ * Async Thunk: Verify registration OTP
+ */
+export const verifyRegistrationOtpUser = createAsyncThunk<
+  GenericAuthResponse,
+  VerifyRegistrationOtpData,
+  { rejectValue: string }
+>('auth/verifyRegistrationOtpUser', async (data, { rejectWithValue }) => {
+  try {
+    return await authRepository.verifyRegistrationOtp(data);
+  } catch (error) {
+    const msg = error instanceof AppError ? error.message : 'Xác thực OTP không thành công.';
+    return rejectWithValue(msg);
+  }
+});
 
 /**
  * Async Thunk: Request password reset
@@ -113,6 +132,38 @@ export const resetPasswordUser = createAsyncThunk<
 });
 
 /**
+ * Async Thunk: Request change password OTP
+ */
+export const requestChangePasswordOtpUser = createAsyncThunk<
+  GenericAuthResponse,
+  void,
+  { rejectValue: string }
+>('auth/requestChangePasswordOtpUser', async (_, { rejectWithValue }) => {
+  try {
+    return await authRepository.requestChangePasswordOtp();
+  } catch (error) {
+    const msg = error instanceof AppError ? error.message : 'Không thể gửi mã xác nhận đổi mật khẩu.';
+    return rejectWithValue(msg);
+  }
+});
+
+/**
+ * Async Thunk: Change password with OTP
+ */
+export const changePasswordOtpUser = createAsyncThunk<
+  GenericAuthResponse,
+  ChangePasswordOtpData,
+  { rejectValue: string }
+>('auth/changePasswordOtpUser', async (data, { rejectWithValue }) => {
+  try {
+    return await authRepository.changePasswordOtp(data);
+  } catch (error) {
+    const msg = error instanceof AppError ? error.message : 'Không thể đổi mật khẩu.';
+    return rejectWithValue(msg);
+  }
+});
+
+/**
  * Async Thunk: Log out user and purge cache
  */
 export const logoutUser = createAsyncThunk<void, void, { rejectValue: string }>(
@@ -120,7 +171,6 @@ export const logoutUser = createAsyncThunk<void, void, { rejectValue: string }>(
   async (_, { dispatch, rejectWithValue }) => {
     try {
       await authRepository.logout();
-      // Reset all RTK Query cached server state
       dispatch(baseApi.util.resetApiState());
     } catch (error) {
       const msg = error instanceof AppError ? error.message : 'Đăng xuất không thành công.';
@@ -139,6 +189,9 @@ export const authSlice = createSlice({
     clearAuthError: (state) => {
       state.error = null;
     },
+    clearRegistrationSuccessMessage: (state) => {
+      state.registrationSuccessMessage = null;
+    },
     setUser: (state, action: PayloadAction<AuthUser | null>) => {
       state.user = action.payload;
     },
@@ -146,6 +199,12 @@ export const authSlice = createSlice({
       state.user = action.payload.user;
       state.tokens = action.payload.tokens;
       state.status = 'authenticated';
+      state.error = null;
+    },
+    handleForceLogout: (state) => {
+      state.status = 'unauthenticated';
+      state.user = null;
+      state.tokens = null;
       state.error = null;
     },
   },
@@ -191,21 +250,33 @@ export const authSlice = createSlice({
       state.error = action.payload || 'Đăng nhập không thành công.';
     });
 
-    // registerUser
-    builder.addCase(registerUser.pending, (state) => {
+    // registerOtpUser
+    builder.addCase(registerOtpUser.pending, (state) => {
       state.loading = true;
       state.error = null;
     });
-    builder.addCase(registerUser.fulfilled, (state, action) => {
+    builder.addCase(registerOtpUser.fulfilled, (state) => {
       state.loading = false;
-      state.status = 'authenticated';
-      state.user = action.payload.user;
-      state.tokens = action.payload.tokens;
       state.error = null;
     });
-    builder.addCase(registerUser.rejected, (state, action) => {
+    builder.addCase(registerOtpUser.rejected, (state, action) => {
       state.loading = false;
       state.error = action.payload || 'Đăng ký không thành công.';
+    });
+
+    // verifyRegistrationOtpUser
+    builder.addCase(verifyRegistrationOtpUser.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    });
+    builder.addCase(verifyRegistrationOtpUser.fulfilled, (state, action) => {
+      state.loading = false;
+      state.registrationSuccessMessage = action.payload.message || 'Xác thực email thành công! Vui lòng đăng nhập.';
+      state.error = null;
+    });
+    builder.addCase(verifyRegistrationOtpUser.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload || 'Mã OTP không hợp lệ hoặc đã hết hạn.';
     });
 
     // logoutUser
@@ -228,5 +299,11 @@ export const authSlice = createSlice({
   },
 });
 
-export const { clearAuthError, setUser, setSession } = authSlice.actions;
+export const {
+  clearAuthError,
+  clearRegistrationSuccessMessage,
+  setUser,
+  setSession,
+  handleForceLogout,
+} = authSlice.actions;
 export const authReducer = authSlice.reducer;

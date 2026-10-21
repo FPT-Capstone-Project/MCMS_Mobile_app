@@ -81,6 +81,7 @@ export const colors = {
     paper: '#FFFFFF',
     elevated: '#FFFFFF',
     subtle: '#F1F5F9',
+    secondary: '#F1F5F9',
   },
 
   // Text Roles

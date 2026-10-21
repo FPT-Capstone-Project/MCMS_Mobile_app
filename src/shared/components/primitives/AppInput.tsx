@@ -22,6 +22,7 @@ export interface AppInputProps extends Omit<TextInputProps, 'style'> {
   inputStyle?: TextStyle;
   style?: ViewStyle;
   disabled?: boolean;
+  required?: boolean;
 }
 
 export const AppInput = React.forwardRef<TextInput, AppInputProps>(
@@ -36,6 +37,7 @@ export const AppInput = React.forwardRef<TextInput, AppInputProps>(
       inputStyle,
       style,
       disabled = false,
+      required = false,
       secureTextEntry,
       placeholder,
       value,
@@ -77,6 +79,11 @@ export const AppInput = React.forwardRef<TextInput, AppInputProps>(
         {label ? (
           <AppText variant="label" style={styles.label}>
             {label}
+            {required ? (
+              <AppText variant="label" color={theme.colors.error.main}>
+                {' '}*
+              </AppText>
+            ) : null}
           </AppText>
         ) : null}
 

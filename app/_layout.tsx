@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Href, Stack, useRouter, useSegments } from 'expo-router';
 import { AppProvider } from '../src/app/providers';
+import { setOnUnauthorized } from '../src/core/api/axiosClient';
 import { useAuth } from '../src/features/auth';
 import { AppLoading } from '../src/shared/components';
 
@@ -11,7 +12,16 @@ import { AppLoading } from '../src/shared/components';
 function NavigationGuard() {
   const segments = useSegments();
   const router = useRouter();
-  const { status, user, isShipper, isInitializing, initialize } = useAuth();
+  const { status, user, isShipper, isInitializing, initialize, forceLogout } = useAuth();
+
+  useEffect(() => {
+    setOnUnauthorized(() => {
+      forceLogout();
+    });
+    return () => {
+      setOnUnauthorized(null);
+    };
+  }, [forceLogout]);
 
   useEffect(() => {
     initialize();
@@ -23,7 +33,14 @@ function NavigationGuard() {
     const currentSegment = segments[0] as string | undefined;
     const inAuthGroup = currentSegment === '(auth)';
     const inCustomerRoutes =
-      currentSegment === '(tabs)' || currentSegment === 'rental' || currentSegment === 'camera';
+      currentSegment === '(tabs)' ||
+      currentSegment === 'rental' ||
+      currentSegment === 'camera' ||
+      currentSegment === 'control' ||
+      currentSegment === 'automatic' ||
+      currentSegment === 'sensors' ||
+      currentSegment === 'cultivation' ||
+      currentSegment === 'mushrooms';
     const inShipperRoutes = currentSegment === '(shipper)';
 
     if (status === 'unauthenticated' && !inAuthGroup) {
@@ -86,6 +103,36 @@ function NavigationGuard() {
       />
       <Stack.Screen
         name="rental/index"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="control/index"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="automatic/index"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="sensors/index"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="cultivation/index"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="mushrooms/index"
         options={{
           headerShown: false,
         }}

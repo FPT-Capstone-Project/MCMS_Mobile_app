@@ -18,6 +18,13 @@ export const axiosClient = axios.create({
   },
 });
 
+type UnauthorizedHandler = () => void;
+let onUnauthorizedHandler: UnauthorizedHandler | null = null;
+
+export const setOnUnauthorized = (handler: UnauthorizedHandler | null) => {
+  onUnauthorizedHandler = handler;
+};
+
 // Request Interceptor: Injects Authorization token from SecureStore if available
 axiosClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
@@ -34,10 +41,24 @@ axiosClient.interceptors.request.use(
   (error) => Promise.reject(handleApiError(error))
 );
 
-// Response Interceptor: Standardizes error objects
+// Response Interceptor: Standardizes error objects and handles 401 unauthorized
 axiosClient.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
+  async (error: AxiosError) => {
+    const status = error.response?.status;
+    const url = error.config?.url || '';
+
+    // If 401 occurred on an authenticated endpoint (not the login endpoint itself), notify app to clear session
+    if (status === 401 && !url.includes('/api/auth/login')) {
+      if (onUnauthorizedHandler) {
+        try {
+          onUnauthorizedHandler();
+        } catch {
+          // Ignore
+        }
+      }
+    }
+
     const formattedError = handleApiError(error);
     return Promise.reject(formattedError);
   }

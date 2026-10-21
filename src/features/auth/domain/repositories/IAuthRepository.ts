@@ -1,11 +1,13 @@
 import {
   AuthSession,
   AuthUser,
+  ChangePasswordOtpData,
   ForgotPasswordData,
   GenericAuthResponse,
   LoginCredentials,
-  RegisterData,
+  RegisterOtpData,
   ResetPasswordData,
+  VerifyRegistrationOtpData,
 } from '../entities/AuthUser';
 
 /**
@@ -19,12 +21,17 @@ export interface IAuthRepository {
   login(credentials: LoginCredentials): Promise<AuthSession>;
 
   /**
-   * Register a new customer account
+   * Register customer with OTP sent to email
    */
-  register(data: RegisterData): Promise<AuthSession>;
+  registerOtp(data: RegisterOtpData): Promise<GenericAuthResponse>;
 
   /**
-   * Request a password reset email/code
+   * Verify email registration OTP
+   */
+  verifyRegistrationOtp(data: VerifyRegistrationOtpData): Promise<GenericAuthResponse>;
+
+  /**
+   * Request a password reset OTP
    */
   forgotPassword(data: ForgotPasswordData): Promise<GenericAuthResponse>;
 
@@ -32,6 +39,16 @@ export interface IAuthRepository {
    * Submit OTP and reset password
    */
   resetPassword(data: ResetPasswordData): Promise<GenericAuthResponse>;
+
+  /**
+   * Request OTP to change password when authenticated
+   */
+  requestChangePasswordOtp(): Promise<GenericAuthResponse>;
+
+  /**
+   * Change password with OTP when authenticated
+   */
+  changePasswordOtp(data: ChangePasswordOtpData): Promise<GenericAuthResponse>;
 
   /**
    * Fetch current authenticated customer profile from backend

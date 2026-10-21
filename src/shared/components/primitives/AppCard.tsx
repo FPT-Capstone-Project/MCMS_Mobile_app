@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { Pressable, StyleSheet, View, ViewProps, ViewStyle } from 'react-native';
+import { Pressable, StyleProp, StyleSheet, View, ViewProps, ViewStyle } from 'react-native';
 import { theme } from '../../../core/theme';
 import { ShadowKey } from '../../../core/theme/shadows';
 import { SpacingKey } from '../../../core/theme/spacing';
@@ -14,7 +14,7 @@ export interface AppCardProps extends ViewProps {
   elevation?: CardElevation;
   padding?: CardPadding;
   onPress?: () => void;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   disabled?: boolean;
 }
 
@@ -32,15 +32,15 @@ export const AppCard: React.FC<AppCardProps> = ({
     const shadowStyle = variant === 'elevated' ? theme.shadows[elevation] : theme.shadows.none;
     const paddingValue = theme.spacing[padding] ?? theme.spacing.base;
 
-    return {
-      ...styles.base,
-      ...variantStyles[variant],
-      ...shadowStyle,
-      padding: paddingValue,
-      ...(pressed && !disabled ? styles.pressed : {}),
-      ...(disabled ? styles.disabled : {}),
-      ...style,
-    };
+    return StyleSheet.flatten([
+      styles.base,
+      variantStyles[variant],
+      shadowStyle,
+      { padding: paddingValue },
+      pressed && !disabled ? styles.pressed : undefined,
+      disabled ? styles.disabled : undefined,
+      style,
+    ]);
   };
 
   if (onPress) {

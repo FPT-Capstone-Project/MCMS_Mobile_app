@@ -12,7 +12,9 @@ export const spacing = {
   lg: 20,
   xl: 24,
   xxl: 32,
+  '2xl': 32,
   xxxl: 40,
+  '3xl': 40,
   huge: 48,
   massive: 64,
 

@@ -44,7 +44,7 @@ export const authApi = baseApi.injectEndpoints({
 
     resetPassword: builder.mutation<GenericAuthResponse, ResetPasswordData>({
       query: (data) => ({
-        url: API_ENDPOINTS.AUTH.RESET_PASSWORD,
+        url: API_ENDPOINTS.AUTH.RESET_PASSWORD_OTP,
         method: 'POST',
         data,
       }),
@@ -59,11 +59,8 @@ export const authApi = baseApi.injectEndpoints({
     }),
 
     logout: builder.mutation<void, void>({
-      query: () => ({
-        url: API_ENDPOINTS.AUTH.LOGOUT,
-        method: 'POST',
-      }),
-      invalidatesTags: ['Auth', 'User', 'Tray', 'Rental', 'Order', 'Monitoring', 'Notification'],
+      queryFn: () => ({ data: undefined }),
+      invalidatesTags: ['Auth', 'User', 'Tray', 'RentalPackage', 'Order', 'Monitoring', 'Notification'],
     }),
   }),
   overrideExisting: false,

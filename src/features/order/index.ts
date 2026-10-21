@@ -1,12 +1,4 @@
-/**
- * Order & Shipper Delivery Feature Module Exports
- */
-
-export * from './domain/entities/DeliveryOrder';
-export * from './domain/repositories/IDeliveryRepository';
-export * from './data/datasources/deliveryMockData';
-export * from './data/repositories/DeliveryRepository';
-export * from './presentation/components/ProofOfDeliveryModal';
-export * from './presentation/components/ProofOfDeliveryViewerModal';
+export * from './domain/entities/Order';
+export * from './data/repositories/OrderRepository';
+export * from './presentation/components/PaymentQrModal';
 export * from './presentation/screens/ShipperDeliveriesScreen';
-

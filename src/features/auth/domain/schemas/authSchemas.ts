@@ -25,7 +25,7 @@ export const loginSchema = z.object({
 export type LoginFormData = z.infer<typeof loginSchema>;
 
 /**
- * Registration Form Validation Schema
+ * Registration Form Validation Schema (Email OTP Flow)
  */
 export const registerSchema = z
   .object({
@@ -42,8 +42,11 @@ export const registerSchema = z
     phoneNumber: z
       .string()
       .trim()
-      .min(1, 'Số điện thoại không được để trống.')
-      .regex(VIETNAMESE_PHONE_REGEX, 'Số điện thoại không hợp lệ (ví dụ: 0912345678).'),
+      .optional()
+      .refine((val) => !val || VIETNAMESE_PHONE_REGEX.test(val), {
+        message: 'Số điện thoại không hợp lệ (ví dụ: 0912345678).',
+      }),
+    address: z.string().trim().optional(),
     password: z
       .string()
       .min(1, 'Mật khẩu không được để trống.')
@@ -58,6 +61,24 @@ export const registerSchema = z
   });
 
 export type RegisterFormData = z.infer<typeof registerSchema>;
+
+/**
+ * OTP Verification Schema
+ */
+export const verifyOtpSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, 'Email không được để trống.')
+    .email('Vui lòng nhập địa chỉ email hợp lệ.'),
+  otp: z
+    .string()
+    .trim()
+    .min(1, 'Mã OTP không được để trống.')
+    .length(6, 'Mã OTP phải gồm đúng 6 chữ số.'),
+});
+
+export type VerifyOtpFormData = z.infer<typeof verifyOtpSchema>;
 
 /**
  * Forgot Password Form Validation Schema
@@ -101,3 +122,28 @@ export const resetPasswordSchema = z
   });
 
 export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
+
+/**
+ * Change Password with OTP Schema (Authenticated)
+ */
+export const changePasswordSchema = z
+  .object({
+    otp: z
+      .string()
+      .trim()
+      .min(1, 'Mã OTP không được để trống.')
+      .length(6, 'Mã OTP phải gồm đúng 6 chữ số.'),
+    newPassword: z
+      .string()
+      .min(1, 'Mật khẩu mới không được để trống.')
+      .min(6, 'Mật khẩu mới phải có ít nhất 6 ký tự.'),
+    confirmPassword: z
+      .string()
+      .min(1, 'Vui lòng xác nhận lại mật khẩu mới.'),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Mật khẩu xác nhận không khớp.',
+    path: ['confirmPassword'],
+  });
+
+export type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;

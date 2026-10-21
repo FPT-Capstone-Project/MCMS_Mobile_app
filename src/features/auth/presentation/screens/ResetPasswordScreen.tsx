@@ -50,7 +50,11 @@ export const ResetPasswordScreen: React.FC = () => {
     setErrorMessage(null);
     clearError();
     try {
-      await resetPassword(data);
+      await resetPassword({
+        email: data.email.trim(),
+        otp: String(data.otp).trim(),
+        new_password: data.newPassword,
+      });
       setIsResetSuccess(true);
     } catch (err: unknown) {
       const msg =
@@ -65,7 +69,7 @@ export const ResetPasswordScreen: React.FC = () => {
 
   const handleNavigateLogin = () => {
     clearError();
-    router.replace('/login' as Href);
+    router.replace('/(auth)/login' as Href);
   };
 
   const displayError = errorMessage || error;

@@ -1,8 +1,3 @@
-/**
- * Authentication Domain Entities & DTOs
- * Pure domain interfaces independent of UI, Redux, and framework logic.
- */
-
 export interface AuthTokens {
   accessToken: string;
   refreshToken?: string;
@@ -12,12 +7,32 @@ export interface AuthTokens {
 
 export type UserRole = 'CUSTOMER' | 'SHIPPER' | 'FARM_OPERATOR' | 'ADMIN';
 
+export interface BackendUser {
+  user_id: number;
+  role_id: number;
+  email: string;
+  full_name: string;
+  phone: string | null;
+  address: string | null;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+  role?: string | { role_id?: number; role_name?: string };
+  role_name?: string;
+}
+
 export interface AuthUser {
   id: string;
+  user_id?: number;
+  role_id?: number;
   email: string;
   fullName: string;
+  full_name?: string;
   phoneNumber?: string;
+  phone?: string | null;
+  address?: string | null;
   role?: UserRole;
+  status?: string;
   avatarUrl?: string;
   createdAt?: string;
 }
@@ -32,11 +47,19 @@ export interface LoginCredentials {
   password: string;
 }
 
-export interface RegisterData {
-  fullName: string;
+export interface RegisterOtpData {
+  name: string;
   email: string;
-  phoneNumber: string;
   password: string;
+  phone?: string;
+  address?: string;
+}
+
+export type RegisterData = RegisterOtpData;
+
+export interface VerifyRegistrationOtpData {
+  email: string;
+  otp: string;
 }
 
 export interface ForgotPasswordData {
@@ -46,16 +69,21 @@ export interface ForgotPasswordData {
 export interface ResetPasswordData {
   email: string;
   otp: string;
-  newPassword: string;
+  new_password: string;
+}
+
+export interface ChangePasswordOtpData {
+  otp: string;
+  new_password: string;
 }
 
 export interface AuthResponseDto {
-  user: AuthUser;
-  tokens: AuthTokens;
   message?: string;
+  token: string;
+  user: BackendUser;
 }
 
 export interface GenericAuthResponse {
-  success: boolean;
+  success?: boolean;
   message: string;
 }

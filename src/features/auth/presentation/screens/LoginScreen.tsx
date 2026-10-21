@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Href, useRouter } from 'expo-router';
+import { Href, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -21,8 +21,12 @@ import { AuthBrandingHeader } from '../components/AuthBrandingHeader';
  */
 export const LoginScreen: React.FC = () => {
   const router = useRouter();
+  const params = useLocalSearchParams<{ verifiedEmail?: string; justRegistered?: string }>();
   const { login, loading, error, clearError } = useAuth();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successNotice, setSuccessNotice] = useState<string | null>(
+    params.justRegistered === 'true' ? 'Xác minh tài khoản thành công! Vui lòng đăng nhập.' : null
+  );
 
   const {
     control,
@@ -31,7 +35,7 @@ export const LoginScreen: React.FC = () => {
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: '',
+      email: params.verifiedEmail || '',
       password: '',
     },
     mode: 'onSubmit',
@@ -40,6 +44,7 @@ export const LoginScreen: React.FC = () => {
 
   const onSubmit = async (data: LoginFormData) => {
     setErrorMessage(null);
+    setSuccessNotice(null);
     clearError();
     try {
       const session = await login(data);
@@ -62,12 +67,12 @@ export const LoginScreen: React.FC = () => {
 
   const handleNavigateRegister = () => {
     clearError();
-    router.push('/register' as Href);
+    router.push('/(auth)/register' as Href);
   };
 
   const handleNavigateForgotPassword = () => {
     clearError();
-    router.push('/forgot-password' as Href);
+    router.push('/(auth)/forgot-password' as Href);
   };
 
   const displayError = errorMessage || error;
@@ -83,6 +88,21 @@ export const LoginScreen: React.FC = () => {
 
         {/* Login Form Card */}
         <AppCard elevation="sm" style={styles.card}>
+          {/* Success Banner if redirected from verification */}
+          {successNotice ? (
+            <View style={styles.successBanner}>
+              <Ionicons
+                name="checkmark-circle"
+                size={20}
+                color={theme.colors.success.main}
+                style={styles.errorIcon}
+              />
+              <AppText variant="bodySmall" color={theme.colors.success.dark} style={styles.errorText}>
+                {successNotice}
+              </AppText>
+            </View>
+          ) : null}
+
           {/* Error Feedback Banner */}
           {displayError ? (
             <View style={styles.errorBanner}>
@@ -98,102 +118,111 @@ export const LoginScreen: React.FC = () => {
             </View>
           ) : null}
 
-          {/* Email Input */}
-          <Controller
-            control={control}
-            name="email"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <AppInput
-                label="Email"
-                placeholder="nhap.email@smartmush.vn"
-                value={value}
-                onChangeText={(val) => {
-                  if (displayError) {
-                    setErrorMessage(null);
-                    clearError();
+          {/* Form Inputs */}
+          <View style={styles.form}>
+            <Controller
+              control={control}
+              name="email"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <AppInput
+                  label="Địa chỉ Email"
+                  placeholder="example@smartmush.vn"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  error={errors.email?.message}
+                  leftIcon={
+                    <Ionicons
+                      name="mail-outline"
+                      size={20}
+                      color={theme.colors.text.muted}
+                    />
                   }
-                  onChange(val);
-                }}
-                onBlur={onBlur}
-                error={errors.email?.message}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                leftIcon={
-                  <Ionicons name="mail-outline" size={20} color={theme.colors.text.muted} />
-                }
-              />
-            )}
-          />
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  required
+                />
+              )}
+            />
 
-          {/* Password Input */}
-          <Controller
-            control={control}
-            name="password"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <AppInput
-                label="Mật khẩu"
-                placeholder="Nhập mật khẩu của bạn"
-                value={value}
-                onChangeText={(val) => {
-                  if (displayError) {
-                    setErrorMessage(null);
-                    clearError();
+            <Controller
+              control={control}
+              name="password"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <AppInput
+                  label="Mật khẩu"
+                  placeholder="••••••••"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  error={errors.password?.message}
+                  leftIcon={
+                    <Ionicons
+                      name="lock-closed-outline"
+                      size={20}
+                      color={theme.colors.text.muted}
+                    />
                   }
-                  onChange(val);
-                }}
-                onBlur={onBlur}
-                error={errors.password?.message}
-                secureTextEntry
-                leftIcon={
-                  <Ionicons name="lock-closed-outline" size={20} color={theme.colors.text.muted} />
-                }
-              />
-            )}
-          />
+                  secureTextEntry
+                  autoCapitalize="none"
+                  required
+                />
+              )}
+            />
 
-          {/* Forgot Password Link */}
-          <View style={styles.forgotRow}>
+            {/* Forgot Password Link */}
+            <View style={styles.forgotPasswordContainer}>
+              <Pressable
+                onPress={handleNavigateForgotPassword}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Quên mật khẩu"
+              >
+                <AppText
+                  variant="caption"
+                  color={theme.colors.primary[600]}
+                  weight="medium"
+                >
+                  Quên mật khẩu?
+                </AppText>
+              </Pressable>
+            </View>
+
+            {/* Submit Button */}
+            <AppButton
+              title="Đăng nhập"
+              variant="primary"
+              size="lg"
+              onPress={handleSubmit(onSubmit)}
+              loading={isSubmitting || loading}
+              disabled={isSubmitting || loading}
+              style={styles.submitBtn}
+              accessibilityLabel="Đăng nhập tài khoản"
+            />
+          </View>
+
+          {/* Navigation to Registration Link */}
+          <View style={styles.footerLinkRow}>
+            <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+              Chưa có tài khoản?{' '}
+            </AppText>
             <Pressable
-              onPress={handleNavigateForgotPassword}
+              onPress={handleNavigateRegister}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="Quên mật khẩu"
+              accessibilityLabel="Đăng ký tài khoản mới"
             >
-              <AppText variant="bodySmallMedium" color={theme.colors.primary[600]}>
-                Quên mật khẩu?
+              <AppText
+                variant="bodySmall"
+                color={theme.colors.primary[600]}
+                weight="bold"
+              >
+                Đăng ký ngay
               </AppText>
             </Pressable>
           </View>
-
-          {/* Submit Button */}
-          <AppButton
-            title="Đăng nhập"
-            variant="primary"
-            size="lg"
-            fullWidth
-            loading={loading || isSubmitting}
-            onPress={handleSubmit(onSubmit)}
-            style={styles.submitBtn}
-          />
         </AppCard>
-
-        {/* Register Navigation Footer */}
-        <View style={styles.footerRow}>
-          <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-            Chưa có tài khoản?{' '}
-          </AppText>
-          <Pressable
-            onPress={handleNavigateRegister}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Đăng ký tài khoản mới"
-          >
-            <AppText variant="bodySmallMedium" weight="bold" color={theme.colors.primary[600]}>
-              Đăng ký ngay
-            </AppText>
-          </Pressable>
-        </View>
       </View>
     </ScreenContainer>
   );
@@ -201,44 +230,58 @@ export const LoginScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: theme.spacing.screenHorizontal,
-    paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing.xxl,
+    paddingHorizontal: theme.spacing.lg,
+    paddingBottom: theme.spacing['2xl'],
   },
   card: {
     padding: theme.spacing.lg,
+    backgroundColor: '#FFFFFF',
     borderRadius: theme.borderRadius.lg,
-    backgroundColor: theme.colors.background.paper,
-    gap: theme.spacing.xs,
+  },
+  successBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.3)',
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.error.light,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: theme.spacing.md,
     borderWidth: 1,
-    borderColor: theme.colors.error.main,
-    borderRadius: theme.borderRadius.base,
-    padding: theme.spacing.sm,
-    marginBottom: theme.spacing.sm,
+    borderColor: 'rgba(239, 68, 68, 0.2)',
   },
   errorIcon: {
-    marginRight: theme.spacing.xs,
+    marginRight: theme.spacing.sm,
   },
   errorText: {
     flex: 1,
   },
-  forgotRow: {
+  form: {
+    gap: theme.spacing.xs,
+  },
+  forgotPasswordContainer: {
     alignItems: 'flex-end',
-    marginTop: -theme.spacing.xxs,
+    marginTop: -theme.spacing.xs,
     marginBottom: theme.spacing.sm,
   },
   submitBtn: {
-    marginTop: theme.spacing.xs,
+    marginTop: theme.spacing.sm,
   },
-  footerRow: {
+  footerLinkRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: theme.spacing.xl,
+    paddingTop: theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border.light,
   },
 });

@@ -66,14 +66,14 @@ export const ForgotPasswordScreen: React.FC = () => {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/login' as Href);
+      router.replace('/(auth)/login' as Href);
     }
   };
 
   const handleGoToReset = () => {
     clearError();
     router.push({
-      pathname: '/reset-password',
+      pathname: '/(auth)/reset-password',
       params: { email: submittedEmail },
     } as unknown as Href);
   };
