@@ -57,6 +57,122 @@ export const AUTO_CONTROL_STATE_LABELS: Record<AutoControlState, string> = {
   FAULT: 'Lỗi hệ thống',
 };
 
+/**
+ * Dịch các thông báo warning, issue và reason từ hệ thống backend IoT sang tiếng Việt
+ */
+export const translateIotMessage = (rawMsg: string): string => {
+  if (!rawMsg || typeof rawMsg !== 'string') return '';
+  const trimmed = rawMsg.trim();
+
+  // 1. Tra cứu chính xác
+  const exactMap: Record<string, string> = {
+    'Some crops lack CO2 data': 'Một số giống nấm thiếu dữ liệu CO₂.',
+    'Some crops do not have CO2 data; CO2 compatibility check skipped':
+      'Một số giống nấm chưa có dữ liệu CO₂; hệ thống bỏ qua kiểm tra tương thích CO₂.',
+    'Missing CO2 data': 'Thiếu thông số CO₂ của giống nấm.',
+    'Missing CO2 range': 'Chưa thiết lập khoảng CO₂ cho giống nấm.',
+    'No active cultivation sessions found on this floor':
+      'Chưa có phiên trồng nào đang hoạt động (ACTIVE) trên tầng này.',
+    'No active sessions found':
+      'Chưa có phiên trồng nào đang hoạt động (ACTIVE) trên tầng này.',
+    'No distinct mushroom crops found':
+      'Chưa tìm thấy giống nấm nào trên các khay của tầng này.',
+    'No mushroom profiles found':
+      'Không tìm thấy hồ sơ điều kiện của giống nấm.',
+    'Incompatible humidity ranges':
+      'Khoảng độ ẩm của các giống nấm bị xung đột (không có khoảng chung).',
+    'Incompatible temperature ranges':
+      'Khoảng nhiệt độ của các giống nấm bị xung đột (không có khoảng chung).',
+    'No overlapping humidity range':
+      'Các loại nấm trên tầng không có khoảng độ ẩm chung phù hợp.',
+    'No overlapping temperature range':
+      'Các loại nấm trên tầng không có khoảng nhiệt độ chung phù hợp.',
+    'Empty humidity range':
+      'Khoảng độ ẩm chung bị rỗng do điều kiện các loại nấm trái ngược nhau.',
+    'Empty temperature range':
+      'Khoảng nhiệt độ chung bị rỗng do điều kiện các loại nấm trái ngược nhau.',
+    'Common humidity range is narrower than 2%':
+      'Độ ẩm chung quá hẹp (dưới 2%), không đủ an toàn để thiết lập tự động.',
+    'Common temperature range is narrower than 1°C':
+      'Nhiệt độ chung quá hẹp (dưới 1°C), không đủ an toàn để thiết lập tự động.',
+    'Cooling blocked by humidity limit; ventilation or other cooling required':
+      'Làm mát bị chặn do độ ẩm đã chạm ngưỡng trần; cần thông gió hoặc giải pháp làm mát khác.',
+    'Cooling blocked by humidity limit':
+      'Làm mát bị chặn do độ ẩm chạm ngưỡng trần.',
+    'Conflict between mushroom profiles':
+      'Xung đột điều kiện sinh trưởng giữa các giống nấm trồng cùng tầng.',
+    'Profile approved is required':
+      'Yêu cầu người vận hành xác nhận duyệt cấu hình trước khi lưu/kích hoạt.',
+    'Not enough valid sensors':
+      'Không đủ số lượng cảm biến hợp lệ đang hoạt động.',
+    'Sensor data is stale or invalid':
+      'Dữ liệu cảm biến bị cũ hoặc không gửi về số đo hợp lệ.',
+    'Floor is currently busy':
+      'Tầng đang bận xử lý chu kỳ hoặc có lệnh chưa xác nhận.',
+    'Floor not found':
+      'Không tìm thấy thông tin tầng.',
+    'Cannot save configuration':
+      'Không thể lưu cấu hình.',
+  };
+
+  if (exactMap[trimmed]) {
+    return exactMap[trimmed];
+  }
+
+  // 2. Nhận diện theo từ khóa và mẫu câu
+  const lower = trimmed.toLowerCase();
+
+  if (lower.includes('co2') && (lower.includes('lack') || lower.includes('missing') || lower.includes('skip') || lower.includes('not have') || lower.includes('without'))) {
+    return 'Một số giống nấm chưa có dữ liệu CO₂; hệ thống bỏ qua kiểm tra tương thích CO₂.';
+  }
+
+  if (lower.includes('no active') && (lower.includes('session') || lower.includes('cultivation') || lower.includes('crop') || lower.includes('floor'))) {
+    return 'Chưa có phiên trồng nào đang hoạt động (ACTIVE) trên tầng này. Vui lòng gán lượt thuê ở Bước 3.';
+  }
+
+  if (lower.includes('humidity') && (lower.includes('narrow') || lower.includes('less than') || lower.includes('2%') || lower.includes('2 percentage') || lower.includes('tight'))) {
+    return 'Khoảng độ ẩm chung quá hẹp (dưới 2 điểm %), không thể tự động tạo cấu hình an toàn.';
+  }
+
+  if (lower.includes('temperature') && (lower.includes('narrow') || lower.includes('less than') || lower.includes('1°c') || lower.includes('1 deg') || lower.includes('tight'))) {
+    return 'Khoảng nhiệt độ chung quá hẹp (dưới 1°C), không thể tự động tạo cấu hình an toàn.';
+  }
+
+  if (lower.includes('humidity') && (lower.includes('empty') || lower.includes('incompatible') || lower.includes('conflict') || lower.includes('no overlap'))) {
+    return 'Độ ẩm sinh trưởng giữa các loại nấm bị xung đột (không tìm thấy khoảng độ ẩm chung).';
+  }
+
+  if (lower.includes('temperature') && (lower.includes('empty') || lower.includes('incompatible') || lower.includes('conflict') || lower.includes('no overlap'))) {
+    return 'Nhiệt độ sinh trưởng giữa các loại nấm bị xung đột (không tìm thấy khoảng nhiệt độ chung).';
+  }
+
+  if (lower.includes('cooling') && (lower.includes('humidity limit') || lower.includes('ventilation'))) {
+    return 'Làm mát bị chặn do độ ẩm chạm ngưỡng trần; cần thông gió hoặc biện pháp làm mát khác.';
+  }
+
+  if (lower.includes('cooling humidity limit must be greater than')) {
+    return 'Trần độ ẩm làm mát phải lớn hơn ngưỡng dừng phun bù ẩm.';
+  }
+
+  if (lower.includes('cooling humidity limit must not exceed')) {
+    return 'Trần độ ẩm làm mát không được vượt quá độ ẩm tối đa của nấm.';
+  }
+
+  if (lower.includes('profile approved') || lower.includes('profile_approved')) {
+    return 'Vui lòng tích chọn xác nhận duyệt cấu hình trước khi lưu.';
+  }
+
+  if (lower.includes('sensor') && (lower.includes('valid') || lower.includes('require') || lower.includes('offline') || lower.includes('stale') || lower.includes('fault'))) {
+    return 'Cảm biến chưa đủ số lượng hợp lệ hoặc dữ liệu đo bị gián đoạn.';
+  }
+
+  if (lower.includes('busy') || lower.includes('lock')) {
+    return 'Tầng đang bận hoặc đang thực hiện chu kỳ phun; vui lòng đợi.';
+  }
+
+  return trimmed;
+};
+
 export const AutomaticWizardScreen: React.FC = () => {
   const router = useRouter();
   const { canControlIot } = useAuth();
@@ -1131,7 +1247,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                   const hasActiveSession = Boolean(tray.mushroom_name && tray.session_id);
                   return (
                     <AppCard key={tray.tray_id} elevation="xs" style={styles.trayCard}>
-                      <View style={styles.cardHeaderRow}>
+                      <View style={styles.trayCardTopRow}>
                         <View style={[styles.iconCircle, { backgroundColor: hasActiveSession ? theme.colors.success.light : theme.colors.neutral[100] }]}>
                           <Ionicons
                             name="cube"
@@ -1165,17 +1281,19 @@ export const AutomaticWizardScreen: React.FC = () => {
                           </View>
 
                           {hasActiveSession ? (
-                            <AppText variant="caption" color={theme.colors.text.secondary}>
+                            <AppText variant="caption" color={theme.colors.text.secondary} style={styles.traySubtitle}>
                               Nấm: <AppText variant="caption" weight="bold">{tray.mushroom_name}</AppText> • Phiên #{tray.session_id} • Đơn thuê #{tray.rental_id}
                             </AppText>
                           ) : (
-                            <AppText variant="caption" color={theme.colors.text.secondary}>
-                              Trạng thái: {tray.tray_status} • Sẵn sàng gán lượt thuê
+                            <AppText variant="caption" color={theme.colors.text.secondary} style={styles.traySubtitle}>
+                              {tray.tray_status ? `Trạng thái: ${tray.tray_status} • ` : ''}Sẵn sàng gán lượt thuê
                             </AppText>
                           )}
                         </View>
+                      </View>
 
-                        {!hasActiveSession && canControlIot && (
+                      {!hasActiveSession && canControlIot && (
+                        <View style={styles.trayActionRow}>
                           <AppButton
                             title="Gán lượt thuê"
                             variant="outline"
@@ -1183,8 +1301,8 @@ export const AutomaticWizardScreen: React.FC = () => {
                             disabled={currentFloorBusy}
                             onPress={() => handleOpenStartSessionModal(tray)}
                           />
-                        )}
-                      </View>
+                        </View>
+                      )}
                     </AppCard>
                   );
                 })}
@@ -1355,7 +1473,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                     </View>
                     {suggestions.issues.map((issue, idx) => (
                       <AppText key={idx} variant="caption" color={theme.colors.error.dark}>
-                        • {issue}
+                        • {translateIotMessage(issue)}
                       </AppText>
                     ))}
                   </View>
@@ -1366,7 +1484,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                   <View style={styles.warningsBox}>
                     {suggestions.warnings.map((warn, idx) => (
                       <AppText key={idx} variant="caption" color={theme.colors.warning.dark}>
-                        ⚠️ {warn}
+                        ⚠️ {translateIotMessage(warn)}
                       </AppText>
                     ))}
                   </View>
@@ -1807,7 +1925,7 @@ export const AutomaticWizardScreen: React.FC = () => {
               {statusData?.runtime?.last_reason && (
                 <View style={styles.reasonRow}>
                   <AppText variant="caption" color={theme.colors.text.muted}>
-                    Lý do: <AppText variant="caption" color={theme.colors.text.primary}>{statusData.runtime.last_reason}</AppText>
+                    Lý do: <AppText variant="caption" color={theme.colors.text.primary}>{translateIotMessage(statusData.runtime.last_reason)}</AppText>
                   </AppText>
                 </View>
               )}
@@ -1816,7 +1934,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                 <View style={styles.errorBox}>
                   <Ionicons name="warning" size={14} color={theme.colors.error.main} />
                   <AppText variant="caption" color={theme.colors.error.main}>
-                    {statusData.runtime.last_error}
+                    {translateIotMessage(statusData.runtime.last_error)}
                   </AppText>
                 </View>
               )}
@@ -2217,15 +2335,33 @@ const styles = StyleSheet.create({
   trayCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.sm,
+    padding: theme.spacing.md,
+    gap: theme.spacing.xs,
+  },
+  trayCardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  traySubtitle: {
+    marginTop: 2,
+  },
+  trayActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingTop: theme.spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border.light,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 6,
   },
   badgeMini: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: theme.borderRadius.full,
   },

@@ -26,6 +26,130 @@ import {
   ScreenContainer,
 } from '../../src/shared/components';
 
+interface QuickActionItem {
+  id: string;
+  title: string;
+  desc: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  iconColor: string;
+  iconBg: string;
+  route: string;
+}
+
+const staffActions: QuickActionItem[] = [
+  {
+    id: 'ssr',
+    title: 'SSR 8 kênh thủ công',
+    desc: 'Điều khiển rơ-le Master',
+    icon: 'hardware-chip-outline',
+    iconColor: '#3B82F6',
+    iconBg: 'rgba(59, 130, 246, 0.1)',
+    route: '/control/manual',
+  },
+  {
+    id: 'control',
+    title: 'Van & Đèn phòng',
+    desc: 'Điều khiển theo sơ đồ tầng',
+    icon: 'options-outline',
+    iconColor: '#10B981',
+    iconBg: 'rgba(16, 185, 129, 0.1)',
+    route: '/control',
+  },
+  {
+    id: 'auto',
+    title: 'Tự động hóa',
+    desc: 'Cấu hình vi khí hậu tự động',
+    icon: 'water-outline',
+    iconColor: '#0EA5E9',
+    iconBg: 'rgba(14, 165, 233, 0.1)',
+    route: '/automatic',
+  },
+  {
+    id: 'sensors',
+    title: 'Cảm biến & Biểu đồ',
+    desc: 'Lịch sử đo vi khí hậu',
+    icon: 'stats-chart-outline',
+    iconColor: '#F59E0B',
+    iconBg: 'rgba(245, 158, 11, 0.1)',
+    route: '/sensors',
+  },
+  {
+    id: 'cultivation',
+    title: 'Phòng, Tầng & Khay',
+    desc: 'Hạ tầng nuôi trồng',
+    icon: 'layers-outline',
+    iconColor: '#8B5CF6',
+    iconBg: 'rgba(139, 92, 246, 0.1)',
+    route: '/cultivation',
+  },
+  {
+    id: 'mushrooms',
+    title: 'Danh mục nấm',
+    desc: 'Catalog & Điều kiện tối ưu',
+    icon: 'leaf-outline',
+    iconColor: '#EC4899',
+    iconBg: 'rgba(236, 72, 153, 0.1)',
+    route: '/mushrooms',
+  },
+];
+
+const customerActions: QuickActionItem[] = [
+  {
+    id: 'rental',
+    title: 'Thuê khay mới',
+    desc: 'Đăng ký gói nuôi trồng',
+    icon: 'cube-outline',
+    iconColor: theme.colors.primary[600],
+    iconBg: 'rgba(34, 197, 94, 0.1)',
+    route: '/rental',
+  },
+  {
+    id: 'my-tray',
+    title: 'Khay của tôi',
+    desc: 'Theo dõi quá trình nấm lớn',
+    icon: 'leaf-outline',
+    iconColor: '#3B82F6',
+    iconBg: 'rgba(59, 130, 246, 0.1)',
+    route: '/(tabs)/tray',
+  },
+  {
+    id: 'orders',
+    title: 'Đơn hàng & QR',
+    desc: 'PayOS VietQR thanh toán',
+    icon: 'receipt-outline',
+    iconColor: '#14B8A6',
+    iconBg: 'rgba(20, 184, 166, 0.1)',
+    route: '/(tabs)/orders',
+  },
+  {
+    id: 'climate',
+    title: 'Cảm biến vi khí hậu',
+    desc: 'Nhiệt độ & Độ ẩm buồng',
+    icon: 'stats-chart-outline',
+    iconColor: '#F59E0B',
+    iconBg: 'rgba(245, 158, 11, 0.1)',
+    route: '/sensors',
+  },
+  {
+    id: 'mushrooms',
+    title: 'Danh mục nấm',
+    desc: 'Các giống nấm phổ biến',
+    icon: 'flower-outline',
+    iconColor: '#EC4899',
+    iconBg: 'rgba(236, 72, 153, 0.1)',
+    route: '/mushrooms',
+  },
+  {
+    id: 'cultivation',
+    title: 'Phòng nuôi trồng',
+    desc: 'Không gian & Điều kiện phòng',
+    icon: 'layers-outline',
+    iconColor: '#8B5CF6',
+    iconBg: 'rgba(139, 92, 246, 0.1)',
+    route: '/cultivation',
+  },
+];
+
 /**
  * Home Tab Screen ("Trang chủ")
  * Comprehensive dashboard connecting real IoT telemetry, Quick Actions, and Active Orders.
@@ -34,6 +158,12 @@ export default function HomeScreen() {
   const router = useRouter();
   const { isAdmin, isFarmOperator, isCustomer } = useAuth();
   const isStaff = isAdmin || isFarmOperator;
+
+  const displayedActions = isStaff ? staffActions : customerActions;
+  const actionRows: QuickActionItem[][] = [];
+  for (let i = 0; i < displayedActions.length; i += 2) {
+    actionRows.push(displayedActions.slice(i, i + 2));
+  }
 
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [masters, setMasters] = useState<IotMaster[]>([]);
@@ -260,199 +390,33 @@ export default function HomeScreen() {
           </AppText>
 
           <View style={styles.actionGrid}>
-            {isStaff ? (
-              /* Admin & Operator Actions */
-              <>
-                {/* 1. Điều khiển SSR thủ công (Tất cả 8 kênh) */}
-                <Pressable style={styles.actionCardWrapper} onPress={() => router.push('/control/manual' as any)}>
-                  <AppCard elevation="xs" style={styles.quickActionCard}>
-                    <View style={styles.cardHeaderRow}>
-                      <View style={[styles.actionIconCircle, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
-                        <Ionicons name="hardware-chip-outline" size={24} color="#3B82F6" />
+            {actionRows.map((row, rowIndex) => (
+              <View key={`action-row-${rowIndex}`} style={styles.actionRow}>
+                {row.map((item) => (
+                  <Pressable
+                    key={item.id}
+                    style={styles.actionCardWrapper}
+                    onPress={() => router.push(item.route as any)}
+                  >
+                    <AppCard elevation="xs" style={styles.quickActionCard}>
+                      <View style={styles.actionIconContainer}>
+                        <View style={[styles.actionIconCircle, { backgroundColor: item.iconBg }]}>
+                          <Ionicons name={item.icon} size={24} color={item.iconColor} />
+                        </View>
                       </View>
-                    </View>
-                    <AppText variant="label" weight="bold">
-                      SSR 8 kênh thủ công
-                    </AppText>
-                    <AppText variant="caption" color={theme.colors.text.secondary}>
-                      Điều khiển rơ-le Master
-                    </AppText>
-                  </AppCard>
-                </Pressable>
-
-                {/* 2. Điều khiển van & đèn theo phòng */}
-                <Pressable style={styles.actionCardWrapper} onPress={() => router.push('/control' as any)}>
-                  <AppCard elevation="xs" style={styles.quickActionCard}>
-                    <View style={styles.cardHeaderRow}>
-                      <View style={[styles.actionIconCircle, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
-                        <Ionicons name="options-outline" size={24} color="#10B981" />
+                      <View style={styles.actionTitleContainer}>
+                        <AppText variant="label" weight="bold" numberOfLines={2}>
+                          {item.title}
+                        </AppText>
                       </View>
-                    </View>
-                    <AppText variant="label" weight="bold">
-                      Van & Đèn phòng
-                    </AppText>
-                    <AppText variant="caption" color={theme.colors.text.secondary}>
-                      Điều khiển theo sơ đồ tầng
-                    </AppText>
-                  </AppCard>
-                </Pressable>
-
-                {/* 3. Phun sương tự động */}
-                <Pressable style={styles.actionCardWrapper} onPress={() => router.push('/automatic' as any)}>
-                  <AppCard elevation="xs" style={styles.quickActionCard}>
-                    <View style={styles.cardHeaderRow}>
-                      <View style={[styles.actionIconCircle, { backgroundColor: 'rgba(14, 165, 233, 0.1)' }]}>
-                        <Ionicons name="water-outline" size={24} color="#0EA5E9" />
-                      </View>
-                    </View>
-                    <AppText variant="label" weight="bold">
-                      Tự động hóa
-                    </AppText>
-                    <AppText variant="caption" color={theme.colors.text.secondary}>
-                      Cấu hình vi khí hậu tự động
-                    </AppText>
-                  </AppCard>
-                </Pressable>
-
-                {/* 4. Cảm biến & Biểu đồ */}
-                <Pressable style={styles.actionCardWrapper} onPress={() => router.push('/sensors' as any)}>
-                  <AppCard elevation="xs" style={styles.quickActionCard}>
-                    <View style={[styles.actionIconCircle, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
-                      <Ionicons name="stats-chart-outline" size={24} color="#F59E0B" />
-                    </View>
-                    <AppText variant="label" weight="bold">
-                      Cảm biến & Biểu đồ
-                    </AppText>
-                    <AppText variant="caption" color={theme.colors.text.secondary}>
-                      Lịch sử đo vi khí hậu
-                    </AppText>
-                  </AppCard>
-                </Pressable>
-
-                {/* 5. Phòng, Tầng & Khay */}
-                <Pressable style={styles.actionCardWrapper} onPress={() => router.push('/cultivation' as any)}>
-                  <AppCard elevation="xs" style={styles.quickActionCard}>
-                    <View style={[styles.actionIconCircle, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
-                      <Ionicons name="layers-outline" size={24} color="#8B5CF6" />
-                    </View>
-                    <AppText variant="label" weight="bold">
-                      Phòng, Tầng & Khay
-                    </AppText>
-                    <AppText variant="caption" color={theme.colors.text.secondary}>
-                      Hạ tầng nuôi trồng
-                    </AppText>
-                  </AppCard>
-                </Pressable>
-
-                {/* 6. Danh mục nấm */}
-                <Pressable style={styles.actionCardWrapper} onPress={() => router.push('/mushrooms' as any)}>
-                  <AppCard elevation="xs" style={styles.quickActionCard}>
-                    <View style={[styles.actionIconCircle, { backgroundColor: 'rgba(236, 72, 153, 0.1)' }]}>
-                      <Ionicons name="leaf-outline" size={24} color="#EC4899" />
-                    </View>
-                    <AppText variant="label" weight="bold">
-                      Danh mục nấm
-                    </AppText>
-                    <AppText variant="caption" color={theme.colors.text.secondary}>
-                      Catalog & Điều kiện tối ưu
-                    </AppText>
-                  </AppCard>
-                </Pressable>
-              </>
-            ) : (
-              /* Customer Actions */
-              <>
-                {/* 1. Thuê khay mới */}
-                <Pressable style={styles.actionCardWrapper} onPress={() => router.push('/rental' as any)}>
-                  <AppCard elevation="xs" style={styles.quickActionCard}>
-                    <View style={[styles.actionIconCircle, { backgroundColor: 'rgba(34, 197, 94, 0.1)' }]}>
-                      <Ionicons name="cube-outline" size={24} color={theme.colors.primary[600]} />
-                    </View>
-                    <AppText variant="label" weight="bold">
-                      Thuê khay mới
-                    </AppText>
-                    <AppText variant="caption" color={theme.colors.text.secondary}>
-                      Đăng ký gói nuôi trồng
-                    </AppText>
-                  </AppCard>
-                </Pressable>
-
-                {/* 2. Khay của tôi */}
-                <Pressable style={styles.actionCardWrapper} onPress={() => router.push('/(tabs)/tray' as any)}>
-                  <AppCard elevation="xs" style={styles.quickActionCard}>
-                    <View style={[styles.actionIconCircle, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
-                      <Ionicons name="leaf-outline" size={24} color="#3B82F6" />
-                    </View>
-                    <AppText variant="label" weight="bold">
-                      Khay của tôi
-                    </AppText>
-                    <AppText variant="caption" color={theme.colors.text.secondary}>
-                      Theo dõi quá trình nấm lớn
-                    </AppText>
-                  </AppCard>
-                </Pressable>
-
-                {/* 3. Đơn hàng & Thanh toán */}
-                <Pressable style={styles.actionCardWrapper} onPress={() => router.push('/(tabs)/orders' as any)}>
-                  <AppCard elevation="xs" style={styles.quickActionCard}>
-                    <View style={[styles.actionIconCircle, { backgroundColor: 'rgba(20, 184, 166, 0.1)' }]}>
-                      <Ionicons name="receipt-outline" size={24} color="#14B8A6" />
-                    </View>
-                    <AppText variant="label" weight="bold">
-                      Đơn hàng & QR
-                    </AppText>
-                    <AppText variant="caption" color={theme.colors.text.secondary}>
-                      PayOS VietQR thanh toán
-                    </AppText>
-                  </AppCard>
-                </Pressable>
-
-                {/* 4. Cảm biến vi khí hậu */}
-                <Pressable style={styles.actionCardWrapper} onPress={() => router.push('/sensors' as any)}>
-                  <AppCard elevation="xs" style={styles.quickActionCard}>
-                    <View style={[styles.actionIconCircle, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
-                      <Ionicons name="stats-chart-outline" size={24} color="#F59E0B" />
-                    </View>
-                    <AppText variant="label" weight="bold">
-                      Cảm biến vi khí hậu
-                    </AppText>
-                    <AppText variant="caption" color={theme.colors.text.secondary}>
-                      Nhiệt độ & Độ ẩm buồng
-                    </AppText>
-                  </AppCard>
-                </Pressable>
-
-                {/* 5. Danh mục nấm */}
-                <Pressable style={styles.actionCardWrapper} onPress={() => router.push('/mushrooms' as any)}>
-                  <AppCard elevation="xs" style={styles.quickActionCard}>
-                    <View style={[styles.actionIconCircle, { backgroundColor: 'rgba(236, 72, 153, 0.1)' }]}>
-                      <Ionicons name="flower-outline" size={24} color="#EC4899" />
-                    </View>
-                    <AppText variant="label" weight="bold">
-                      Danh mục nấm
-                    </AppText>
-                    <AppText variant="caption" color={theme.colors.text.secondary}>
-                      Các giống nấm phổ biến
-                    </AppText>
-                  </AppCard>
-                </Pressable>
-
-                {/* 6. Buồng & Phòng trồng */}
-                <Pressable style={styles.actionCardWrapper} onPress={() => router.push('/cultivation' as any)}>
-                  <AppCard elevation="xs" style={styles.quickActionCard}>
-                    <View style={[styles.actionIconCircle, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
-                      <Ionicons name="layers-outline" size={24} color="#8B5CF6" />
-                    </View>
-                    <AppText variant="label" weight="bold">
-                      Phòng nuôi trồng
-                    </AppText>
-                    <AppText variant="caption" color={theme.colors.text.secondary}>
-                      Không gian & Điều kiện phòng
-                    </AppText>
-                  </AppCard>
-                </Pressable>
-              </>
-            )}
+                      <AppText variant="caption" color={theme.colors.text.secondary} numberOfLines={2}>
+                        {item.desc}
+                      </AppText>
+                    </AppCard>
+                  </Pressable>
+                ))}
+              </View>
+            ))}
           </View>
         </View>
       </View>
@@ -568,19 +532,27 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.xs,
   },
   actionGrid: {
+    gap: theme.spacing.sm,
+  },
+  actionRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: theme.spacing.sm,
   },
   actionCardWrapper: {
-    width: '48%',
+    flex: 1,
   },
   quickActionCard: {
+    flex: 1,
+    height: '100%',
     backgroundColor: '#FFFFFF',
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.md,
     gap: 4,
-    minHeight: 110,
+    minHeight: 136,
+    justifyContent: 'flex-start',
+  },
+  actionIconContainer: {
+    marginBottom: 4,
   },
   actionIconCircle: {
     width: 40,
@@ -589,18 +561,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  lockBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: theme.colors.warning.light,
+  actionTitleContainer: {
+    minHeight: 40,
     justifyContent: 'center',
-    alignItems: 'center',
   },
 });

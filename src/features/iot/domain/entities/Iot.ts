@@ -7,6 +7,7 @@ export interface IotMaster {
   id: number;
   masterId: string;
   cultivationRoomId: number | null;
+  light_ssr_channel?: number | null;
   reportedStatus: 'online' | 'offline' | null;
   lastSeenAt: string | null;
   statusReceivedAt: string | null;

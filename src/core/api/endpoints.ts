@@ -77,6 +77,7 @@ export const API_ENDPOINTS = {
     SSR_COMMAND: (masterId: string, channel: number) =>
       `/api/iot/masters/${masterId}/ssr/${channel}/commands`,
     COMMAND_STATUS: (commandId: string) => `/api/iot/commands/${commandId}`,
+    MASTER_LIGHT: (masterId: string) => `/api/iot/masters/${masterId}/light`,
   },
   // Automatic Misting & Floors
   AUTOMATIC: {

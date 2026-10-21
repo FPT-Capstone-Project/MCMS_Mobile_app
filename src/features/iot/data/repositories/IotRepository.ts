@@ -156,6 +156,26 @@ export class IotRepository {
   }
 
   /**
+   * Update or unassign master light SSR channel
+   * PUT /api/iot/masters/:masterId/light
+   * Body: { channel: number | null }
+   */
+  async updateMasterLight(masterId: string, channel: number | null): Promise<IotMaster> {
+    try {
+      const response = await axiosClient.put<{ data: IotMaster } | IotMaster>(
+        API_ENDPOINTS.IOT.MASTER_LIGHT(masterId),
+        { channel }
+      );
+      if ('data' in response.data && response.data.data) {
+        return response.data.data;
+      }
+      return response.data as IotMaster;
+    } catch (error) {
+      throw error instanceof AppError ? error : handleApiError(error);
+    }
+  }
+
+  /**
    * List all cultivation floor mappings, optionally filtered by roomId
    */
   async getFloors(roomId?: number): Promise<FloorMapping[]> {

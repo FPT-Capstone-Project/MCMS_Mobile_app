@@ -4,6 +4,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +19,7 @@ import {
   AppText,
   ScreenContainer,
 } from '../../../../shared/components';
+import { useAuth } from '../../../auth';
 import {
   cultivationRepository,
   CultivationRoom,
@@ -32,8 +34,11 @@ import { iotRepository } from '../../data/repositories/IotRepository';
 
 export const ControlCenterScreen: React.FC = () => {
   const router = useRouter();
+  const { canControlIot } = useAuth();
+
   const [rooms, setRooms] = useState<CultivationRoom[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
+  const currentRoomIdRef = useRef<number | null>(null);
 
   const [masters, setMasters] = useState<IotMaster[]>([]);
   const [floors, setFloors] = useState<FloorMapping[]>([]);
@@ -46,7 +51,13 @@ export const ControlCenterScreen: React.FC = () => {
   const [channelStatusMsg, setChannelStatusMsg] = useState<Record<string, string>>({});
 
   // Active polling tracking
-  const activePollers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const activePollers = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+
+  // Light Configuration Modal State
+  const [isConfigModalVisible, setIsConfigModalVisible] = useState(false);
+  const [selectedConfigMaster, setSelectedConfigMaster] = useState<IotMaster | null>(null);
+  const [selectedConfigChannel, setSelectedConfigChannel] = useState<number | null>(null);
+  const [configSaving, setConfigSaving] = useState(false);
 
   const clearAllPollers = () => {
     Object.values(activePollers.current).forEach(clearInterval);
@@ -65,8 +76,9 @@ export const ControlCenterScreen: React.FC = () => {
       setMasters(mastersData);
       setFloors(floorsData);
 
-      if (roomsData.length > 0 && selectedRoomId === null) {
+      if (roomsData.length > 0 && currentRoomIdRef.current === null) {
         setSelectedRoomId(roomsData[0].room_id);
+        currentRoomIdRef.current = roomsData[0].room_id;
       }
 
       // Load SSR states for all masters
@@ -94,7 +106,7 @@ export const ControlCenterScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedRoomId]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -104,6 +116,12 @@ export const ControlCenterScreen: React.FC = () => {
       };
     }, [loadData])
   );
+
+  const handleSelectRoom = (roomId: number) => {
+    if (selectedRoomId === roomId) return;
+    setSelectedRoomId(roomId);
+    currentRoomIdRef.current = roomId;
+  };
 
   // Find mapping for a specific floor number in the selected room
   const getFloorForNumber = (floorNum: number): FloorMapping | undefined => {
@@ -124,7 +142,7 @@ export const ControlCenterScreen: React.FC = () => {
     return masterSsr?.channels?.find((c) => c.channel === channelNum);
   };
 
-  // Execute manual SSR Command
+  // Execute manual SSR Command (for Valve or Light)
   const handleSendCommand = async (
     targetName: string,
     masterIdString: string,
@@ -132,7 +150,7 @@ export const ControlCenterScreen: React.FC = () => {
     action: 'ON' | 'OFF'
   ) => {
     const key = `${masterIdString}_${channelNum}`;
-    if (channelLoading[key]) return;
+    if (channelLoading[key]) return; // Block duplicate taps while executing
 
     const actionText = action === 'ON' ? 'BẬT' : 'TẮT';
     setChannelLoading((prev) => ({ ...prev, [key]: true }));
@@ -143,7 +161,7 @@ export const ControlCenterScreen: React.FC = () => {
       const brokerStatus = command.status === 'PUBLISHED' ? 'Đã xuất bản tới broker' : 'Đang xử lý';
       setChannelStatusMsg((prev) => ({
         ...prev,
-        [key]: `Lệnh ${brokerStatus}. Đang kiểm tra...`,
+        [key]: `Lệnh ${brokerStatus}. Đang kiểm tra phản hồi từ thiết bị...`,
       }));
 
       // Poll command status until final state
@@ -163,7 +181,7 @@ export const ControlCenterScreen: React.FC = () => {
 
             const statusText =
               cmdStatus.status === 'PUBLISHED'
-                ? 'Đã gửi broker thành công (QoS 1)'
+                ? 'Thiết bị đã ghi nhận lệnh'
                 : cmdStatus.status === 'FAILED'
                 ? `Thất bại: ${cmdStatus.errorMessage || 'Lỗi MQTT'}`
                 : 'Hết thời gian chờ phản hồi (5s)';
@@ -171,7 +189,7 @@ export const ControlCenterScreen: React.FC = () => {
             setChannelStatusMsg((prev) => ({ ...prev, [key]: statusText }));
             setChannelLoading((prev) => ({ ...prev, [key]: false }));
 
-            // Refresh SSR data
+            // Refresh SSR data to verify reportedState
             const updatedSsr = await iotRepository.getMasterSsr(masterIdString);
             setSsrData((prev) => ({ ...prev, [masterIdString]: updatedSsr }));
           }
@@ -198,6 +216,80 @@ export const ControlCenterScreen: React.FC = () => {
     }
   };
 
+  // Light configuration handlers
+  const handleOpenConfigModal = (master?: IotMaster) => {
+    const target = master || roomMasters[0] || null;
+    setSelectedConfigMaster(target);
+    setSelectedConfigChannel(target?.light_ssr_channel ?? null);
+    setIsConfigModalVisible(true);
+  };
+
+  const handleSelectModalMaster = (m: IotMaster) => {
+    setSelectedConfigMaster(m);
+    setSelectedConfigChannel(m.light_ssr_channel ?? null);
+  };
+
+  const handleSaveLightConfig = async (masterId: string, channel: number | null) => {
+    try {
+      setConfigSaving(true);
+      await iotRepository.updateMasterLight(masterId, channel);
+
+      const actionDesc =
+        channel != null
+          ? `Đã cấu hình Đèn phòng cho Master ${masterId} ở Kênh SSR ${channel}.`
+          : `Đã bỏ gán kênh đèn của Master ${masterId}.`;
+      Alert.alert('Thành công', actionDesc);
+
+      // Reload masters
+      const freshMasters = await iotRepository.getMasters();
+      setMasters(freshMasters);
+
+      // If channel assigned, refresh SSR state for this master
+      if (channel != null) {
+        const ssr = await iotRepository.getMasterSsr(masterId);
+        setSsrData((prev) => ({ ...prev, [masterId]: ssr }));
+      }
+
+      setIsConfigModalVisible(false);
+    } catch (err: unknown) {
+      let msg = 'Không thể cập nhật cấu hình đèn.';
+      if (err && typeof err === 'object') {
+        const errorObj = err as any;
+        const status = errorObj.statusCode || errorObj.response?.status || errorObj.status;
+        if (status === 403) {
+          msg = 'Bạn không có quyền cấu hình đèn (yêu cầu quyền iot.automation.manage).';
+        } else if (status === 409) {
+          msg = 'Xung đột kênh: Kênh SSR đã được dùng cho van hoặc Master chưa thuộc phòng.';
+        } else if (status === 404) {
+          msg = 'Không tìm thấy thiết bị Master trên hệ thống.';
+        } else if (status === 400) {
+          msg = 'Dữ liệu không hợp lệ. Kênh SSR phải từ 1 đến 8 hoặc null.';
+        } else if (errorObj.message) {
+          msg = errorObj.message;
+        }
+      }
+      Alert.alert('Cấu hình thất bại', msg);
+    } finally {
+      setConfigSaving(false);
+    }
+  };
+
+  const handleUnassignLight = () => {
+    if (!selectedConfigMaster) return;
+    Alert.alert(
+      'Xác nhận bỏ gán',
+      `Bạn có chắc chắn muốn bỏ gán kênh đèn của Master ${selectedConfigMaster.masterId}?`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Đồng ý bỏ gán',
+          style: 'destructive',
+          onPress: () => handleSaveLightConfig(selectedConfigMaster.masterId, null),
+        },
+      ]
+    );
+  };
+
   const selectedRoom = rooms.find((r) => r.room_id === selectedRoomId);
 
   // Mappings for Floor 1 and Floor 2
@@ -209,10 +301,13 @@ export const ControlCenterScreen: React.FC = () => {
   const masterId2 = floor2 ? getMasterIdString(floor2.master_id) : undefined;
   const channelInfo2 = getChannelInfo(masterId2, floor2?.misting_ssr_channel);
 
+  // Masters belonging strictly to this cultivation room
+  const roomMasters = masters.filter((m) => m.cultivationRoomId === selectedRoomId);
+
   if (loading) {
     return (
       <ScreenContainer edges={['top', 'left', 'right']}>
-        <AppHeader title="Điều khiển thiết bị" subtitle="Van phun sương & Đèn GPIO6" />
+        <AppHeader title="Điều khiển thiết bị" subtitle="Van phun sương & Đèn phòng" />
         <View style={styles.centerLoading}>
           <ActivityIndicator size="large" color={theme.colors.primary[500]} />
           <AppText variant="bodySmall" color={theme.colors.text.secondary} style={styles.loadingText}>
@@ -225,7 +320,7 @@ export const ControlCenterScreen: React.FC = () => {
 
   return (
     <ScreenContainer scrollable edges={['left', 'right']}>
-      <AppHeader title="Điều khiển thiết bị" subtitle="Van phun sương & Đèn GPIO6" />
+      <AppHeader title="Điều khiển thiết bị" subtitle="Van phun sương & Đèn phòng" />
 
       <View style={styles.content}>
         {/* Banner linking to Manual SSR 8-channel Control */}
@@ -259,7 +354,7 @@ export const ControlCenterScreen: React.FC = () => {
               return (
                 <Pressable
                   key={room.room_id}
-                  onPress={() => setSelectedRoomId(room.room_id)}
+                  onPress={() => handleSelectRoom(room.room_id)}
                   style={[styles.roomPill, isSelected && styles.roomPillActive]}
                 >
                   <Ionicons
@@ -280,6 +375,11 @@ export const ControlCenterScreen: React.FC = () => {
           </ScrollView>
         </View>
 
+        {/* ================= SECTION: VAN PHUN SƯƠNG ================= */}
+        <AppText variant="label" color={theme.colors.text.muted}>
+          VAN PHUN SƯƠNG THEO TẦNG
+        </AppText>
+
         {/* ================= CARD A: VAN TẦNG 1 ================= */}
         <AppCard elevation="sm" style={styles.controlCard}>
           <View style={styles.cardHeader}>
@@ -287,7 +387,7 @@ export const ControlCenterScreen: React.FC = () => {
               <View style={[styles.deviceIconBox, { backgroundColor: theme.colors.primary[50] }]}>
                 <Ionicons name="water-outline" size={24} color={theme.colors.primary[600]} />
               </View>
-              <View>
+              <View style={{ flex: 1 }}>
                 <AppText variant="title" weight="bold">
                   Van tầng 1
                 </AppText>
@@ -352,7 +452,8 @@ export const ControlCenterScreen: React.FC = () => {
               disabled={
                 !floor1 ||
                 !masterId1 ||
-                channelLoading[`${masterId1}_${floor1?.misting_ssr_channel}`]
+                channelLoading[`${masterId1}_${floor1?.misting_ssr_channel}`] ||
+                !canControlIot
               }
               onPress={() =>
                 masterId1 &&
@@ -369,7 +470,8 @@ export const ControlCenterScreen: React.FC = () => {
               disabled={
                 !floor1 ||
                 !masterId1 ||
-                channelLoading[`${masterId1}_${floor1?.misting_ssr_channel}`]
+                channelLoading[`${masterId1}_${floor1?.misting_ssr_channel}`] ||
+                !canControlIot
               }
               onPress={() =>
                 masterId1 &&
@@ -387,7 +489,7 @@ export const ControlCenterScreen: React.FC = () => {
               <View style={[styles.deviceIconBox, { backgroundColor: theme.colors.primary[50] }]}>
                 <Ionicons name="water-outline" size={24} color={theme.colors.primary[600]} />
               </View>
-              <View>
+              <View style={{ flex: 1 }}>
                 <AppText variant="title" weight="bold">
                   Van tầng 2
                 </AppText>
@@ -452,7 +554,8 @@ export const ControlCenterScreen: React.FC = () => {
               disabled={
                 !floor2 ||
                 !masterId2 ||
-                channelLoading[`${masterId2}_${floor2?.misting_ssr_channel}`]
+                channelLoading[`${masterId2}_${floor2?.misting_ssr_channel}`] ||
+                !canControlIot
               }
               onPress={() =>
                 masterId2 &&
@@ -469,7 +572,8 @@ export const ControlCenterScreen: React.FC = () => {
               disabled={
                 !floor2 ||
                 !masterId2 ||
-                channelLoading[`${masterId2}_${floor2?.misting_ssr_channel}`]
+                channelLoading[`${masterId2}_${floor2?.misting_ssr_channel}`] ||
+                !canControlIot
               }
               onPress={() =>
                 masterId2 &&
@@ -480,59 +584,379 @@ export const ControlCenterScreen: React.FC = () => {
           </View>
         </AppCard>
 
-        {/* ================= CARD C: ĐÈN — GPIO6 ================= */}
-        <AppCard elevation="sm" style={styles.controlCard}>
-          <View style={styles.cardHeader}>
-            <View style={styles.titleWithIcon}>
-              <View style={[styles.deviceIconBox, { backgroundColor: 'rgba(234, 179, 8, 0.1)' }]}>
-                <Ionicons name="bulb-outline" size={24} color={theme.colors.warning.main} />
+        {/* ================= SECTION: ĐÈN PHÒNG ================= */}
+        <View style={styles.sectionHeaderRow}>
+          <AppText variant="label" color={theme.colors.text.muted}>
+            ĐÈN CHIẾU SÁNG PHÒNG
+          </AppText>
+          {canControlIot && roomMasters.length > 0 && (
+            <AppButton
+              title="Cấu hình đèn"
+              variant="outline"
+              size="sm"
+              leftIcon={<Ionicons name="settings-outline" size={14} color={theme.colors.primary[600]} />}
+              onPress={() => handleOpenConfigModal()}
+            />
+          )}
+        </View>
+
+        {roomMasters.length === 0 ? (
+          <AppCard elevation="sm" style={styles.controlCard}>
+            <View style={styles.cardHeader}>
+              <View style={styles.titleWithIcon}>
+                <View style={[styles.deviceIconBox, { backgroundColor: theme.colors.neutral[100] }]}>
+                  <Ionicons name="bulb-outline" size={24} color={theme.colors.text.muted} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText variant="title" weight="bold">
+                    Đèn phòng
+                  </AppText>
+                  <AppText variant="caption" color={theme.colors.text.secondary}>
+                    {selectedRoom?.room_name || 'Chưa chọn phòng'} • Chưa có Master
+                  </AppText>
+                </View>
               </View>
-              <View>
-                <AppText variant="title" weight="bold">
-                  Đèn — GPIO6
-                </AppText>
-                <AppText variant="caption" color={theme.colors.text.secondary}>
-                  Phần cứng chân GPIO6 • Chưa liên kết SSR
+
+              <View style={[styles.stateBadge, { backgroundColor: theme.colors.neutral[100] }]}>
+                <AppText variant="captionMedium" color={theme.colors.neutral[600]} weight="bold">
+                  Chưa có Master
                 </AppText>
               </View>
             </View>
 
-            <View style={[styles.stateBadge, { backgroundColor: theme.colors.neutral[100] }]}>
-              <AppText variant="captionMedium" color={theme.colors.neutral[600]} weight="bold">
-                Chưa cấu hình GPIO6
+            <AppDivider spacing="xs" />
+
+            <View style={styles.warningNoticeBox}>
+              <Ionicons name="information-circle-outline" size={18} color={theme.colors.warning.dark} />
+              <AppText variant="caption" color={theme.colors.warning.dark} style={styles.warningNoticeText}>
+                Phòng nuôi trồng này hiện chưa có thiết bị Master nào. Vui lòng gán Master cho phòng trước khi cấu hình đèn.
               </AppText>
             </View>
-          </View>
+          </AppCard>
+        ) : (
+          roomMasters.map((master) => {
+            const lightChannel = master.light_ssr_channel;
+            const isConfigured = lightChannel != null;
+            const channelKey = isConfigured ? `${master.masterId}_${lightChannel}` : '';
+            const channelInfo = getChannelInfo(master.masterId, lightChannel ?? undefined);
+            const isChLoading = channelKey ? Boolean(channelLoading[channelKey]) : false;
+            const isReportedOn = channelInfo?.reportedState === 'ON';
+            const isReportedOff = channelInfo?.reportedState === 'OFF';
 
-          <AppDivider spacing="xs" />
+            return (
+              <AppCard key={master.id} elevation="sm" style={styles.controlCard}>
+                <View style={styles.cardHeader}>
+                  <View style={styles.titleWithIcon}>
+                    <View
+                      style={[
+                        styles.deviceIconBox,
+                        {
+                          backgroundColor: isReportedOn
+                            ? 'rgba(234, 179, 8, 0.15)'
+                            : theme.colors.neutral[100],
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name={isReportedOn ? 'bulb' : 'bulb-outline'}
+                        size={24}
+                        color={isReportedOn ? '#EAB308' : theme.colors.text.secondary}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <AppText variant="title" weight="bold">
+                        {roomMasters.length > 1 ? `Đèn phòng (${master.masterId})` : 'Đèn phòng'}
+                      </AppText>
+                      <AppText variant="caption" color={theme.colors.text.secondary}>
+                        {isConfigured
+                          ? `${master.masterId} · Kênh ${lightChannel}`
+                          : `${master.masterId} · Chưa cấu hình`}
+                      </AppText>
+                    </View>
+                  </View>
 
-          {/* Missing Hardware Mapping Specification Notice */}
-          <View style={styles.warningNoticeBox}>
-            <Ionicons name="alert-circle-outline" size={18} color={theme.colors.warning.dark} />
-            <AppText variant="caption" color={theme.colors.warning.dark} style={styles.warningNoticeText}>
-              GPIO6 là chân phần cứng trên board vi điều khiển, chưa được định tuyến vào kênh SSR 1-8 hoặc API backend hiện tại. Các nút điều khiển tạm thời bị khóa để bảo đảm an toàn phần cứng.
-            </AppText>
-          </View>
+                  <View
+                    style={[
+                      styles.stateBadge,
+                      {
+                        backgroundColor: !isConfigured
+                          ? theme.colors.neutral[100]
+                          : isChLoading
+                          ? 'rgba(234, 179, 8, 0.12)'
+                          : isReportedOn
+                          ? 'rgba(34, 197, 94, 0.12)'
+                          : isReportedOff
+                          ? theme.colors.neutral[100]
+                          : 'rgba(234, 179, 8, 0.12)',
+                      },
+                    ]}
+                  >
+                    <AppText
+                      variant="captionMedium"
+                      weight="bold"
+                      color={
+                        !isConfigured
+                          ? theme.colors.neutral[600]
+                          : isChLoading
+                          ? theme.colors.warning.dark
+                          : isReportedOn
+                          ? theme.colors.success.dark
+                          : isReportedOff
+                          ? theme.colors.neutral[600]
+                          : theme.colors.warning.dark
+                      }
+                    >
+                      {!isConfigured
+                        ? 'Chưa cấu hình'
+                        : isChLoading
+                        ? 'Chờ phản hồi'
+                        : isReportedOn
+                        ? 'Đang bật'
+                        : isReportedOff
+                        ? 'Đang tắt'
+                        : 'Chưa xác định'}
+                    </AppText>
+                  </View>
+                </View>
 
-          {/* Action Buttons (Strictly Disabled) */}
-          <View style={styles.actionRow}>
-            <AppButton
-              title="Bật đèn"
-              variant="primary"
-              size="md"
-              style={styles.actionBtn}
-              disabled
-            />
-            <AppButton
-              title="Tắt đèn"
-              variant="outline"
-              size="md"
-              style={styles.actionBtn}
-              disabled
-            />
-          </View>
-        </AppCard>
+                <AppDivider spacing="xs" />
+
+                <View style={styles.mappingInfoBox}>
+                  <View>
+                    <AppText variant="caption" color={theme.colors.text.muted}>
+                      Kênh SSR điều khiển:
+                    </AppText>
+                    <AppText variant="captionMedium" weight="medium">
+                      {isConfigured ? `Kênh SSR ${lightChannel}` : 'Chưa cấu hình kênh điều khiển'}
+                    </AppText>
+                  </View>
+                  {canControlIot && (
+                    <AppButton
+                      title={isConfigured ? 'Đổi kênh' : 'Cấu hình'}
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => handleOpenConfigModal(master)}
+                    />
+                  )}
+                </View>
+
+                {channelKey && channelStatusMsg[channelKey] ? (
+                  <View style={styles.statusMsgRow}>
+                    <Ionicons name="information-circle-outline" size={16} color={theme.colors.primary[600]} />
+                    <AppText variant="caption" color={theme.colors.primary[700]} style={styles.statusMsgText}>
+                      {channelStatusMsg[channelKey]}
+                    </AppText>
+                  </View>
+                ) : null}
+
+                <View style={styles.actionRow}>
+                  <AppButton
+                    title="Bật đèn"
+                    variant="primary"
+                    size="md"
+                    style={styles.actionBtn}
+                    loading={isChLoading}
+                    disabled={!isConfigured || isChLoading || !canControlIot}
+                    onPress={() =>
+                      isConfigured &&
+                      handleSendCommand('Đèn phòng', master.masterId, lightChannel, 'ON')
+                    }
+                  />
+                  <AppButton
+                    title="Tắt đèn"
+                    variant="outline"
+                    size="md"
+                    style={styles.actionBtn}
+                    loading={isChLoading}
+                    disabled={!isConfigured || isChLoading || !canControlIot}
+                    onPress={() =>
+                      isConfigured &&
+                      handleSendCommand('Đèn phòng', master.masterId, lightChannel, 'OFF')
+                    }
+                  />
+                </View>
+              </AppCard>
+            );
+          })
+        )}
       </View>
+
+      {/* ================= MODAL: CẤU HÌNH ĐÈN PHÒNG ================= */}
+      <Modal
+        visible={isConfigModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => !configSaving && setIsConfigModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1 }}>
+                <AppText variant="h3" weight="bold">
+                  Cấu hình Đèn phòng
+                </AppText>
+                <AppText variant="caption" color={theme.colors.text.secondary}>
+                  Phòng {selectedRoom?.room_name || ''} ({selectedRoom?.room_code || ''})
+                </AppText>
+              </View>
+              <Pressable
+                disabled={configSaving}
+                onPress={() => setIsConfigModalVisible(false)}
+                style={styles.modalCloseBtn}
+              >
+                <Ionicons name="close" size={24} color={theme.colors.text.muted} />
+              </Pressable>
+            </View>
+
+            {/* Master selection if room has multiple masters */}
+            {roomMasters.length > 1 ? (
+              <View style={styles.modalMasterSelectSection}>
+                <AppText variant="label" weight="medium" color={theme.colors.text.primary}>
+                  Chọn thiết bị Master:
+                </AppText>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modalMasterPills}>
+                  {roomMasters.map((m) => {
+                    const isMasterSelected = selectedConfigMaster?.id === m.id;
+                    return (
+                      <Pressable
+                        key={m.id}
+                        disabled={configSaving}
+                        onPress={() => handleSelectModalMaster(m)}
+                        style={[
+                          styles.modalMasterPill,
+                          isMasterSelected && styles.modalMasterPillActive,
+                        ]}
+                      >
+                        <Ionicons
+                          name="hardware-chip-outline"
+                          size={16}
+                          color={isMasterSelected ? '#FFFFFF' : theme.colors.text.secondary}
+                        />
+                        <AppText
+                          variant="captionMedium"
+                          weight={isMasterSelected ? 'bold' : 'normal'}
+                          color={isMasterSelected ? '#FFFFFF' : theme.colors.text.primary}
+                        >
+                          {m.masterId} (ID #{m.id})
+                        </AppText>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            ) : selectedConfigMaster ? (
+              <View style={styles.singleMasterInfo}>
+                <Ionicons name="hardware-chip-outline" size={16} color={theme.colors.primary[600]} />
+                <AppText variant="captionMedium" color={theme.colors.text.secondary}>
+                  Thiết bị điều khiển:{' '}
+                  <AppText variant="captionMedium" weight="bold">
+                    {selectedConfigMaster.masterId} (ID #{selectedConfigMaster.id})
+                  </AppText>
+                </AppText>
+              </View>
+            ) : null}
+
+            {/* Channel Selection List (Channels 1 to 8) */}
+            <View style={{ gap: theme.spacing.xs }}>
+              <AppText variant="label" weight="medium" color={theme.colors.text.primary}>
+                Chọn kênh SSR điều khiển đèn (1 - 8):
+              </AppText>
+              <ScrollView style={styles.channelList} showsVerticalScrollIndicator={false}>
+                {Array.from({ length: 8 }, (_, i) => i + 1).map((ch) => {
+                  const valveOnCh = floors.find(
+                    (f) => f.master_id === selectedConfigMaster?.id && f.misting_ssr_channel === ch
+                  );
+                  const isCurrentAssigned = selectedConfigMaster?.light_ssr_channel === ch;
+                  const isSelected = selectedConfigChannel === ch;
+                  const isBlocked = Boolean(valveOnCh);
+
+                  return (
+                    <Pressable
+                      key={ch}
+                      disabled={isBlocked || configSaving}
+                      onPress={() => setSelectedConfigChannel(ch)}
+                      style={[
+                        styles.channelItem,
+                        isSelected && styles.channelItemSelected,
+                        isBlocked && styles.channelItemDisabled,
+                      ]}
+                    >
+                      <View style={styles.channelItemLeft}>
+                        <View
+                          style={[
+                            styles.channelRadio,
+                            isSelected && styles.channelRadioSelected,
+                            isBlocked && { borderColor: theme.colors.neutral[300] },
+                          ]}
+                        >
+                          {isSelected ? <View style={styles.channelRadioInner} /> : null}
+                        </View>
+                        <View>
+                          <AppText
+                            variant="bodySmall"
+                            weight={isSelected ? 'bold' : 'medium'}
+                            color={isBlocked ? theme.colors.text.muted : theme.colors.text.primary}
+                          >
+                            Kênh SSR #{ch}
+                          </AppText>
+                        </View>
+                      </View>
+
+                      {/* Status badges */}
+                      {isBlocked ? (
+                        <View style={styles.channelBlockedBadge}>
+                          <AppText variant="caption" color={theme.colors.error.main} weight="bold">
+                            Đã dùng: Van {valveOnCh?.floor_name || `Tầng ${valveOnCh?.floor_number}`}
+                          </AppText>
+                        </View>
+                      ) : isCurrentAssigned ? (
+                        <View style={styles.channelCurrentBadge}>
+                          <AppText variant="caption" color={theme.colors.primary[700]} weight="bold">
+                            Đang gán hiện tại
+                          </AppText>
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* Action Buttons in Modal */}
+            <View style={styles.modalActionButtons}>
+              {selectedConfigMaster?.light_ssr_channel != null && (
+                <AppButton
+                  title="Bỏ gán đèn"
+                  variant="outline"
+                  size="md"
+                  textStyle={{ color: theme.colors.error.main }}
+                  style={{ borderColor: theme.colors.error.light }}
+                  loading={configSaving}
+                  disabled={configSaving}
+                  onPress={handleUnassignLight}
+                />
+              )}
+              <AppButton
+                title="Lưu cấu hình"
+                variant="primary"
+                size="md"
+                style={styles.modalSaveBtn}
+                loading={configSaving}
+                disabled={
+                  configSaving ||
+                  selectedConfigChannel === null ||
+                  selectedConfigChannel === selectedConfigMaster?.light_ssr_channel
+                }
+                onPress={() =>
+                  selectedConfigMaster &&
+                  handleSaveLightConfig(selectedConfigMaster.masterId, selectedConfigChannel)
+                }
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 };
@@ -573,6 +997,12 @@ const styles = StyleSheet.create({
   roomPillActive: {
     backgroundColor: theme.colors.primary[600],
     borderColor: theme.colors.primary[600],
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: theme.spacing.xs,
   },
   controlCard: {
     backgroundColor: '#FFFFFF',
@@ -665,5 +1095,124 @@ const styles = StyleSheet.create({
   ssrBannerContent: {
     flex: 1,
     gap: 2,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: theme.borderRadius.xl,
+    borderTopRightRadius: theme.borderRadius.xl,
+    padding: theme.spacing.lg,
+    gap: theme.spacing.md,
+    maxHeight: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalCloseBtn: {
+    padding: theme.spacing.xs,
+  },
+  modalMasterSelectSection: {
+    gap: theme.spacing.xs,
+  },
+  modalMasterPills: {
+    gap: theme.spacing.xs,
+    paddingVertical: 2,
+  },
+  modalMasterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+    backgroundColor: theme.colors.neutral[50],
+  },
+  modalMasterPillActive: {
+    backgroundColor: theme.colors.primary[600],
+    borderColor: theme.colors.primary[600],
+  },
+  singleMasterInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    backgroundColor: theme.colors.primary[50],
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+  },
+  channelList: {
+    gap: theme.spacing.xs,
+    maxHeight: 260,
+  },
+  channelItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+    backgroundColor: '#FFFFFF',
+    marginBottom: theme.spacing.xs,
+  },
+  channelItemSelected: {
+    borderColor: theme.colors.primary[500],
+    backgroundColor: theme.colors.primary[50],
+  },
+  channelItemDisabled: {
+    opacity: 0.55,
+    backgroundColor: theme.colors.neutral[100],
+    borderColor: theme.colors.border.light,
+  },
+  channelItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  channelRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: theme.colors.neutral[300],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  channelRadioSelected: {
+    borderColor: theme.colors.primary[600],
+  },
+  channelRadioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.colors.primary[600],
+  },
+  channelBlockedBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    paddingHorizontal: theme.spacing.xs,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.sm,
+  },
+  channelCurrentBadge: {
+    backgroundColor: theme.colors.primary[50],
+    paddingHorizontal: theme.spacing.xs,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.sm,
+  },
+  modalActionButtons: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.xs,
+  },
+  modalSaveBtn: {
+    flex: 1,
   },
 });
