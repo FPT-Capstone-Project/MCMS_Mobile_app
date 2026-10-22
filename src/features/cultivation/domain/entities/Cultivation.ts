@@ -44,8 +44,28 @@ export interface MushroomCondition {
   humidity_max: number | null;
   co2_min: number | null;
   co2_max: number | null;
-  substrate_moisture_min: number | null;
-  substrate_moisture_max: number | null;
   created_at?: string;
   updated_at?: string;
 }
+
+export interface CreateMushroomConditionRequest {
+  mushroomTypeId: number;
+  temperatureMin?: number | null;
+  temperatureMax?: number | null;
+  humidityMin?: number | null;
+  humidityMax?: number | null;
+  co2Min?: number | null;
+  co2Max?: number | null;
+}
+
+export interface UpdateMushroomConditionRequest {
+  mushroomTypeId?: number;
+  temperatureMin?: number | null;
+  temperatureMax?: number | null;
+  humidityMin?: number | null;
+  humidityMax?: number | null;
+  co2Min?: number | null;
+  co2Max?: number | null;
+}
+
+

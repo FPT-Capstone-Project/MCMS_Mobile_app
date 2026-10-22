@@ -3,10 +3,12 @@ import { API_ENDPOINTS } from '../../../../core/api/endpoints';
 import { AppError } from '../../../../core/errors/appError';
 import { handleApiError } from '../../../../core/errors/errorHandler';
 import {
+  CreateMushroomConditionRequest,
   CultivationRoom,
   CultivationTray,
   MushroomCondition,
   MushroomType,
+  UpdateMushroomConditionRequest,
 } from '../../domain/entities/Cultivation';
 
 /**
@@ -158,6 +160,59 @@ export class CultivationRepository {
       throw error instanceof AppError ? error : handleApiError(error);
     }
   }
+
+  /**
+   * Create a mushroom condition for a mushroom type (POST /api/mushroom-conditions)
+   */
+  async createMushroomCondition(
+    data: CreateMushroomConditionRequest
+  ): Promise<MushroomCondition> {
+    try {
+      const response = await axiosClient.post<
+        { message?: string; data: MushroomCondition } | MushroomCondition
+      >(API_ENDPOINTS.MUSHROOM_CONDITIONS.BASE, data);
+
+      if ('data' in response.data && response.data.data) {
+        return response.data.data;
+      }
+      return response.data as MushroomCondition;
+    } catch (error) {
+      throw error instanceof AppError ? error : handleApiError(error);
+    }
+  }
+
+  /**
+   * Update an existing mushroom condition (PUT /api/mushroom-conditions/:id)
+   */
+  async updateMushroomCondition(
+    id: number,
+    data: UpdateMushroomConditionRequest
+  ): Promise<MushroomCondition> {
+    try {
+      const response = await axiosClient.put<
+        { message?: string; data: MushroomCondition } | MushroomCondition
+      >(API_ENDPOINTS.MUSHROOM_CONDITIONS.DETAIL(id), data);
+
+      if ('data' in response.data && response.data.data) {
+        return response.data.data;
+      }
+      return response.data as MushroomCondition;
+    } catch (error) {
+      throw error instanceof AppError ? error : handleApiError(error);
+    }
+  }
+
+  /**
+   * Delete a mushroom condition (DELETE /api/mushroom-conditions/:id)
+   */
+  async deleteMushroomCondition(id: number): Promise<void> {
+    try {
+      await axiosClient.delete(API_ENDPOINTS.MUSHROOM_CONDITIONS.DETAIL(id));
+    } catch (error) {
+      throw error instanceof AppError ? error : handleApiError(error);
+    }
+  }
 }
 
 export const cultivationRepository = new CultivationRepository();
+

@@ -15,15 +15,18 @@ import { formatVND } from '../../src/core/utils/currency';
 import {
   cultivationRepository,
   MushroomCondition,
+  MushroomConditionModal,
   MushroomType,
 } from '../../src/features/cultivation';
 import {
+  AppButton,
   AppCard,
   AppDivider,
   AppHeader,
   AppText,
   ScreenContainer,
 } from '../../src/shared/components';
+
 
 export default function MushroomsScreen() {
   const router = useRouter();
@@ -32,6 +35,8 @@ export default function MushroomsScreen() {
   const [selectedMushroomId, setSelectedMushroomId] = useState<number | null>(null);
 
   const [loading, setLoading] = useState(true);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isEditingCondition, setIsEditingCondition] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -68,6 +73,49 @@ export default function MushroomsScreen() {
 
   const selectedMushroom = mushroomTypes.find((m) => m.mushroom_type_id === selectedMushroomId);
   const selectedCondition = conditions.find((c) => c.mushroom_type_id === selectedMushroomId);
+
+  const handleOpenCreate = () => {
+    setIsEditingCondition(false);
+    setIsModalVisible(true);
+  };
+
+  const handleOpenEdit = () => {
+    setIsEditingCondition(true);
+    setIsModalVisible(true);
+  };
+
+  const handleDeleteCondition = (conditionId: number) => {
+    Alert.alert(
+      'Xác nhận xóa',
+      `Bạn có chắc chắn muốn xóa bảng điều kiện vi khí hậu của giống nấm "${selectedMushroom?.name || ''}"?`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await cultivationRepository.deleteMushroomCondition(conditionId);
+              Alert.alert('Thành công', 'Đã xóa bảng điều kiện vi khí hậu.');
+              await loadData();
+            } catch (err: unknown) {
+              Alert.alert(
+                'Lỗi',
+                typeof err === 'string'
+                  ? err
+                  : err instanceof Error
+                  ? err.message
+                  : 'Không thể xóa điều kiện vi khí hậu.'
+              );
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   if (loading) {
     return (
@@ -154,12 +202,37 @@ export default function MushroomsScreen() {
 
         {/* Condition Thresholds Card */}
         <AppCard elevation="sm" style={styles.conditionCard}>
-          <View style={styles.cardTitleRow}>
-            <Ionicons name="thermometer-outline" size={22} color={theme.colors.primary[600]} />
-            <AppText variant="title" weight="bold">
-              Điều kiện vi khí hậu tối ưu
-            </AppText>
+          <View style={styles.cardHeaderWithAction}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="thermometer-outline" size={22} color={theme.colors.primary[600]} />
+              <AppText variant="title" weight="bold">
+                Điều kiện vi khí hậu tối ưu
+              </AppText>
+            </View>
+            {selectedCondition ? (
+              <View style={styles.cardActionButtons}>
+                <Pressable
+                  onPress={handleOpenEdit}
+                  style={styles.iconActionBtn}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Chỉnh sửa điều kiện"
+                >
+                  <Ionicons name="create-outline" size={18} color={theme.colors.primary[600]} />
+                </Pressable>
+                <Pressable
+                  onPress={() => handleDeleteCondition(selectedCondition.condition_id)}
+                  style={[styles.iconActionBtn, styles.deleteActionBtn]}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Xóa điều kiện"
+                >
+                  <Ionicons name="trash-outline" size={18} color={theme.colors.error.main} />
+                </Pressable>
+              </View>
+            ) : null}
           </View>
+
           <AppText variant="caption" color={theme.colors.text.secondary}>
             Ngưỡng môi trường cần duy trì trong buồng trồng cho giống {selectedMushroom?.name || ''}.
           </AppText>
@@ -197,27 +270,36 @@ export default function MushroomsScreen() {
                   {selectedCondition.co2_min ?? '—'} - {selectedCondition.co2_max ?? '—'} ppm
                 </AppText>
               </View>
-
-              <View style={styles.conditionRow}>
-                <View style={styles.conditionLabel}>
-                  <Ionicons name="earth" size={18} color={theme.colors.secondary[600]} />
-                  <AppText variant="bodySmall">Độ ẩm giá thể:</AppText>
-                </View>
-                <AppText variant="label" weight="bold">
-                  {selectedCondition.substrate_moisture_min ?? '—'} - {selectedCondition.substrate_moisture_max ?? '—'} %
-                </AppText>
-              </View>
             </View>
           ) : (
-            <View style={styles.emptyCondition}>
-              <Ionicons name="alert-circle-outline" size={24} color={theme.colors.text.muted} />
-              <AppText variant="caption" color={theme.colors.text.muted}>
-                Giống nấm này chưa được thiết lập bảng điều kiện sinh trưởng.
-              </AppText>
+            <View style={styles.emptyConditionWrapper}>
+              <View style={styles.emptyCondition}>
+                <Ionicons name="alert-circle-outline" size={22} color={theme.colors.warning.main} />
+                <AppText variant="caption" color={theme.colors.text.secondary}>
+                  Giống nấm này chưa được thiết lập bảng điều kiện sinh trưởng.
+                </AppText>
+              </View>
+              <AppButton
+                title="+ Thiết lập điều kiện vi khí hậu"
+                variant="primary"
+                size="sm"
+                onPress={handleOpenCreate}
+              />
             </View>
           )}
         </AppCard>
       </View>
+
+      {/* Modal: Gán / Chỉnh sửa điều kiện vi khí hậu */}
+      <MushroomConditionModal
+        visible={isModalVisible}
+        onClose={() => setIsModalVisible(false)}
+        mushroom={selectedMushroom || null}
+        existingCondition={isEditingCondition ? selectedCondition || null : null}
+        onSuccess={() => {
+          loadData();
+        }}
+      />
     </ScreenContainer>
   );
 }
@@ -312,7 +394,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.xs,
-    paddingVertical: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
     justifyContent: 'center',
+  },
+  cardHeaderWithAction: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardActionButtons: {
+    flexDirection: 'row',
+    gap: theme.spacing.xs,
+  },
+  iconActionBtn: {
+    padding: theme.spacing.xs,
+    backgroundColor: theme.colors.neutral[100],
+    borderRadius: theme.borderRadius.sm,
+  },
+  deleteActionBtn: {
+    backgroundColor: theme.colors.error.light,
+  },
+  emptyConditionWrapper: {
+    paddingVertical: theme.spacing.sm,
+    gap: theme.spacing.md,
+    alignItems: 'center',
   },
 });
