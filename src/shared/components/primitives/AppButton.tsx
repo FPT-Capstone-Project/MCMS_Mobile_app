@@ -14,7 +14,7 @@ import { AppText } from './AppText';
 export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
-export interface AppButtonProps extends Omit<PressableProps, 'style'> {
+export interface AppButtonProps extends Omit<PressableProps, 'style' | 'onPress'> {
   title: string;
   variant?: ButtonVariant;
   size?: ButtonSize;
@@ -25,6 +25,7 @@ export interface AppButtonProps extends Omit<PressableProps, 'style'> {
   rightIcon?: ReactNode;
   style?: ViewStyle;
   textStyle?: TextStyle;
+  onPress?: (event?: any) => void;
 }
 
 export const AppButton: React.FC<AppButtonProps> = ({

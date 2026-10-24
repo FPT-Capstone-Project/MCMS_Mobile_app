@@ -52,7 +52,7 @@ const TAB_CONFIGS: Record<string, TabConfig> = {
 
 export type TabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0];
 
-export const TabBar: React.FC<TabBarProps> = ({ state, descriptors, navigation }) => {
+export const TabBar: React.FC<TabBarProps> = ({ state, descriptors, emitter, navigateToTab }) => {
   const insets = useSafeAreaInsets();
 
   return (
@@ -77,19 +77,19 @@ export const TabBar: React.FC<TabBarProps> = ({ state, descriptors, navigation }
           };
 
           const onPress = () => {
-            const event = navigation.emit({
+            const event = emitter.emit({
               type: 'tabPress',
               target: route.key,
               canPreventDefault: true,
             });
 
             if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
+              navigateToTab(route.key);
             }
           };
 
           const onLongPress = () => {
-            navigation.emit({
+            emitter.emit({
               type: 'tabLongPress',
               target: route.key,
             });

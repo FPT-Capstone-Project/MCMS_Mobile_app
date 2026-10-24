@@ -20,6 +20,9 @@ import {
   rentalRepository,
 } from '../../src/features/rental';
 import {
+  CultivationTrayDetailModal,
+} from '../../src/features/cultivation';
+import {
   AppButton,
   AppCard,
   AppDivider,
@@ -39,6 +42,7 @@ export default function TrayScreen() {
   const [telemetry, setTelemetry] = useState<TrayTelemetry | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
 
   const loadTrayData = async () => {
     try {
@@ -226,7 +230,7 @@ export default function TrayScreen() {
                 </View>
               ) : null}
 
-              {/* Primary Action: Xem camera */}
+              {/* Action Buttons: Xem camera & Chi tiết khay */}
               <View style={styles.actionButtons}>
                 <AppButton
                   title="Xem camera trực tiếp"
@@ -237,6 +241,20 @@ export default function TrayScreen() {
                     <Ionicons name="videocam" size={20} color="#FFFFFF" />
                   }
                   onPress={handleGoToCamera}
+                />
+                <AppButton
+                  title="Xem chi tiết khay & chu kỳ nuôi trồng"
+                  variant="outline"
+                  size="md"
+                  fullWidth
+                  leftIcon={
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={20}
+                      color={theme.colors.primary[600]}
+                    />
+                  }
+                  onPress={() => setDetailModalVisible(true)}
                 />
               </View>
             </AppCard>
@@ -282,6 +300,26 @@ export default function TrayScreen() {
           </AppCard>
         )}
       </ScrollView>
+
+      {/* Tray Detail Modal for Active Rented Tray */}
+      {activeRental && (
+        <CultivationTrayDetailModal
+          visible={detailModalVisible}
+          onClose={() => setDetailModalVisible(false)}
+          tray={{
+            tray_id: 1,
+            room_id: 1,
+            tray_code: String(activeRental.trayId),
+            tray_name: `Khay ${activeRental.trayId}`,
+            status: 'OCCUPIED',
+            session_id: 1,
+            rental_id: 1,
+            mushroom_name: activeRental.mushroom.name,
+            start_date: activeRental.startDate,
+            end_date: activeRental.endDate,
+          }}
+        />
+      )}
     </ScreenContainer>
   );
 }
@@ -353,6 +391,7 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     marginTop: theme.spacing.xs,
+    gap: theme.spacing.sm,
   },
   infoCard: {
     backgroundColor: theme.colors.neutral[50],

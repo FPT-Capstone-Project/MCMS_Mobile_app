@@ -20,10 +20,8 @@ import {
   ScreenContainer,
 } from '../../../../shared/components';
 import { useAuth } from '../../../auth';
-import {
-  cultivationRepository,
-  CultivationRoom,
-} from '../../../cultivation';
+import { cultivationRepository } from '../../../cultivation/data/repositories/CultivationRepository';
+import type { CultivationRoom } from '../../../cultivation/domain/entities/Cultivation';
 import {
   FloorMapping,
   IotMaster,
@@ -786,7 +784,9 @@ export const ControlCenterScreen: React.FC = () => {
         visible={isConfigModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => !configSaving && setIsConfigModalVisible(false)}
+        onRequestClose={() => {
+          if (!configSaving) setIsConfigModalVisible(false);
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>

@@ -23,11 +23,12 @@ import {
   ScreenContainer,
 } from '../../../../shared/components';
 import { useAuth } from '../../../auth';
-import {
-  cultivationRepository,
+import { cultivationRepository } from '../../../cultivation/data/repositories/CultivationRepository';
+import type {
   CultivationRoom,
   CultivationTray,
-} from '../../../cultivation';
+} from '../../../cultivation/domain/entities/Cultivation';
+import { CultivationTrayDetailModal } from '../../../cultivation/presentation/components/CultivationTrayDetailModal';
 import {
   AdminRental,
   AutoControlLogItem,
@@ -255,6 +256,14 @@ export const AutomaticWizardScreen: React.FC = () => {
   const [hasMoreLogs, setHasMoreLogs] = useState(false);
   const [loadingMoreLogs, setLoadingMoreLogs] = useState(false);
 
+  // Status of all floors to track active sessions across the farm
+  const [floorStatuses, setFloorStatuses] = useState<Record<number, AutoControlStatus>>({});
+  const [loadingFloorStatuses, setLoadingFloorStatuses] = useState(false);
+
+  // Tray Cultivation Detail Modal State
+  const [selectedTrayForDetail, setSelectedTrayForDetail] = useState<CultivationTray | null>(null);
+  const [trayDetailModalVisible, setTrayDetailModalVisible] = useState(false);
+
   // General Loading & Action Loading
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -311,6 +320,32 @@ export const AutomaticWizardScreen: React.FC = () => {
     setIsFormDirty(false);
   }, []);
 
+  // Fetch status of all floors to detect active AUTO sessions across rooms
+  const fetchFloorStatuses = useCallback(async (floorsList: FloorMapping[]) => {
+    try {
+      setLoadingFloorStatuses(true);
+      const results = await Promise.allSettled(
+        floorsList.map(async (floor) => {
+          const fid = floor.floor_id ?? floor.id;
+          if (!fid) return null;
+          const st = await iotRepository.getAutoControlStatus(fid);
+          return { floorId: fid, status: st };
+        })
+      );
+      const map: Record<number, AutoControlStatus> = {};
+      results.forEach((r) => {
+        if (r.status === 'fulfilled' && r.value) {
+          map[r.value.floorId] = r.value.status;
+        }
+      });
+      setFloorStatuses(map);
+    } catch {
+      // Ignore background errors
+    } finally {
+      setLoadingFloorStatuses(false);
+    }
+  }, []);
+
   // 1. Initial Data Load
   const loadInitialData = useCallback(async () => {
     try {
@@ -331,6 +366,9 @@ export const AutomaticWizardScreen: React.FC = () => {
       if (mastersData.length > 0 && !masterIdInput) {
         setMasterIdInput(String(mastersData[0].id));
       }
+
+      // Concurrently scan all floors for active runs
+      fetchFloorStatuses(floorsData);
     } catch (err: unknown) {
       Alert.alert(
         'Lỗi nạp dữ liệu',
@@ -339,7 +377,7 @@ export const AutomaticWizardScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedRoomId, masterIdInput]);
+  }, [selectedRoomId, masterIdInput, fetchFloorStatuses]);
 
   useFocusEffect(
     useCallback(() => {
@@ -858,13 +896,17 @@ export const AutomaticWizardScreen: React.FC = () => {
       // Re-fetch status immediately
       const st = await iotRepository.getAutoControlStatus(floorId);
       setStatusData(st);
+      setFloorStatuses((prev) => ({ ...prev, [floorId]: st }));
     } catch (err: unknown) {
       Alert.alert(
         'Lỗi khởi chạy mô phỏng',
         typeof err === 'string' ? err : err instanceof Error ? err.message : 'Không thể bắt đầu mô phỏng.'
       );
       // Re-check status on timeout / error
-      iotRepository.getAutoControlStatus(floorId).then(setStatusData).catch(() => {});
+      iotRepository.getAutoControlStatus(floorId).then((st) => {
+        setStatusData(st);
+        setFloorStatuses((prev) => ({ ...prev, [floorId]: st }));
+      }).catch(() => {});
     } finally {
       setActionLoading(false);
     }
@@ -889,13 +931,17 @@ export const AutomaticWizardScreen: React.FC = () => {
               Alert.alert('Thành công', 'Đã kích hoạt điều khiển phun sương tự động thực tế.');
               const st = await iotRepository.getAutoControlStatus(floorId);
               setStatusData(st);
+              setFloorStatuses((prev) => ({ ...prev, [floorId]: st }));
             } catch (err: unknown) {
               Alert.alert(
                 'Khởi chạy thực tế thất bại',
                 typeof err === 'string' ? err : err instanceof Error ? err.message : 'Không thể kích hoạt chạy thật.'
               );
               // Re-check real state
-              iotRepository.getAutoControlStatus(floorId).then(setStatusData).catch(() => {});
+              iotRepository.getAutoControlStatus(floorId).then((st) => {
+                setStatusData(st);
+                setFloorStatuses((prev) => ({ ...prev, [floorId]: st }));
+              }).catch(() => {});
             } finally {
               setActionLoading(false);
             }
@@ -913,6 +959,7 @@ export const AutomaticWizardScreen: React.FC = () => {
       setActionLoading(true);
       const res = await iotRepository.stopAutoControl(floorId);
       setStatusData(res);
+      setFloorStatuses((prev) => ({ ...prev, [floorId]: res }));
       Alert.alert(
         'Đã dừng tự động',
         'Đã gửi lệnh dừng. Hệ thống chuyển về MANUAL. Nếu còn OFF_PENDING, hệ thống sẽ tiếp tục đợi xác nhận từ rơ-le.'
@@ -922,11 +969,115 @@ export const AutomaticWizardScreen: React.FC = () => {
         'Lỗi dừng AUTO',
         typeof err === 'string' ? err : err instanceof Error ? err.message : 'Không thể dừng tiến trình.'
       );
-      iotRepository.getAutoControlStatus(floorId).then(setStatusData).catch(() => {});
+      iotRepository.getAutoControlStatus(floorId).then((st) => {
+        setStatusData(st);
+        setFloorStatuses((prev) => ({ ...prev, [floorId]: st }));
+      }).catch(() => {});
     } finally {
       setActionLoading(false);
     }
   };
+
+  // Direct Navigation Helpers
+  const canNavigateToStep = (targetStep: number): boolean => {
+    if (targetStep === 1) return true;
+    if (targetStep === 2) return selectedRoomId != null;
+    return selectedFloor != null;
+  };
+
+  const handleJumpToStep5 = useCallback(
+    (floor: FloorMapping) => {
+      setSelectedFloor(floor);
+      if (floor.room_id) {
+        setSelectedRoomId(floor.room_id);
+      }
+      const floorId = floor.floor_id ?? floor.id;
+      if (floorId) {
+        loadFloorCultivationAndConfig(floorId);
+        loadFloorSuggestions(floorId, true);
+        if (floorStatuses[floorId]) {
+          setStatusData(floorStatuses[floorId]);
+        }
+      }
+      setStep(5);
+    },
+    [floorStatuses, loadFloorCultivationAndConfig, loadFloorSuggestions]
+  );
+
+  const handleJumpToStep4 = useCallback(
+    (floor: FloorMapping) => {
+      setSelectedFloor(floor);
+      if (floor.room_id) {
+        setSelectedRoomId(floor.room_id);
+      }
+      const floorId = floor.floor_id ?? floor.id;
+      if (floorId) {
+        loadFloorCultivationAndConfig(floorId);
+        loadFloorSuggestions(floorId, true);
+        if (floorStatuses[floorId]) {
+          setStatusData(floorStatuses[floorId]);
+        }
+      }
+      setStep(4);
+    },
+    [floorStatuses, loadFloorCultivationAndConfig, loadFloorSuggestions]
+  );
+
+  const handleQuickStop = useCallback(
+    (floor: FloorMapping, roomName?: string) => {
+      const floorId = floor.floor_id ?? floor.id;
+      if (!floorId) return;
+
+      Alert.alert(
+        'DỪNG TỰ ĐỘNG KHẨN CẤP',
+        `Bạn có chắc chắn muốn dừng chế độ tự động cho "${floor.floor_name}"${roomName ? ` (${roomName})` : ''} và tắt rơ-le phun sương ngay lập tức?`,
+        [
+          { text: 'Hủy', style: 'cancel' },
+          {
+            text: 'Dừng ngay',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                setActionLoading(true);
+                const res = await iotRepository.stopAutoControl(floorId);
+                Alert.alert('Đã dừng thành công', `Hệ thống đã dừng điều khiển tự động cho ${floor.floor_name}.`);
+                setFloorStatuses((prev) => ({ ...prev, [floorId]: res }));
+                if ((selectedFloor?.floor_id ?? selectedFloor?.id) === floorId) {
+                  setStatusData(res);
+                }
+              } catch (err: unknown) {
+                Alert.alert(
+                  'Lỗi dừng tự động',
+                  typeof err === 'string' ? err : err instanceof Error ? err.message : 'Không thể dừng tiến trình.'
+                );
+              } finally {
+                setActionLoading(false);
+              }
+            },
+          },
+        ]
+      );
+    },
+    [selectedFloor]
+  );
+
+  // Active running sessions across all floors
+  const activeFloorSessions = floors
+    .map((floor) => {
+      const fid = floor.floor_id ?? floor.id;
+      const status = fid ? floorStatuses[fid] : undefined;
+      const room = rooms.find((r) => r.room_id === floor.room_id);
+      return { floor, room, status };
+    })
+    .filter((item): item is { floor: FloorMapping; room: CultivationRoom | undefined; status: AutoControlStatus } => {
+      if (!item.status) return false;
+      const isAuto = item.status.mode === 'AUTO';
+      const isRunning = item.status.run?.status === 'RUNNING';
+      const isTransitional = ['MISTING', 'ON_REQUESTED', 'OFF_PENDING'].includes(
+        item.status.runtime?.control_state
+      );
+      return isAuto || isRunning || isTransitional;
+    });
 
   // Distinct mushroom crops on this floor
   const activeCropNames = Array.from(
@@ -975,26 +1126,198 @@ export const AutomaticWizardScreen: React.FC = () => {
             { s: 3, title: '3. Khay & Trồng' },
             { s: 4, title: '4. Cấu hình' },
             { s: 5, title: '5. Vận hành' },
-          ].map((item) => (
-            <Pressable
-              key={item.s}
-              onPress={() => item.s < step && setStep(item.s as any)}
-              style={[styles.stepItem, step === item.s && styles.stepItemActive]}
-            >
-              <AppText
-                variant="caption"
-                weight={step === item.s ? 'bold' : 'normal'}
-                color={step === item.s ? theme.colors.primary[600] : theme.colors.text.muted}
+          ].map((item) => {
+            const isAccessible = canNavigateToStep(item.s);
+            const isActive = step === item.s;
+            return (
+              <Pressable
+                key={item.s}
+                onPress={() => {
+                  if (isAccessible) {
+                    setStep(item.s as any);
+                  } else {
+                    if (item.s === 2 && !selectedRoomId) {
+                      Alert.alert('Chưa chọn phòng', 'Vui lòng chọn một phòng nuôi trồng ở Bước 1 trước.');
+                    } else if (item.s >= 3 && !selectedFloor) {
+                      Alert.alert('Chưa chọn tầng', 'Vui lòng chọn một tầng ở Bước 2 trước khi sang bước này.');
+                    }
+                  }
+                }}
+                style={[
+                  styles.stepItem,
+                  isActive && styles.stepItemActive,
+                  !isAccessible && styles.stepItemDisabled,
+                ]}
               >
-                {item.title}
-              </AppText>
-            </Pressable>
-          ))}
+                <AppText
+                  variant="caption"
+                  weight={isActive ? 'bold' : 'normal'}
+                  color={
+                    isActive
+                      ? theme.colors.primary[600]
+                      : isAccessible
+                      ? theme.colors.text.primary
+                      : theme.colors.text.muted
+                  }
+                >
+                  {item.title}
+                </AppText>
+              </Pressable>
+            );
+          })}
         </ScrollView>
 
-        {/* ================= STEP 1: CHỌN PHÒNG ================= */}
+        {/* ================= STEP 1: CHỌN PHÒNG & TỔNG QUAN AUTO ================= */}
         {step === 1 && (
           <View style={styles.section}>
+            {/* Active Sessions Overview */}
+            <View style={styles.activeSessionsContainer}>
+              <View style={styles.activeSessionsHeader}>
+                <View style={styles.activeSessionsTitleRow}>
+                  <Ionicons name="flash" size={18} color={theme.colors.secondary[700]} />
+                  <AppText variant="title" weight="bold" style={{ marginLeft: 6 }}>
+                    Phiên Tự Động Đang Vận Hành ({activeFloorSessions.length})
+                  </AppText>
+                </View>
+                <Pressable
+                  onPress={() => fetchFloorStatuses(floors)}
+                  style={styles.refreshIconBtn}
+                  hitSlop={8}
+                >
+                  {loadingFloorStatuses ? (
+                    <ActivityIndicator size="small" color={theme.colors.primary[500]} />
+                  ) : (
+                    <Ionicons name="refresh" size={18} color={theme.colors.primary[600]} />
+                  )}
+                </Pressable>
+              </View>
+
+              {activeFloorSessions.length === 0 ? (
+                <View style={styles.emptyActiveBox}>
+                  <Ionicons name="checkmark-circle-outline" size={22} color={theme.colors.success.main} />
+                  <AppText variant="caption" color={theme.colors.text.secondary} style={{ marginLeft: 8 }}>
+                    Hiện không có tầng nào đang chạy tự động.
+                  </AppText>
+                </View>
+              ) : (
+                <View style={styles.activeCardsList}>
+                  {activeFloorSessions.map(({ floor, room, status }) => {
+                    const floorId = floor.floor_id ?? floor.id;
+                    const isDryRun = status.run?.dry_run;
+                    const isFault =
+                      status.run?.status === 'FAULT' ||
+                      status.runtime?.control_state === 'FAULT' ||
+                      status.runtime?.control_state === 'SENSOR_FAULT';
+                    const ssrOn = status.ssr?.reported_state === 'ON';
+                    const stateLabel =
+                      AUTO_CONTROL_STATE_LABELS[status.runtime?.control_state] || status.runtime?.control_state;
+
+                    return (
+                      <AppCard key={floorId} elevation="sm" style={styles.activeCard}>
+                        <View style={styles.activeCardHeader}>
+                          <View style={styles.activeCardTitleCol}>
+                            <View style={styles.activeCardTitleRow}>
+                              <Ionicons name="layers" size={16} color={theme.colors.primary[600]} />
+                              <AppText variant="title" weight="bold" style={{ marginLeft: 6 }}>
+                                {floor.floor_name}
+                              </AppText>
+                              <AppText variant="caption" color={theme.colors.text.secondary} style={{ marginLeft: 6 }}>
+                                • {room?.room_name || `Phòng ID ${floor.room_id}`}
+                              </AppText>
+                            </View>
+                            <AppText variant="caption" color={theme.colors.text.secondary}>
+                              Master: {floor.master_id} • Node {floor.node_address} • Kênh SSR {floor.misting_ssr_channel}
+                            </AppText>
+                          </View>
+
+                          {/* Status Badge */}
+                          <View
+                            style={[
+                              styles.statusBadge,
+                              isFault
+                                ? styles.statusBadgeFault
+                                : isDryRun
+                                ? styles.statusBadgeDryRun
+                                : styles.statusBadgeRunning,
+                            ]}
+                          >
+                            <Ionicons
+                              name={isFault ? 'alert-circle' : isDryRun ? 'flask' : 'play'}
+                              size={12}
+                              color="#FFFFFF"
+                            />
+                            <AppText variant="caption" weight="bold" color="#FFFFFF" style={{ marginLeft: 4, fontSize: 10 }}>
+                              {isFault ? 'LỖI' : isDryRun ? 'MÔ PHỎNG' : 'AUTO THẬT'}
+                            </AppText>
+                          </View>
+                        </View>
+
+                        {/* Live sensor & state info */}
+                        <View style={styles.activeCardMetricsRow}>
+                          <View style={styles.metricItem}>
+                            <AppText variant="caption" color={theme.colors.text.secondary}>
+                              Trạng thái
+                            </AppText>
+                            <AppText
+                              variant="caption"
+                              weight="bold"
+                              color={isFault ? theme.colors.error.main : theme.colors.primary[700]}
+                            >
+                              {stateLabel}
+                            </AppText>
+                          </View>
+                          <View style={styles.metricItem}>
+                            <AppText variant="caption" color={theme.colors.text.secondary}>
+                              Rơ-le SSR
+                            </AppText>
+                            <AppText
+                              variant="caption"
+                              weight="bold"
+                              color={ssrOn ? theme.colors.success.main : theme.colors.text.secondary}
+                            >
+                              {ssrOn ? 'ĐANG BẬT' : 'TẮT'}
+                            </AppText>
+                          </View>
+                          {status.environment && (
+                            <View style={styles.metricItem}>
+                              <AppText variant="caption" color={theme.colors.text.secondary}>
+                                Khí hậu đo
+                              </AppText>
+                              <AppText variant="caption" weight="bold">
+                                {status.environment.averageTemperature != null ? `${status.environment.averageTemperature}°C` : '--'} •{' '}
+                                {status.environment.averageHumidity != null ? `${status.environment.averageHumidity}%` : '--'}
+                              </AppText>
+                            </View>
+                          )}
+                        </View>
+
+                        {/* Quick Action Buttons */}
+                        <View style={styles.activeCardActionsRow}>
+                          <AppButton
+                            title="Dừng ngay (STOP)"
+                            variant="danger"
+                            size="sm"
+                            style={styles.activeActionBtn}
+                            loading={actionLoading}
+                            onPress={() => handleQuickStop(floor, room?.room_name)}
+                          />
+                          <AppButton
+                            title="Vào giám sát (Bước 5) ⚡"
+                            variant="primary"
+                            size="sm"
+                            style={styles.activeActionBtn}
+                            onPress={() => handleJumpToStep5(floor)}
+                          />
+                        </View>
+                      </AppCard>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+
+            <AppDivider spacing="sm" />
+
             <AppText variant="h3">Chọn phòng nuôi trồng</AppText>
             <AppText variant="bodySmall" color={theme.colors.text.secondary}>
               Chọn buồng nuôi trồng thông minh để cấu hình hệ thống phun sương vi khí hậu theo tầng.
@@ -1166,43 +1489,119 @@ export const AutomaticWizardScreen: React.FC = () => {
                     const floorId = floor.floor_id ?? floor.id;
                     const isSelected = (selectedFloor?.floor_id ?? selectedFloor?.id) === floorId;
                     const masterMatch = masters.find((m) => m.id === floor.master_id);
+                    const status = floorId ? floorStatuses[floorId] : undefined;
+                    const isAutoRunning = status?.mode === 'AUTO' || status?.run?.status === 'RUNNING';
+                    const isDryRun = status?.run?.dry_run;
+                    const isFault =
+                      status?.run?.status === 'FAULT' ||
+                      status?.runtime?.control_state === 'FAULT' ||
+                      status?.runtime?.control_state === 'SENSOR_FAULT';
+                    const stateLabel = status?.runtime?.control_state
+                      ? AUTO_CONTROL_STATE_LABELS[status.runtime.control_state] || status.runtime.control_state
+                      : null;
 
                     return (
-                      <Pressable
+                      <AppCard
                         key={floorId || floor.floor_number}
-                        onPress={() => handleSelectFloor(floor)}
+                        elevation={isSelected ? 'md' : 'xs'}
+                        style={[styles.cardItem, isSelected && styles.cardSelected]}
                       >
-                        <AppCard
-                          elevation={isSelected ? 'md' : 'xs'}
-                          style={[styles.cardItem, isSelected && styles.cardSelected]}
+                        <Pressable
+                          onPress={() => handleSelectFloor(floor)}
+                          style={styles.cardHeaderRow}
                         >
-                          <View style={styles.cardHeaderRow}>
-                            <View style={styles.iconCircle}>
-                              <Ionicons name="layers" size={22} color={theme.colors.primary[600]} />
-                            </View>
-                            <View style={styles.cardInfo}>
+                          <View style={styles.iconCircle}>
+                            <Ionicons name="layers" size={22} color={theme.colors.primary[600]} />
+                          </View>
+                          <View style={styles.cardInfo}>
+                            <View style={styles.rowAlign}>
                               <AppText variant="title" weight="bold">
                                 {floor.floor_name} (Tầng {floor.floor_number})
                               </AppText>
-                              <AppText variant="caption" color={theme.colors.text.secondary}>
-                                Master: {masterMatch?.masterId || floor.master_id} • Node: {floor.node_address} • SSR Kênh {floor.misting_ssr_channel}
-                              </AppText>
+                              {isAutoRunning && (
+                                <View
+                                  style={[
+                                    styles.miniBadge,
+                                    isFault ? styles.statusBadgeFault : isDryRun ? styles.statusBadgeDryRun : styles.statusBadgeRunning,
+                                  ]}
+                                >
+                                  <AppText variant="caption" weight="bold" color="#FFFFFF" style={{ fontSize: 10 }}>
+                                    {isFault ? 'LỖI' : isDryRun ? 'MÔ PHỎNG' : 'AUTO ĐANG CHẠY'}
+                                  </AppText>
+                                </View>
+                              )}
                             </View>
-                            {canControlIot && (
-                              <Pressable
-                                onPress={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenEditFloor(floor);
-                                }}
-                                style={styles.iconBtn}
-                              >
-                                <Ionicons name="pencil" size={18} color={theme.colors.primary[700]} />
-                              </Pressable>
+                            <AppText variant="caption" color={theme.colors.text.secondary}>
+                              Master: {masterMatch?.masterId || floor.master_id} • Node: {floor.node_address} • SSR Kênh {floor.misting_ssr_channel}
+                            </AppText>
+                            {stateLabel && (
+                              <AppText variant="caption" color={isFault ? theme.colors.error.main : theme.colors.primary[700]} weight="bold">
+                                Trạng thái: {stateLabel}
+                              </AppText>
                             )}
-                            <Ionicons name="chevron-forward" size={20} color={theme.colors.text.muted} />
                           </View>
-                        </AppCard>
-                      </Pressable>
+                          {canControlIot && (
+                            <Pressable
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                handleOpenEditFloor(floor);
+                              }}
+                              style={styles.iconBtn}
+                            >
+                              <Ionicons name="pencil" size={18} color={theme.colors.primary[700]} />
+                            </Pressable>
+                          )}
+                          <Ionicons name="chevron-forward" size={20} color={theme.colors.text.muted} />
+                        </Pressable>
+
+                        {/* Quick Navigation & Action Buttons for Floor */}
+                        <View style={styles.floorQuickActionsRow}>
+                          <Pressable
+                            style={styles.floorQuickActionBtn}
+                            onPress={() => handleSelectFloor(floor)}
+                          >
+                            <Ionicons name="cube-outline" size={13} color={theme.colors.primary[700]} />
+                            <AppText variant="caption" weight="semibold" color={theme.colors.primary[700]} style={{ marginLeft: 4 }}>
+                              Khay (B3)
+                            </AppText>
+                          </Pressable>
+
+                          <Pressable
+                            style={styles.floorQuickActionBtn}
+                            onPress={() => handleJumpToStep4(floor)}
+                          >
+                            <Ionicons name="settings-outline" size={13} color={theme.colors.primary[700]} />
+                            <AppText variant="caption" weight="semibold" color={theme.colors.primary[700]} style={{ marginLeft: 4 }}>
+                              Cấu hình (B4)
+                            </AppText>
+                          </Pressable>
+
+                          <Pressable
+                            style={[styles.floorQuickActionBtn, styles.floorQuickActionBtnHighlight]}
+                            onPress={() => handleJumpToStep5(floor)}
+                          >
+                            <Ionicons name="flash" size={13} color="#FFFFFF" />
+                            <AppText variant="caption" weight="bold" color="#FFFFFF" style={{ marginLeft: 4 }}>
+                              Vận hành (B5) ⚡
+                            </AppText>
+                          </Pressable>
+
+                          {isAutoRunning && (
+                            <Pressable
+                              style={[styles.floorQuickActionBtn, styles.floorQuickActionBtnStop]}
+                              onPress={() => {
+                                const room = rooms.find((r) => r.room_id === selectedRoomId);
+                                handleQuickStop(floor, room?.room_name);
+                              }}
+                            >
+                              <Ionicons name="stop-circle" size={13} color={theme.colors.error.main} />
+                              <AppText variant="caption" weight="bold" color={theme.colors.error.main} style={{ marginLeft: 4 }}>
+                                Dừng
+                              </AppText>
+                            </Pressable>
+                          )}
+                        </View>
+                      </AppCard>
                     );
                   })
                 )}
@@ -1291,6 +1690,40 @@ export const AutomaticWizardScreen: React.FC = () => {
                           )}
                         </View>
                       </View>
+
+                      {hasActiveSession && (
+                        <View style={styles.trayActionRow}>
+                          <AppButton
+                            title="Xem chi tiết nuôi trồng"
+                            variant="ghost"
+                            size="sm"
+                            leftIcon={
+                              <Ionicons
+                                name="information-circle-outline"
+                                size={16}
+                                color={theme.colors.primary[600]}
+                              />
+                            }
+                            onPress={() => {
+                              const convertedTray: CultivationTray = {
+                                tray_id: tray.tray_id,
+                                room_id: selectedRoomId || 0,
+                                floor_id: selectedFloor?.floor_id ?? selectedFloor?.id ?? null,
+                                tray_code: tray.tray_code,
+                                tray_name: `Khay ${tray.tray_code}`,
+                                status: 'OCCUPIED',
+                                session_id: tray.session_id,
+                                rental_id: tray.rental_id,
+                                mushroom_name: tray.mushroom_name,
+                                mushroom_type_id: tray.mushroom_type_id,
+                                cultivation_status: tray.cultivation_status,
+                              };
+                              setSelectedTrayForDetail(convertedTray);
+                              setTrayDetailModalVisible(true);
+                            }}
+                          />
+                        </View>
+                      )}
 
                       {!hasActiveSession && canControlIot && (
                         <View style={styles.trayActionRow}>
@@ -1778,15 +2211,24 @@ export const AutomaticWizardScreen: React.FC = () => {
                 </View>
               )}
 
-              <AppButton
-                title="Lưu cấu hình & Tiếp tục →"
-                variant="primary"
-                size="lg"
-                loading={actionLoading}
-                disabled={currentFloorBusy || (suggestions?.config === null)}
-                onPress={handleSaveConfig}
-                style={styles.btnFull}
-              />
+              <View style={styles.step4ActionButtons}>
+                <AppButton
+                  title="Lưu cấu hình & Tiếp tục →"
+                  variant="primary"
+                  size="md"
+                  loading={actionLoading}
+                  disabled={currentFloorBusy || suggestions?.config === null}
+                  onPress={handleSaveConfig}
+                  style={styles.flexOne}
+                />
+                <AppButton
+                  title="Sang Vận hành (B5) ⚡"
+                  variant="outline"
+                  size="md"
+                  onPress={() => setStep(5)}
+                  style={styles.flexOne}
+                />
+              </View>
               {suggestions?.config === null && (
                 <AppText variant="caption" color={theme.colors.error.main} style={{ textAlign: 'center' }}>
                   Không thể lưu cấu hình do chưa có phiên trồng hợp lệ hoặc điều kiện xung đột.
@@ -2185,6 +2627,15 @@ export const AutomaticWizardScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Tray Cultivation Detail Modal */}
+      <CultivationTrayDetailModal
+        visible={trayDetailModalVisible}
+        onClose={() => setTrayDetailModalVisible(false)}
+        tray={selectedTrayForDetail}
+        room={rooms.find((r) => r.room_id === selectedRoomId)}
+        floor={selectedFloor}
+      />
     </ScreenContainer>
   );
 };
@@ -2589,5 +3040,137 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.spacing.sm,
     marginTop: theme.spacing.xs,
+  },
+  stepItemDisabled: {
+    opacity: 0.45,
+  },
+  activeSessionsContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    gap: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+  },
+  activeSessionsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  activeSessionsTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  refreshIconBtn: {
+    padding: 6,
+  },
+  emptyActiveBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    backgroundColor: theme.colors.neutral[50],
+    borderRadius: theme.borderRadius.md,
+  },
+  activeCardsList: {
+    gap: theme.spacing.sm,
+  },
+  activeCard: {
+    backgroundColor: theme.colors.neutral[50],
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.sm,
+    gap: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+  },
+  activeCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  activeCardTitleCol: {
+    flex: 1,
+  },
+  activeCardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: theme.borderRadius.full,
+  },
+  statusBadgeRunning: {
+    backgroundColor: theme.colors.success.main,
+  },
+  statusBadgeDryRun: {
+    backgroundColor: theme.colors.secondary[700],
+  },
+  statusBadgeFault: {
+    backgroundColor: theme.colors.error.main,
+  },
+  activeCardMetricsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: theme.spacing.xs,
+    borderRadius: theme.borderRadius.sm,
+    marginVertical: 4,
+  },
+  activeCardActionsRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    marginTop: 4,
+  },
+  activeActionBtn: {
+    flex: 1,
+  },
+  rowAlign: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  miniBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.full,
+  },
+  floorQuickActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingTop: theme.spacing.xs,
+    marginTop: theme.spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border.light,
+    flexWrap: 'wrap',
+  },
+  floorQuickActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.primary[50],
+    borderWidth: 1,
+    borderColor: theme.colors.primary[200],
+  },
+  floorQuickActionBtnHighlight: {
+    backgroundColor: theme.colors.primary[600],
+    borderColor: theme.colors.primary[700],
+  },
+  floorQuickActionBtnStop: {
+    backgroundColor: theme.colors.error.light,
+    borderColor: theme.colors.error.main,
+  },
+  step4ActionButtons: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
   },
 });

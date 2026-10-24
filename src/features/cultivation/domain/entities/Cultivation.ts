@@ -17,11 +17,49 @@ export interface CultivationRoom {
 export interface CultivationTray {
   tray_id: number;
   room_id: number;
+  floor_id?: number | null;
   tray_code: string;
   tray_name: string | null;
   status: 'AVAILABLE' | 'OCCUPIED' | 'MAINTENANCE' | 'INACTIVE';
+  session_id?: number | null;
+  rental_id?: number | null;
+  mushroom_type_id?: number | null;
+  mushroom_name?: string | null;
+  cultivation_status?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface CultivatedTrayDetail {
+  tray: CultivationTray;
+  room?: CultivationRoom | null;
+  floor?: {
+    floor_id?: number;
+    floor_name?: string;
+    floor_number?: number;
+    master_id?: string;
+    node_address?: number;
+    misting_ssr_channel?: number;
+  } | null;
+  session?: {
+    session_id?: number | null;
+    rental_id?: number | null;
+    status?: string | null;
+    start_date?: string | null;
+    end_date?: string | null;
+    duration_days?: number | null;
+    customer_name?: string | null;
+    customer_email?: string | null;
+  } | null;
+  mushroom?: MushroomType | null;
+  condition?: MushroomCondition | null;
+  environment?: {
+    temperature?: number | null;
+    humidity?: number | null;
+    co2?: number | null;
+  } | null;
 }
 
 export interface MushroomType {

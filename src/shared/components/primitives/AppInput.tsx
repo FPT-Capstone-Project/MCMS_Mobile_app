@@ -25,7 +25,7 @@ export interface AppInputProps extends Omit<TextInputProps, 'style'> {
   required?: boolean;
 }
 
-export const AppInput = React.forwardRef<TextInput, AppInputProps>(
+export const AppInput = React.forwardRef<React.ComponentRef<typeof TextInput>, AppInputProps>(
   (
     {
       label,
@@ -48,8 +48,8 @@ export const AppInput = React.forwardRef<TextInput, AppInputProps>(
     },
     ref
   ) => {
-    const innerRef = React.useRef<TextInput>(null);
-    React.useImperativeHandle(ref, () => innerRef.current as TextInput);
+    const innerRef = React.useRef<React.ComponentRef<typeof TextInput>>(null);
+    React.useImperativeHandle(ref, () => innerRef.current as React.ComponentRef<typeof TextInput>);
 
     const [isFocused, setIsFocused] = useState(false);
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);

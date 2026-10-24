@@ -32,7 +32,7 @@ export const AppCard: React.FC<AppCardProps> = ({
     const shadowStyle = variant === 'elevated' ? theme.shadows[elevation] : theme.shadows.none;
     const paddingValue = theme.spacing[padding] ?? theme.spacing.base;
 
-    return StyleSheet.flatten([
+    return (StyleSheet.flatten([
       styles.base,
       variantStyles[variant],
       shadowStyle,
@@ -40,7 +40,7 @@ export const AppCard: React.FC<AppCardProps> = ({
       pressed && !disabled ? styles.pressed : undefined,
       disabled ? styles.disabled : undefined,
       style,
-    ]);
+    ]) ?? {}) as ViewStyle;
   };
 
   if (onPress) {

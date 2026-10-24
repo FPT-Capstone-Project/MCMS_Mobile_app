@@ -1,6 +1,6 @@
 # Expo HAS CHANGED
 
-Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
+Read the exact versioned docs at https://docs.expo.dev/versions/v58.0.0/ before writing any code.
 # MCMS Mobile App - AGENTS.md
 
 ## 1. Project
@@ -12,7 +12,7 @@ The app is primarily designed for Customer users.
 Tech stack:
 
 - React Native
-- Expo SDK 57
+- Expo SDK 58
 - TypeScript
 - Expo Router
 - Redux Toolkit
@@ -29,11 +29,11 @@ Tech stack:
 
 ## 2. Expo Version
 
-This project uses Expo SDK 57.
+This project uses Expo SDK 58.
 
-Before writing or modifying Expo-specific code, use the exact Expo SDK 57 documentation:
+Before writing or modifying Expo-specific code, use the exact Expo SDK 58 documentation:
 
-https://docs.expo.dev/versions/v57.0.0/
+https://docs.expo.dev/versions/v58.0.0/
 
 Do not use APIs or packages intended for incompatible Expo versions.
 
