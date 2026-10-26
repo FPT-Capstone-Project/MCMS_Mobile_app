@@ -1,2 +1,2 @@
-// Notification feature scaffold - clean architecture (domain, data, presentation)
-export {};
+export * from './domain/entities/Notification';
+export * from './data/repositories/NotificationRepository';

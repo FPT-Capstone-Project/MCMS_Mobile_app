@@ -3,7 +3,7 @@ import { LiveCameraScreen } from '../../src/features/monitoring';
 
 /**
  * Dedicated Live Camera Stream Route
- * /camera/[trayId]
+ * /camera/[cameraId]
  */
 export default function LiveCameraRoute() {
   return <LiveCameraScreen />;

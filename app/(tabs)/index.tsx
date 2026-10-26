@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { theme } from '../../src/core/theme';
+import { ENV } from '../../src/core/config';
 import {
   CustomerOrder,
   orderRepository,
@@ -122,15 +123,6 @@ const customerActions: QuickActionItem[] = [
     route: '/(tabs)/orders',
   },
   {
-    id: 'climate',
-    title: 'Cảm biến vi khí hậu',
-    desc: 'Nhiệt độ & Độ ẩm buồng',
-    icon: 'stats-chart-outline',
-    iconColor: '#F59E0B',
-    iconBg: 'rgba(245, 158, 11, 0.1)',
-    route: '/sensors',
-  },
-  {
     id: 'mushrooms',
     title: 'Danh mục nấm',
     desc: 'Các giống nấm phổ biến',
@@ -140,13 +132,22 @@ const customerActions: QuickActionItem[] = [
     route: '/mushrooms',
   },
   {
-    id: 'cultivation',
-    title: 'Phòng nuôi trồng',
-    desc: 'Không gian & Điều kiện phòng',
-    icon: 'layers-outline',
+    id: 'notifications',
+    title: 'Thông báo',
+    desc: 'Cập nhật từ SmartMush',
+    icon: 'notifications-outline',
     iconColor: '#8B5CF6',
     iconBg: 'rgba(139, 92, 246, 0.1)',
-    route: '/cultivation',
+    route: '/(tabs)/notifications',
+  },
+  {
+    id: 'camera',
+    title: 'Camera trực tiếp',
+    desc: 'Theo dõi hình ảnh buồng nuôi',
+    icon: 'videocam-outline',
+    iconColor: '#0EA5E9',
+    iconBg: 'rgba(14, 165, 233, 0.1)',
+    route: `/camera/${ENV.cameraId}`,
   },
 ];
 
@@ -168,25 +169,34 @@ export default function HomeScreen() {
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [masters, setMasters] = useState<IotMaster[]>([]);
   const [activeSensors, setActiveSensors] = useState<IotSensor[]>([]);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
 
   const loadDashboardData = useCallback(async () => {
+    setDashboardLoading(true);
+    setDashboardError(null);
     try {
-      const [ordersData, mastersData] = await Promise.all([
-        orderRepository.getCustomerOrders().catch(() => []),
-        iotRepository.getMasters().catch(() => []),
-      ]);
-
+      const ordersData = await orderRepository.getCustomerOrders();
       setOrders(ordersData);
-      setMasters(mastersData);
 
-      if (mastersData.length > 0) {
-        const sensors = await iotRepository.getMasterSensors(mastersData[0].masterId).catch(() => []);
-        setActiveSensors(sensors);
+      if (isStaff) {
+        const mastersData = await iotRepository.getMasters();
+        setMasters(mastersData);
+        if (mastersData.length > 0) {
+          const sensors = await iotRepository.getMasterSensors(mastersData[0].masterId);
+          setActiveSensors(sensors);
+        } else {
+          setActiveSensors([]);
+        }
       }
-    } catch {
-      // Graceful fallback
+    } catch (error: unknown) {
+      setDashboardError(
+        error instanceof Error ? error.message : 'Không thể tải dữ liệu trang chủ.'
+      );
+    } finally {
+      setDashboardLoading(false);
     }
-  }, []);
+  }, [isStaff]);
 
   useFocusEffect(
     useCallback(() => {
@@ -201,12 +211,12 @@ export default function HomeScreen() {
   const avgTemp =
     validTempSensors.length > 0
       ? (validTempSensors.reduce((acc, s) => acc + (s.temperature || 0), 0) / validTempSensors.length).toFixed(1)
-      : '25.0';
+      : null;
 
   const avgHum =
     validHumSensors.length > 0
       ? (validHumSensors.reduce((acc, s) => acc + (s.humidity || 0), 0) / validHumSensors.length).toFixed(0)
-      : '85';
+      : null;
 
   const firstMaster = masters[0];
   const pendingOrders = orders.filter((o) => o.order_status === 'PENDING');
@@ -301,6 +311,21 @@ export default function HomeScreen() {
           </AppCard>
         )}
 
+        {dashboardError ? (
+          <AppCard elevation="xs" style={styles.dashboardError}>
+            <AppText variant="bodySmall" color={theme.colors.error.main}>
+              {dashboardError}
+            </AppText>
+            <AppButton
+              title="Tải lại"
+              variant="outline"
+              size="sm"
+              loading={dashboardLoading}
+              onPress={loadDashboardData}
+            />
+          </AppCard>
+        ) : null}
+
         {/* Pending Order Notice Banner (Customer Only) */}
         {!isStaff && isCustomer && pendingOrders.length > 0 && (
           <Pressable onPress={() => router.push('/(tabs)/orders' as any)}>
@@ -321,8 +346,48 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
-        {/* Real IoT Chamber Telemetry Card */}
-        <AppCard elevation="sm" style={styles.heroCard}>
+        {!isStaff ? (
+          <AppCard elevation="sm" style={styles.heroCard}>
+            <View style={styles.heroHeader}>
+              <View style={styles.heroIconBadge}>
+                <Ionicons name="receipt-outline" size={24} color={theme.colors.primary[500]} />
+              </View>
+              <View style={styles.heroTextGroup}>
+                <AppText variant="overline" color={theme.colors.primary[500]}>
+                  Tổng quan tài khoản
+                </AppText>
+                <AppText variant="h3">Đơn hàng của bạn</AppText>
+              </View>
+            </View>
+            {dashboardLoading ? (
+              <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+                Đang tải đơn hàng...
+              </AppText>
+            ) : (
+              <View style={styles.metricsRow}>
+                <View style={styles.metricItem}>
+                  <AppText variant="caption" color={theme.colors.text.muted}>Tổng đơn</AppText>
+                  <AppText variant="title" weight="bold">
+                    {dashboardError ? '—' : orders.length}
+                  </AppText>
+                </View>
+                <AppDivider orientation="vertical" spacing="sm" />
+                <View style={styles.metricItem}>
+                  <AppText variant="caption" color={theme.colors.text.muted}>Chờ thanh toán</AppText>
+                  <AppText variant="title" weight="bold" color={theme.colors.warning.main}>
+                    {dashboardError
+                      ? '—'
+                      : pendingOrders.filter((order) => order.payment_status !== 'PAID').length}
+                  </AppText>
+                </View>
+              </View>
+            )}
+          </AppCard>
+        ) : null}
+
+        {/* IoT telemetry is for staff only; customer-specific tray telemetry needs a
+            backend ownership-scoped endpoint and must not use farm-wide readings. */}
+        {isStaff ? <AppCard elevation="sm" style={styles.heroCard}>
           <View style={styles.heroHeader}>
             <View style={styles.heroIconBadge}>
               <Ionicons name="hardware-chip-outline" size={24} color={theme.colors.primary[500]} />
@@ -338,7 +403,9 @@ export default function HomeScreen() {
           </View>
 
           <AppText variant="bodySmall" color={theme.colors.text.secondary} style={styles.heroDescription}>
-            Hệ thống IoT kết nối trực tiếp đến backend Render. Đang ghi nhận số đo từ {activeSensors.length} cảm biến.
+            {dashboardLoading
+              ? 'Đang tải dữ liệu cảm biến...'
+              : `Đang ghi nhận số đo từ ${activeSensors.length} cảm biến.`}
           </AppText>
 
           <View style={styles.metricsRow}>
@@ -347,7 +414,7 @@ export default function HomeScreen() {
                 Nhiệt độ trung bình
               </AppText>
               <AppText variant="title" weight="bold" color={theme.colors.text.primary}>
-                {avgTemp} °C
+                {avgTemp ? `${avgTemp} °C` : 'Chưa có dữ liệu'}
               </AppText>
             </View>
 
@@ -358,7 +425,7 @@ export default function HomeScreen() {
                 Độ ẩm trung bình
               </AppText>
               <AppText variant="title" weight="bold" color={theme.colors.primary[600]}>
-                {avgHum} %
+                {avgHum ? `${avgHum} %` : 'Chưa có dữ liệu'}
               </AppText>
             </View>
 
@@ -377,11 +444,11 @@ export default function HomeScreen() {
                   ? 'Trực tuyến'
                   : firstMaster?.reportedStatus === 'offline'
                   ? 'Ngoại tuyến'
-                  : 'Sẵn sàng'}
+                  : 'Chưa xác định'}
               </AppText>
             </View>
           </View>
-        </AppCard>
+        </AppCard> : null}
 
         {/* Quick Action Navigation Grid */}
         <View style={styles.quickActionsSection}>
@@ -491,6 +558,11 @@ const styles = StyleSheet.create({
   pendingOrderText: {
     flex: 1,
     gap: 2,
+  },
+  dashboardError: {
+    gap: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.error.light,
   },
   heroCard: {
     backgroundColor: '#FFFFFF',

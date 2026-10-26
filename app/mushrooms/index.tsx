@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { theme } from '../../src/core/theme';
+import { useAuth } from '../../src/features/auth';
 import { formatVND } from '../../src/core/utils/currency';
 import {
   cultivationRepository,
@@ -30,6 +31,8 @@ import {
 
 export default function MushroomsScreen() {
   const router = useRouter();
+  const { isAdmin, isFarmOperator } = useAuth();
+  const canManageConditions = isAdmin || isFarmOperator;
   const [mushroomTypes, setMushroomTypes] = useState<MushroomType[]>([]);
   const [conditions, setConditions] = useState<MushroomCondition[]>([]);
   const [selectedMushroomId, setSelectedMushroomId] = useState<number | null>(null);
@@ -209,7 +212,7 @@ export default function MushroomsScreen() {
                 Điều kiện vi khí hậu tối ưu
               </AppText>
             </View>
-            {selectedCondition ? (
+            {selectedCondition && canManageConditions ? (
               <View style={styles.cardActionButtons}>
                 <Pressable
                   onPress={handleOpenEdit}
@@ -279,12 +282,14 @@ export default function MushroomsScreen() {
                   Giống nấm này chưa được thiết lập bảng điều kiện sinh trưởng.
                 </AppText>
               </View>
-              <AppButton
-                title="+ Thiết lập điều kiện vi khí hậu"
-                variant="primary"
-                size="sm"
-                onPress={handleOpenCreate}
-              />
+              {canManageConditions ? (
+                <AppButton
+                  title="+ Thiết lập điều kiện vi khí hậu"
+                  variant="primary"
+                  size="sm"
+                  onPress={handleOpenCreate}
+                />
+              ) : null}
             </View>
           )}
         </AppCard>

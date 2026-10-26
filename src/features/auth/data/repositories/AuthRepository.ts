@@ -47,11 +47,11 @@ export function resolveUserRole(backendUser: BackendUser): UserRole {
     case 1:
       return 'ADMIN';
     case 2:
-      return 'CUSTOMER';
-    case 3:
-      return 'SHIPPER';
-    case 4:
       return 'FARM_OPERATOR';
+    case 3:
+      return 'CUSTOMER';
+    case 4:
+      return 'SHIPPER';
     default:
       return backendUser.role_id === 2 ? 'CUSTOMER' : 'ADMIN';
   }

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../../../core/theme';
+import { ENV } from '../../../../core/config';
 import {
   AppButton,
   AppCard,
@@ -271,7 +272,7 @@ export const CultivationTrayDetailModal: React.FC<CultivationTrayDetailModalProp
 
   const handleGoToCamera = () => {
     onClose();
-    router.push(`/camera/${tray.tray_id}` as any);
+    router.push(`/camera/${ENV.cameraId}` as any);
   };
 
   const handleGoToSensors = () => {

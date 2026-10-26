@@ -225,22 +225,20 @@ export default function ProfileScreen() {
 
           <AppDivider spacing="xs" />
 
-          {/* Shortcut to Cultivation Infrastructure */}
-          <Pressable style={styles.settingItem} onPress={() => router.push('/cultivation' as any)}>
+          <Pressable style={styles.settingItem} onPress={() => router.push('/(tabs)/orders')}>
             <View style={styles.settingLeft}>
-              <Ionicons name="business-outline" size={20} color={theme.colors.text.primary} />
-              <AppText variant="bodyMedium">Phòng & Khay nuôi trồng</AppText>
+              <Ionicons name="receipt-outline" size={20} color={theme.colors.text.primary} />
+              <AppText variant="bodyMedium">Đơn hàng của tôi</AppText>
             </View>
             <Ionicons name="chevron-forward" size={18} color={theme.colors.text.muted} />
           </Pressable>
 
           <AppDivider spacing="xs" />
 
-          {/* Shortcut to Mushroom Catalog */}
-          <Pressable style={styles.settingItem} onPress={() => router.push('/mushrooms' as any)}>
+          <Pressable style={styles.settingItem} onPress={() => router.push('/(tabs)/notifications')}>
             <View style={styles.settingLeft}>
-              <Ionicons name="leaf-outline" size={20} color={theme.colors.text.primary} />
-              <AppText variant="bodyMedium">Danh mục nấm & Điều kiện</AppText>
+              <Ionicons name="notifications-outline" size={20} color={theme.colors.text.primary} />
+              <AppText variant="bodyMedium">Thông báo</AppText>
             </View>
             <Ionicons name="chevron-forward" size={18} color={theme.colors.text.muted} />
           </Pressable>
@@ -252,7 +250,7 @@ export default function ProfileScreen() {
             MCMS Mobile App • SmartMush
           </AppText>
           <AppText variant="caption" color={theme.colors.text.muted} align="center">
-            Nền tảng Expo SDK 57 • Kết nối Backend Render
+            Nền tảng Expo SDK 58 • Kết nối Backend
           </AppText>
         </AppCard>
 

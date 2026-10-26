@@ -38,6 +38,9 @@ export default function OrdersScreen() {
   const [activePaymentOrderId, setActivePaymentOrderId] = useState<number | null>(null);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
+  const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
+  const [orderDetailLoading, setOrderDetailLoading] = useState(false);
+  const [orderDetailError, setOrderDetailError] = useState<string | null>(null);
 
   const loadOrders = useCallback(async () => {
     try {
@@ -66,6 +69,32 @@ export default function OrdersScreen() {
   const handleOpenPayment = (orderId: number) => {
     setActivePaymentOrderId(orderId);
     setPaymentModalVisible(true);
+  };
+
+  const loadOrderDetail = async (orderId: number) => {
+    setOrderDetailLoading(true);
+    setOrderDetailError(null);
+    try {
+      const detail = await orderRepository.getOrderDetail(orderId);
+      setOrders((current) =>
+        current.map((order) => order.order_id === orderId ? detail : order)
+      );
+    } catch (err: unknown) {
+      setOrderDetailError(
+        err instanceof Error ? err.message : 'Không thể tải chi tiết đơn hàng.'
+      );
+    } finally {
+      setOrderDetailLoading(false);
+    }
+  };
+
+  const handleToggleOrderDetails = (orderId: number) => {
+    if (expandedOrderId === orderId) {
+      setExpandedOrderId(null);
+      return;
+    }
+    setExpandedOrderId(orderId);
+    void loadOrderDetail(orderId);
   };
 
   const handleCancelOrder = (orderId: number) => {
@@ -98,32 +127,34 @@ export default function OrdersScreen() {
   };
 
   const renderStatusBadge = (order: CustomerOrder) => {
-    const isPaid =
-      order.order_status === 'PAID' ||
-      order.order_status === 'CONFIRMED' ||
-      order.payment?.payment_status === 'PAID';
-    const isCancelled = order.order_status === 'CANCELLED';
-
     let badgeText = 'Chờ thanh toán';
     let badgeColor: string = theme.colors.warning.main;
     let badgeBg = 'rgba(234, 179, 8, 0.1)';
 
-    if (isPaid) {
-      badgeText = order.order_status === 'CONFIRMED' ? 'Đã xác nhận' : 'Đã thanh toán';
-      badgeColor = theme.colors.success.dark;
-      badgeBg = 'rgba(34, 197, 94, 0.12)';
-    } else if (isCancelled) {
+    if (order.order_status === 'CANCELLED') {
       badgeText = 'Đã hủy';
       badgeColor = theme.colors.neutral[500];
       badgeBg = theme.colors.neutral[100];
-    } else if (order.order_status === 'PROCESSING') {
-      badgeText = 'Đang xử lý';
-      badgeColor = theme.colors.primary[600];
-      badgeBg = theme.colors.primary[50];
     } else if (order.order_status === 'COMPLETED') {
       badgeText = 'Hoàn thành';
       badgeColor = theme.colors.success.dark;
       badgeBg = 'rgba(34, 197, 94, 0.12)';
+    } else if (order.order_status === 'PROCESSING') {
+      badgeText = 'Đang nuôi trồng';
+      badgeColor = theme.colors.primary[600];
+      badgeBg = theme.colors.primary[50];
+    } else if (order.order_status === 'CONFIRMED') {
+      badgeText = 'Đã xác nhận';
+      badgeColor = theme.colors.success.dark;
+      badgeBg = 'rgba(34, 197, 94, 0.12)';
+    } else if (order.order_status === 'PAID' || order.payment_status === 'PAID') {
+      badgeText = 'Đã thanh toán';
+      badgeColor = theme.colors.success.dark;
+      badgeBg = 'rgba(34, 197, 94, 0.12)';
+    } else if (order.payment_status === 'FAILED') {
+      badgeText = 'Thanh toán thất bại';
+      badgeColor = theme.colors.error.main;
+      badgeBg = theme.colors.error.light;
     }
 
     return (
@@ -179,7 +210,7 @@ export default function OrdersScreen() {
           orders.map((order) => {
             const isPendingUnpaid =
               order.order_status === 'PENDING' &&
-              order.payment?.payment_status !== 'PAID';
+              ['UNPAID', 'PENDING', 'FAILED'].includes(order.payment_status || '');
 
             const items = order.items || order.order_items || [];
 
@@ -230,6 +261,48 @@ export default function OrdersScreen() {
                     </AppText>
                   </View>
                 </View>
+
+                <AppButton
+                  title={expandedOrderId === order.order_id ? 'Ẩn chi tiết' : 'Xem chi tiết'}
+                  variant="ghost"
+                  size="sm"
+                  onPress={() => handleToggleOrderDetails(order.order_id)}
+                />
+                {expandedOrderId === order.order_id ? (
+                  <View style={styles.detailContainer}>
+                    {orderDetailLoading ? (
+                      <ActivityIndicator color={theme.colors.primary[500]} />
+                    ) : orderDetailError ? (
+                      <View style={styles.detailError}>
+                        <AppText variant="caption" color={theme.colors.error.main}>
+                          {orderDetailError}
+                        </AppText>
+                        <AppButton
+                          title="Thử lại"
+                          variant="ghost"
+                          size="sm"
+                          onPress={() => loadOrderDetail(order.order_id)}
+                        />
+                      </View>
+                    ) : (
+                      <>
+                        <AppText variant="caption">
+                          Trạng thái thanh toán: {order.payment_status || 'Chưa xác định'}
+                        </AppText>
+                        {(order.items || order.order_items || []).map((item, index) => (
+                          <View key={item.order_item_id || index} style={styles.detailItem}>
+                            <AppText variant="caption" color={theme.colors.text.secondary}>
+                              {item.item_type || 'Sản phẩm'} · SL {item.quantity ?? 1}
+                            </AppText>
+                            <AppText variant="caption" color={theme.colors.text.secondary}>
+                              {formatVND(item.total_price ?? item.price ?? 0)}
+                            </AppText>
+                          </View>
+                        ))}
+                      </>
+                    )}
+                  </View>
+                ) : null}
 
                 {isPendingUnpaid && (
                   <View style={styles.orderFooter}>
@@ -344,5 +417,20 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     flex: 1,
+  },
+  detailContainer: {
+    gap: theme.spacing.xs,
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.neutral[50],
+  },
+  detailError: {
+    gap: theme.spacing.xs,
+    alignItems: 'flex-start',
+  },
+  detailItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
   },
 });

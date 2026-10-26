@@ -19,6 +19,11 @@ export const API_ENDPOINTS = {
   USERS: {
     ME: '/api/users/me',
   },
+  NOTIFICATIONS: {
+    BASE: '/api/notifications',
+    READ_ALL: '/api/notifications/read-all',
+    READ: (notificationId: number) => `/api/notifications/${notificationId}/read`,
+  },
   // Cultivation Rooms
   ROOMS: {
     BASE: '/api/cultivation-rooms',
@@ -64,6 +69,10 @@ export const API_ENDPOINTS = {
     STATUS: (orderId: string | number) => `/api/payments/orders/${orderId}/status`,
     /** @deprecated Use PAYOS instead */
     SEPAY_QR: (orderId: string | number) => `/api/payments/orders/${orderId}/payos`,
+  },
+  CAMERAS: {
+    LIVE_STREAM: (cameraId: number) => `/api/cameras/${cameraId}/live-stream`,
+    STOP_LIVE_STREAM: (cameraId: number) => `/api/cameras/${cameraId}/live-stream/stop`,
   },
   // IoT Masters, Sensors, SSR
   IOT: {

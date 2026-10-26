@@ -4,12 +4,78 @@ import { AppError } from '../../../../core/errors/appError';
 import { handleApiError } from '../../../../core/errors/errorHandler';
 import {
   CreateRentalOrderRequest,
+  BackendCustomerOrder,
   CustomerOrder,
   PaymentStatusData,
   PayosPaymentData,
   RentalPackage,
   SepayQrData,
 } from '../../domain/entities/Order';
+
+function toAmount(value: number | string | undefined, field: string): number | undefined {
+  if (value === undefined) return undefined;
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) {
+    throw new AppError(`Giá trị ${field} từ máy chủ không hợp lệ.`, 'API_ERROR', 500);
+  }
+  return amount;
+}
+
+function mapOrderStatus(status: string): CustomerOrder['order_status'] {
+  switch (status.toUpperCase()) {
+    case 'PENDING':
+      return 'PENDING';
+    case 'CONFIRMED':
+      return 'CONFIRMED';
+    case 'PAID':
+      return 'PAID';
+    case 'PROCESSING':
+    case 'PREPARING':
+    case 'ACTIVE':
+      return 'PROCESSING';
+    case 'COMPLETED':
+      return 'COMPLETED';
+    case 'CANCELLED':
+      return 'CANCELLED';
+    default:
+      throw new AppError(`Trạng thái đơn hàng "${status}" chưa được hỗ trợ.`, 'API_ERROR', 500);
+  }
+}
+
+function mapBackendOrder(order: BackendCustomerOrder): CustomerOrder {
+  if (!order || typeof order.status !== 'string' || typeof order.payment_status !== 'string') {
+    throw new AppError('Dữ liệu đơn hàng từ máy chủ không hợp lệ.', 'API_ERROR', 500);
+  }
+  const totalAmount = toAmount(order.total_amount, 'total_amount');
+  if (totalAmount === undefined) {
+    throw new AppError('Thiếu tổng tiền đơn hàng từ máy chủ.', 'API_ERROR', 500);
+  }
+  const items = order.items?.map((item) => ({
+    order_item_id: item.order_item_id,
+    item_type: item.item_type,
+    package_id: item.rental_package_id ?? undefined,
+    mushroom_type_id: item.mushroom_type_id ?? undefined,
+    package_name: item.package_name ?? undefined,
+    mushroom_name: item.mushroom_name ?? undefined,
+    quantity: toAmount(item.quantity, 'quantity'),
+    price: toAmount(item.unit_price, 'unit_price'),
+    unit_price: toAmount(item.unit_price, 'unit_price'),
+    total_price: toAmount(item.total_price, 'total_price'),
+  }));
+  return {
+    order_id: order.order_id,
+    user_id: order.user_id,
+    order_status: mapOrderStatus(order.status),
+    payment_status: order.payment_status.toUpperCase(),
+    subtotal: toAmount(order.subtotal, 'subtotal'),
+    discount: toAmount(order.discount, 'discount'),
+    shipping_fee: toAmount(order.shipping_fee, 'shipping_fee'),
+    total_amount: totalAmount,
+    created_at: order.created_at,
+    updated_at: order.updated_at,
+    items,
+  };
+}
 
 /**
  * Order & PayOS Payment Repository Implementation
@@ -55,17 +121,17 @@ export class OrderRepository {
    */
   async createRentalOrder(data: CreateRentalOrderRequest): Promise<CustomerOrder> {
     try {
-      const response = await axiosClient.post<{ data: CustomerOrder } | CustomerOrder>(
+      const response = await axiosClient.post<{ data: BackendCustomerOrder }>(
         API_ENDPOINTS.ORDERS.RENTALS,
         {
           packageId: data.packageId,
           mushroomTypeId: data.mushroomTypeId,
         }
       );
-      if ('data' in response.data) {
-        return response.data.data;
+      if (!response.data?.data) {
+        throw new AppError('Phản hồi tạo đơn hàng không hợp lệ.', 'API_ERROR', 500);
       }
-      return response.data as CustomerOrder;
+      return mapBackendOrder(response.data.data);
     } catch (error) {
       throw error instanceof AppError ? error : handleApiError(error);
     }
@@ -76,13 +142,13 @@ export class OrderRepository {
    */
   async getCustomerOrders(): Promise<CustomerOrder[]> {
     try {
-      const response = await axiosClient.get<CustomerOrder[] | { data: CustomerOrder[] }>(
+      const response = await axiosClient.get<{ data: BackendCustomerOrder[] }>(
         API_ENDPOINTS.ORDERS.BASE
       );
-      if (Array.isArray(response.data)) {
-        return response.data;
+      if (!Array.isArray(response.data?.data)) {
+        throw new AppError('Danh sách đơn hàng từ máy chủ không hợp lệ.', 'API_ERROR', 500);
       }
-      return (response.data as { data: CustomerOrder[] })?.data || [];
+      return response.data.data.map(mapBackendOrder);
     } catch (error) {
       throw error instanceof AppError ? error : handleApiError(error);
     }
@@ -93,13 +159,13 @@ export class OrderRepository {
    */
   async getOrderDetail(orderId: number): Promise<CustomerOrder> {
     try {
-      const response = await axiosClient.get<{ data: CustomerOrder } | CustomerOrder>(
+      const response = await axiosClient.get<{ data: BackendCustomerOrder }>(
         API_ENDPOINTS.ORDERS.DETAIL(orderId)
       );
-      if ('data' in response.data) {
-        return response.data.data;
+      if (!response.data?.data) {
+        throw new AppError('Chi tiết đơn hàng từ máy chủ không hợp lệ.', 'API_ERROR', 500);
       }
-      return response.data as CustomerOrder;
+      return mapBackendOrder(response.data.data);
     } catch (error) {
       throw error instanceof AppError ? error : handleApiError(error);
     }

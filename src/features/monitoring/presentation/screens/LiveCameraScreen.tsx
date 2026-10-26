@@ -1,13 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { useEvent } from 'expo';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { VideoView, useVideoPlayer } from 'expo-video';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { ENV } from '../../../../core/config';
 import { theme } from '../../../../core/theme';
+import { useAuth } from '../../../auth';
+import { cameraRepository } from '../../data/repositories/CameraRepository';
 import {
   AppButton,
   AppCard,
@@ -16,243 +16,264 @@ import {
   AppText,
   ScreenContainer,
 } from '../../../../shared/components';
-import { TrayId } from '../../../tray/domain/entities/Tray';
-import {
-  CameraFeed,
-  CameraStatus,
-  TrayTelemetry,
-} from '../../domain/entities/Monitoring';
-import { monitoringRepository } from '../../data/repositories/MonitoringRepository';
-import { LiveCameraView } from '../components/LiveCameraView';
-import { TelemetryGaugeCard } from '../components/TelemetryGaugeCard';
 
 export const LiveCameraScreen: React.FC = () => {
   const router = useRouter();
-  const params = useLocalSearchParams<{ trayId?: string }>();
-  const trayId = (params.trayId as TrayId) || '1-1';
+  const params = useLocalSearchParams<{ cameraId?: string }>();
+  const { isAdmin } = useAuth();
+  const cameraId = useMemo(() => {
+    const id = Number(params.cameraId || ENV.cameraId);
+    return Number.isSafeInteger(id) && id > 0 ? id : null;
+  }, [params.cameraId]);
+  const player = useVideoPlayer(null);
+  const { status: playbackStatus, error: playbackError } = useEvent(
+    player,
+    'statusChange',
+    { status: player.status, error: undefined }
+  );
 
-  // Camera stream & telemetry state
-  const [feed, setFeed] = useState<CameraFeed | null>(null);
-  const [telemetry, setTelemetry] = useState<TrayTelemetry | null>(null);
-  const [status, setStatus] = useState<CameraStatus>('CONNECTING');
-  const [chamberLightOn, setChamberLightOn] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [cameraName, setCameraName] = useState('Camera SmartMush');
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [stopping, setStopping] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
-  const loadCameraData = React.useCallback(async () => {
-    try {
-      // 1. Verify ownership
-      const isOwner = await monitoringRepository.verifyTrayOwnership(trayId);
-      if (!isOwner) {
-        setStatus('UNAUTHORIZED');
+  useEffect(() => {
+    let isActive = true;
+    void (async () => {
+      if (!cameraId) {
+        setErrorMessage('Mã camera không hợp lệ. Kiểm tra EXPO_PUBLIC_CAMERA_ID.');
+        setLoading(false);
         return;
       }
 
-      // 2. Fetch camera feed & telemetry concurrently
-      const [feedData, telemetryData] = await Promise.all([
-        monitoringRepository.getCameraFeed(trayId),
-        monitoringRepository.getTrayTelemetry(trayId),
-      ]);
+      setLoading(true);
+      setErrorMessage(null);
+      setStreamUrl(null);
+      try {
+        const result = await cameraRepository.startLiveStream(cameraId);
+        if (!isActive) return;
+        setCameraName(result.cameraName || 'Camera SmartMush');
+        setStreamUrl(result.stream.url);
+      } catch (error: unknown) {
+        if (isActive) {
+          setErrorMessage(
+            error instanceof Error ? error.message : 'Không thể kết nối camera. Vui lòng thử lại.'
+          );
+        }
+      } finally {
+        if (isActive) setLoading(false);
+      }
+    })();
 
-      setFeed(feedData);
-      setTelemetry(telemetryData);
-      setStatus(feedData.status);
-    } catch {
-      setStatus('ERROR');
-    }
-  }, [trayId]);
+    return () => {
+      isActive = false;
+      player.pause();
+    };
+  }, [cameraId, retryKey, player]);
 
   useEffect(() => {
-    let isMounted = true;
-    const init = async () => {
-      try {
-        const isOwner = await monitoringRepository.verifyTrayOwnership(trayId);
-        if (!isMounted) return;
-        if (!isOwner) {
-          setStatus('UNAUTHORIZED');
-          return;
+    let isActive = true;
+    if (!streamUrl) return;
+
+    void player.replaceAsync(streamUrl)
+      .then(() => {
+        if (isActive) player.play();
+      })
+      .catch((error: unknown) => {
+        if (isActive) {
+          setErrorMessage(
+            error instanceof Error ? error.message : 'Không thể phát luồng camera.'
+          );
         }
+      });
 
-        const [feedData, telemetryData] = await Promise.all([
-          monitoringRepository.getCameraFeed(trayId),
-          monitoringRepository.getTrayTelemetry(trayId),
-        ]);
-
-        if (!isMounted) return;
-        setFeed(feedData);
-        setTelemetry(telemetryData);
-        setStatus(feedData.status);
-      } catch {
-        if (isMounted) setStatus('ERROR');
-      }
-    };
-
-    init();
     return () => {
-      isMounted = false;
+      isActive = false;
+      player.pause();
     };
-  }, [trayId]);
+  }, [player, streamUrl]);
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    setStatus('CONNECTING');
-    await loadCameraData();
-    setRefreshing(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (streamUrl) player.play();
+      return () => player.pause();
+    }, [player, streamUrl])
+  );
+
+  const handleStopStream = async () => {
+    if (!cameraId || stopping) return;
+    setStopping(true);
+    setErrorMessage(null);
+    try {
+      const result = await cameraRepository.stopLiveStream(cameraId);
+      player.pause();
+      await player.replaceAsync(null);
+      setStreamUrl(null);
+      if (!result.stopped) {
+        Alert.alert('Camera', 'Hiện không có phiên xem trực tiếp nào đang hoạt động.');
+      }
+    } catch (error: unknown) {
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Không thể dừng phiên camera.'
+      );
+    } finally {
+      setStopping(false);
+    }
   };
 
-  const handleToggleLight = () => {
-    setChamberLightOn((prev) => !prev);
-    Alert.alert(
-      'Điều khiển IoT',
-      chamberLightOn
-        ? 'Đã tắt đèn LED quang hợp trong buồng.'
-        : 'Đã bật đèn LED quang hợp hỗ trợ quan sát.'
-    );
-  };
+  const handleRetry = () => setRetryKey((key) => key + 1);
 
-  const handleSnapshot = () => {
-    Alert.alert(
-      'Chụp ảnh lưu niệm',
-      `Đã lưu ảnh chụp thời gian thực của Khay ${trayId} vào thư viện thiết bị của bạn.`
-    );
-  };
+  const currentError = errorMessage || (
+    playbackStatus === 'error' ? playbackError?.message || 'Không thể phát luồng camera.' : null
+  );
 
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
-      {/* Header */}
       <AppHeader
         title="Camera trực tiếp"
-        subtitle={`Giám sát thời gian thực • Khay ${trayId}`}
+        subtitle={cameraName}
         showBack
         onBack={() => router.back()}
         rightAction={
           <AppIconButton
-            icon={
-              <Ionicons
-                name="refresh"
-                size={20}
-                color={refreshing ? theme.colors.primary[500] : theme.colors.text.primary}
-              />
-            }
-            onPress={handleRefresh}
-            accessibilityLabel="Làm mới luồng camera"
+            icon={<Ionicons name="refresh" size={20} color={theme.colors.text.primary} />}
+            onPress={handleRetry}
+            accessibilityLabel="Kết nối lại camera"
           />
         }
       />
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Live Camera View Surface */}
-        <LiveCameraView
-          trayId={trayId}
-          feed={feed}
-          telemetry={telemetry}
-          status={status}
-          onRetry={handleRefresh}
-        />
+      <View style={styles.content}>
+        <View style={styles.videoFrame}>
+          {streamUrl ? (
+            <VideoView
+              player={player}
+              style={StyleSheet.absoluteFill}
+              contentFit="contain"
+              nativeControls
+              allowsPictureInPicture
+            />
+          ) : null}
 
-        {/* Quick Remote Chamber Controls */}
-        {status === 'ONLINE' && (
-          <AppCard elevation="sm" style={styles.controlsCard}>
-            <View style={styles.controlsHeader}>
-              <Ionicons name="hardware-chip-outline" size={18} color={theme.colors.primary[500]} />
-              <AppText variant="label" weight="bold">
-                Điều khiển buồng nuôi trồng từ xa
+          {loading ? (
+            <View style={styles.overlay}>
+              <ActivityIndicator size="large" color="#FFFFFF" />
+              <AppText variant="bodySmall" color="#FFFFFF">
+                Đang kết nối camera...
               </AppText>
             </View>
+          ) : null}
 
-            <View style={styles.controlsGrid}>
-              <AppButton
-                title={chamberLightOn ? 'Tắt đèn buồng' : 'Bật đèn buồng'}
-                variant={chamberLightOn ? 'primary' : 'outline'}
-                size="sm"
-                style={styles.controlBtn}
-                leftIcon={
-                  <Ionicons
-                    name={chamberLightOn ? 'sunny' : 'sunny-outline'}
-                    size={16}
-                    color={chamberLightOn ? '#FFFFFF' : theme.colors.primary[500]}
-                  />
-                }
-                onPress={handleToggleLight}
-              />
-
-              <AppButton
-                title="Chụp ảnh khay"
-                variant="secondary"
-                size="sm"
-                style={styles.controlBtn}
-                leftIcon={
-                  <Ionicons
-                    name="camera-outline"
-                    size={16}
-                    color={theme.colors.neutral[800]}
-                  />
-                }
-                onPress={handleSnapshot}
-              />
+          {!loading && !currentError && streamUrl ? (
+            <View style={styles.liveBadge}>
+              <View style={styles.liveDot} />
+              <AppText variant="captionMedium" weight="bold" color="#FFFFFF">TRỰC TIẾP</AppText>
             </View>
+          ) : null}
+
+          {!loading && !streamUrl ? (
+            <View style={styles.overlay}>
+              <Ionicons name="videocam-off-outline" size={38} color="#FFFFFF" />
+              <AppText variant="bodySmall" color="#FFFFFF" align="center">
+                {currentError || 'Luồng camera chưa được kết nối.'}
+              </AppText>
+              <AppButton title="Thử lại" variant="secondary" size="sm" onPress={handleRetry} />
+            </View>
+          ) : null}
+        </View>
+
+        {currentError && streamUrl ? (
+          <AppCard elevation="xs" style={styles.errorCard}>
+            <AppText variant="bodySmall" color={theme.colors.error.main} selectable>
+              {currentError}
+            </AppText>
+            <AppButton title="Kết nối lại" variant="outline" size="sm" onPress={handleRetry} />
           </AppCard>
-        )}
+        ) : null}
 
-        {/* IoT Sensor Gauges */}
-        {telemetry && status === 'ONLINE' && (
-          <TelemetryGaugeCard telemetry={telemetry} />
-        )}
-
-        {/* Chamber Info & Safety Notice */}
-        <AppCard elevation="xs" variant="outlined" style={styles.noticeCard}>
-          <View style={styles.noticeRow}>
-            <Ionicons name="shield-checkmark" size={20} color={theme.colors.primary[500]} />
-            <View style={styles.noticeTextGroup}>
-              <AppText variant="bodySmallMedium" weight="bold">
-                Bảo mật & Giám sát riêng tư
-              </AppText>
-              <AppText variant="caption" color={theme.colors.text.secondary}>
-                Luồng video được mã hóa đầu cuối và chỉ cung cấp quyền truy cập duy nhất cho chủ nhân khay {trayId}.
-              </AppText>
-            </View>
+        <AppCard elevation="xs" style={styles.infoCard}>
+          <View style={styles.infoHeading}>
+            <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary[600]} />
+            <AppText variant="label" weight="bold">Camera dùng chung</AppText>
           </View>
+          <AppText variant="caption" color={theme.colors.text.secondary}>
+            Đường truyền trực tiếp HLS từ camera {cameraId ?? '—'}. Khi rời màn hình, ứng dụng dừng
+            phát trên thiết bị. Dừng phiên trên máy chủ chỉ dành cho quản trị viên.
+          </AppText>
+          {isAdmin ? (
+            <AppButton
+              title="Dừng phiên camera"
+              variant="outline"
+              size="sm"
+              loading={stopping}
+              disabled={!streamUrl || stopping}
+              leftIcon={
+                <Ionicons name="stop-circle-outline" size={18} color={theme.colors.error.main} />
+              }
+              onPress={handleStopStream}
+            />
+          ) : null}
         </AppCard>
-      </ScrollView>
+      </View>
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  scrollContent: {
+  content: {
+    flex: 1,
     paddingHorizontal: theme.spacing.screenHorizontal,
     paddingTop: theme.spacing.md,
-    paddingBottom: theme.spacing.xxl,
-    gap: theme.spacing.base,
+    paddingBottom: theme.spacing.xl,
+    gap: theme.spacing.md,
   },
-  controlsCard: {
+  videoFrame: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    overflow: 'hidden',
+    borderRadius: theme.borderRadius.lg,
+    backgroundColor: '#0F172A',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: theme.spacing.sm,
-    backgroundColor: theme.colors.background.paper,
+    padding: theme.spacing.lg,
+    backgroundColor: '#0F172A',
   },
-  controlsHeader: {
+  liveBadge: {
+    position: 'absolute',
+    top: theme.spacing.sm,
+    left: theme.spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 4,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
   },
-  controlsGrid: {
-    flexDirection: 'row',
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.error.main,
+  },
+  errorCard: {
     gap: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.error.light,
   },
-  controlBtn: {
-    flex: 1,
-  },
-  noticeCard: {
+  infoCard: {
+    gap: theme.spacing.sm,
     backgroundColor: theme.colors.neutral[50],
   },
-  noticeRow: {
+  infoHeading: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: theme.spacing.sm,
-  },
-  noticeTextGroup: {
-    flex: 1,
-    gap: 2,
+    alignItems: 'center',
+    gap: theme.spacing.xs,
   },
 });

@@ -42,12 +42,17 @@ function NavigationGuard() {
       currentSegment === 'cultivation' ||
       currentSegment === 'mushrooms';
     const inShipperRoutes = currentSegment === '(shipper)';
-
+    const inStaffOnlyRoute =
+      currentSegment === 'control' ||
+      currentSegment === 'automatic' ||
+      currentSegment === 'sensors' ||
+      currentSegment === 'cultivation';
     if (status === 'unauthenticated' && !inAuthGroup) {
       // Route unauthenticated visitors to login screen
       router.replace('/(auth)/login' as Href);
     } else if (status === 'authenticated') {
       const shipperActive = isShipper || user?.role === 'SHIPPER';
+      const staffActive = user?.role === 'ADMIN' || user?.role === 'FARM_OPERATOR';
 
       if (inAuthGroup) {
         // Route away from auth screens based on authenticated role
@@ -61,6 +66,9 @@ function NavigationGuard() {
         router.replace('/(shipper)' as Href);
       } else if (!shipperActive && inShipperRoutes) {
         // Enforce role boundary: Customers cannot view Shipper screens
+        router.replace('/(tabs)' as Href);
+      } else if (!staffActive && inStaffOnlyRoute) {
+        // Farm-wide IoT routes are not available to customer accounts.
         router.replace('/(tabs)' as Href);
       }
     }

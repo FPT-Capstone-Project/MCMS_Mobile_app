@@ -22,9 +22,12 @@ export interface OrderItem {
   id?: number;
   package_id?: number;
   mushroom_type_id?: number;
+  item_type?: 'MUSHROOM' | 'RENTAL' | string;
   package_name?: string;
   mushroom_name?: string;
   price?: number;
+  unit_price?: number;
+  total_price?: number;
   quantity?: number;
 }
 
@@ -32,6 +35,10 @@ export interface CustomerOrder {
   order_id: number;
   user_id: number;
   order_status: 'PENDING' | 'CONFIRMED' | 'PAID' | 'PROCESSING' | 'COMPLETED' | 'CANCELLED';
+  payment_status?: string;
+  subtotal?: number;
+  discount?: number;
+  shipping_fee?: number;
   total_amount: number;
   created_at?: string;
   updated_at?: string;
@@ -44,6 +51,30 @@ export interface CustomerOrder {
     payment_code: string;
     amount: number;
   };
+}
+
+export interface BackendCustomerOrder {
+  order_id: number;
+  user_id: number;
+  subtotal?: number | string;
+  discount?: number | string;
+  shipping_fee?: number | string;
+  total_amount: number | string;
+  status: string;
+  payment_status: string;
+  created_at?: string;
+  updated_at?: string;
+  items?: {
+    order_item_id?: number;
+    item_type?: string;
+    rental_package_id?: number | null;
+    mushroom_type_id?: number | null;
+    package_name?: string | null;
+    mushroom_name?: string | null;
+    quantity?: number | string;
+    unit_price?: number | string;
+    total_price?: number | string;
+  }[];
 }
 
 /**
