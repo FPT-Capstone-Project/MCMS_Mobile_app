@@ -183,7 +183,7 @@ export const LiveCameraView: React.FC<LiveCameraViewProps> = ({
           {telemetry ? (
             <View style={styles.sensorHudPill}>
               <AppText variant="caption" color="#4ADE80" weight="bold">
-                {telemetry.temperature}°C • {telemetry.humidity}%
+                {Number(telemetry.temperature).toFixed(2)}°C • {Number(telemetry.humidity).toFixed(2)}%
               </AppText>
             </View>
           ) : null}

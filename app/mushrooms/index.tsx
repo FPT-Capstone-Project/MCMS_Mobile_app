@@ -263,16 +263,6 @@ export default function MushroomsScreen() {
                   {selectedCondition.humidity_min ?? '—'} - {selectedCondition.humidity_max ?? '—'} %
                 </AppText>
               </View>
-
-              <View style={styles.conditionRow}>
-                <View style={styles.conditionLabel}>
-                  <Ionicons name="cloud-outline" size={18} color={theme.colors.neutral[500]} />
-                  <AppText variant="bodySmall">Nồng độ CO₂:</AppText>
-                </View>
-                <AppText variant="label" weight="bold">
-                  {selectedCondition.co2_min ?? '—'} - {selectedCondition.co2_max ?? '—'} ppm
-                </AppText>
-              </View>
             </View>
           ) : (
             <View style={styles.emptyConditionWrapper}>

@@ -26,17 +26,6 @@ export const mushroomConditionBaseSchema = z.object({
     .max(100, 'Độ ẩm không khí tối đa đến 100%')
     .nullable()
     .optional(),
-
-  co2Min: z
-    .number()
-    .min(0, 'Nồng độ CO₂ phải >= 0 ppm')
-    .nullable()
-    .optional(),
-  co2Max: z
-    .number()
-    .min(0, 'Nồng độ CO₂ phải >= 0 ppm')
-    .nullable()
-    .optional(),
 });
 
 interface ConditionMinMaxFields {
@@ -44,8 +33,6 @@ interface ConditionMinMaxFields {
   temperatureMax?: number | null;
   humidityMin?: number | null;
   humidityMax?: number | null;
-  co2Min?: number | null;
-  co2Max?: number | null;
 }
 
 /**
@@ -75,18 +62,6 @@ const applyConditionRefinements = <T extends z.ZodType<ConditionMinMaxFields>>(s
       {
         message: 'Độ ẩm không khí tối thiểu không được lớn hơn tối đa.',
         path: ['humidityMin'],
-      }
-    )
-    .refine(
-      (data) => {
-        if (data.co2Min != null && data.co2Max != null) {
-          return data.co2Min <= data.co2Max;
-        }
-        return true;
-      },
-      {
-        message: 'Nồng độ CO₂ tối thiểu không được lớn hơn tối đa.',
-        path: ['co2Min'],
       }
     );
 

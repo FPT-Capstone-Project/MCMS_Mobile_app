@@ -265,10 +265,7 @@ export const CultivationTrayDetailModal: React.FC<CultivationTrayDetailModalProp
       ? `${data.condition.humidity_min}% - ${data.condition.humidity_max}%`
       : '80% - 90%';
 
-  const co2Ideal =
-    data?.condition?.co2_max != null
-      ? `< ${data.condition.co2_max} ppm`
-      : '< 800 ppm';
+  const co2Ideal = '< 800 ppm';
 
   const handleGoToCamera = () => {
     onClose();
@@ -467,7 +464,7 @@ export const CultivationTrayDetailModal: React.FC<CultivationTrayDetailModalProp
                           </AppText>
                         </View>
                         <AppText variant="h3" weight="bold" color={theme.colors.text.primary}>
-                          {data?.temperature != null ? `${data.temperature.toFixed(1)}°C` : '--'}
+                          {data?.temperature != null ? `${Number(data.temperature).toFixed(2)}°C` : '--'}
                         </AppText>
                         <View style={styles.idealBadge}>
                           <AppText variant="caption" color={theme.colors.text.secondary}>
@@ -485,7 +482,7 @@ export const CultivationTrayDetailModal: React.FC<CultivationTrayDetailModalProp
                           </AppText>
                         </View>
                         <AppText variant="h3" weight="bold" color={theme.colors.text.primary}>
-                          {data?.humidity != null ? `${Math.round(data.humidity)}%` : '--'}
+                          {data?.humidity != null ? `${Number(data.humidity).toFixed(2)}%` : '--'}
                         </AppText>
                         <View style={styles.idealBadge}>
                           <AppText variant="caption" color={theme.colors.text.secondary}>

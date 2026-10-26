@@ -80,8 +80,6 @@ export interface MushroomCondition {
   temperature_max: number | null;
   humidity_min: number | null;
   humidity_max: number | null;
-  co2_min: number | null;
-  co2_max: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -92,8 +90,6 @@ export interface CreateMushroomConditionRequest {
   temperatureMax?: number | null;
   humidityMin?: number | null;
   humidityMax?: number | null;
-  co2Min?: number | null;
-  co2Max?: number | null;
 }
 
 export interface UpdateMushroomConditionRequest {
@@ -102,8 +98,6 @@ export interface UpdateMushroomConditionRequest {
   temperatureMax?: number | null;
   humidityMin?: number | null;
   humidityMax?: number | null;
-  co2Min?: number | null;
-  co2Max?: number | null;
 }
 
 

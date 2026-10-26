@@ -39,8 +39,6 @@ interface FormState {
   temperatureMax: string;
   humidityMin: string;
   humidityMax: string;
-  co2Min: string;
-  co2Max: string;
 }
 
 const INITIAL_FORM: FormState = {
@@ -48,8 +46,6 @@ const INITIAL_FORM: FormState = {
   temperatureMax: '',
   humidityMin: '',
   humidityMax: '',
-  co2Min: '',
-  co2Max: '',
 };
 
 function getInitialForm(existingCondition: MushroomCondition | null): FormState {
@@ -72,14 +68,6 @@ function getInitialForm(existingCondition: MushroomCondition | null): FormState 
     humidityMax:
       existingCondition.humidity_max != null
         ? String(existingCondition.humidity_max)
-        : '',
-    co2Min:
-      existingCondition.co2_min != null
-        ? String(existingCondition.co2_min)
-        : '',
-    co2Max:
-      existingCondition.co2_max != null
-        ? String(existingCondition.co2_max)
         : '',
   };
 }
@@ -138,8 +126,6 @@ const ConditionFormSheet: React.FC<ConditionFormSheetProps> = ({
       temperatureMax: parseNumberOrNull(form.temperatureMax),
       humidityMin: parseNumberOrNull(form.humidityMin),
       humidityMax: parseNumberOrNull(form.humidityMax),
-      co2Min: parseNumberOrNull(form.co2Min),
-      co2Max: parseNumberOrNull(form.co2Max),
     };
 
     // Validate with Zod
@@ -313,37 +299,6 @@ const ConditionFormSheet: React.FC<ConditionFormSheetProps> = ({
               </View>
             </View>
 
-            {/* 3. CO2 Section */}
-            <View style={styles.fieldSection}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="cloud-outline" size={16} color={theme.colors.neutral[600]} />
-                <AppText variant="label" weight="bold">
-                  Nồng độ CO₂ (ppm)
-                </AppText>
-              </View>
-              <View style={styles.rowTwoCols}>
-                <View style={styles.col}>
-                  <AppInput
-                    label="Tối thiểu (Min)"
-                    placeholder="VD: 350"
-                    keyboardType="numeric"
-                    value={form.co2Min}
-                    onChangeText={(t) => handleChange('co2Min', t)}
-                    error={errors.co2Min}
-                  />
-                </View>
-                <View style={styles.col}>
-                  <AppInput
-                    label="Tối đa (Max)"
-                    placeholder="VD: 500"
-                    keyboardType="numeric"
-                    value={form.co2Max}
-                    onChangeText={(t) => handleChange('co2Max', t)}
-                    error={errors.co2Max}
-                  />
-                </View>
-              </View>
-            </View>
 
             {/* Action Buttons */}
             <View style={styles.actionsRow}>

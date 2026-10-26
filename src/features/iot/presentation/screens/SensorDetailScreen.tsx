@@ -270,7 +270,7 @@ export const SensorDetailScreen: React.FC = () => {
                   Nhiệt độ
                 </AppText>
                 <AppText variant="h2" weight="bold" color={theme.colors.text.primary}>
-                  {selectedSensor.temperature != null ? `${selectedSensor.temperature.toFixed(1)} °C` : '—'}
+                  {selectedSensor.temperature != null ? `${Number(selectedSensor.temperature).toFixed(2)} °C` : '—'}
                 </AppText>
               </View>
 
@@ -281,7 +281,7 @@ export const SensorDetailScreen: React.FC = () => {
                   Độ ẩm không khí
                 </AppText>
                 <AppText variant="h2" weight="bold" color={theme.colors.primary[600]}>
-                  {selectedSensor.humidity != null ? `${selectedSensor.humidity.toFixed(1)} %` : '—'}
+                  {selectedSensor.humidity != null ? `${Number(selectedSensor.humidity).toFixed(2)} %` : '—'}
                 </AppText>
               </View>
             </View>

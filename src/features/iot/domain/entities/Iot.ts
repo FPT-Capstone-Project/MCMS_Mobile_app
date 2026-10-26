@@ -95,8 +95,6 @@ export interface SourceProfile {
   temperature_max: number | null;
   humidity_min: number | null;
   humidity_max: number | null;
-  co2_min: number | null;
-  co2_max: number | null;
 }
 
 export interface CommonConditions {
@@ -104,8 +102,6 @@ export interface CommonConditions {
   temperature_max?: number;
   humidity_min?: number;
   humidity_max?: number;
-  co2_min?: number;
-  co2_max?: number;
 }
 
 export interface AutoMistingConfig {

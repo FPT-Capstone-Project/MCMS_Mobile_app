@@ -37,7 +37,7 @@ export const TelemetryGaugeCard: React.FC<TelemetryGaugeCardProps> = ({ telemetr
             Nhiệt độ
           </AppText>
           <AppText variant="title" weight="bold" color={theme.colors.text.primary}>
-            {telemetry.temperature}°C
+            {typeof telemetry.temperature === 'number' ? `${telemetry.temperature.toFixed(2)}°C` : `${telemetry.temperature}°C`}
           </AppText>
           <View style={styles.statusChip}>
             <AppText variant="caption" color={theme.colors.success.dark}>
@@ -57,7 +57,7 @@ export const TelemetryGaugeCard: React.FC<TelemetryGaugeCardProps> = ({ telemetr
             Độ ẩm
           </AppText>
           <AppText variant="title" weight="bold" color={theme.colors.text.primary}>
-            {telemetry.humidity}%
+            {typeof telemetry.humidity === 'number' ? `${telemetry.humidity.toFixed(2)}%` : `${telemetry.humidity}%`}
           </AppText>
           <View style={styles.statusChip}>
             <AppText variant="caption" color={theme.colors.success.dark}>

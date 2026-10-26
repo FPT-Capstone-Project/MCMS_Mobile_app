@@ -1283,9 +1283,14 @@ export const AutomaticWizardScreen: React.FC = () => {
                               <AppText variant="caption" color={theme.colors.text.secondary}>
                                 Khí hậu đo
                               </AppText>
-                              <AppText variant="caption" weight="bold">
-                                {status.environment.averageTemperature != null ? `${status.environment.averageTemperature}°C` : '--'} •{' '}
-                                {status.environment.averageHumidity != null ? `${status.environment.averageHumidity}%` : '--'}
+                              <AppText variant="caption" weight="bold" style={{ textAlign: 'center' }}>
+                                {status.environment.averageTemperature != null
+                                  ? `${Number(status.environment.averageTemperature).toFixed(2)}°C`
+                                  : '--'}{' '}
+                                •{' '}
+                                {status.environment.averageHumidity != null
+                                  ? `${Number(status.environment.averageHumidity).toFixed(2)}%`
+                                  : '--'}
                               </AppText>
                             </View>
                           )}
@@ -1880,19 +1885,6 @@ export const AutomaticWizardScreen: React.FC = () => {
                         : 'Chưa đủ dữ liệu'}
                     </AppText>
                   </View>
-                  {suggestions.common.co2_min != null && (
-                    <>
-                      <AppDivider orientation="vertical" spacing="sm" />
-                      <View style={styles.commonItem}>
-                        <AppText variant="caption" color={theme.colors.text.muted}>
-                          CO₂ (Kiểm tra)
-                        </AppText>
-                        <AppText variant="title" weight="bold" color={theme.colors.text.secondary}>
-                          {`${suggestions.common.co2_min} - ${suggestions.common.co2_max} ppm`}
-                        </AppText>
-                      </View>
-                    </>
-                  )}
                 </View>
 
                 {/* Issues if any */}
@@ -2462,7 +2454,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                     Độ ẩm trung bình
                   </AppText>
                   <AppText variant="h2" weight="bold" color={theme.colors.primary[600]}>
-                    {envData?.averageHumidity != null ? `${envData.averageHumidity.toFixed(1)}%` : '—'}
+                    {envData?.averageHumidity != null ? `${envData.averageHumidity.toFixed(2)}%` : '—'}
                   </AppText>
                 </View>
                 <AppDivider orientation="vertical" spacing="md" />
@@ -2471,7 +2463,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                     Nhiệt độ trung bình
                   </AppText>
                   <AppText variant="h2" weight="bold" color={theme.colors.text.primary}>
-                    {envData?.averageTemperature != null ? `${envData.averageTemperature.toFixed(1)}°C` : '—'}
+                    {envData?.averageTemperature != null ? `${envData.averageTemperature.toFixed(2)}°C` : '—'}
                   </AppText>
                 </View>
               </View>
@@ -2485,7 +2477,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                         Sensor #{s.sensorId}:
                       </AppText>
                       <AppText variant="caption">
-                        {s.humidity != null ? `${s.humidity.toFixed(0)}%` : 'N/A'} • {s.temperature != null ? `${s.temperature.toFixed(1)}°C` : 'N/A'}
+                        {s.humidity != null ? `${s.humidity.toFixed(2)}%` : 'N/A'} • {s.temperature != null ? `${s.temperature.toFixed(2)}°C` : 'N/A'}
                       </AppText>
                       <AppText variant="caption" color={s.valid ? theme.colors.success.main : theme.colors.error.main}>
                         ({s.valid ? 'Hợp lệ' : 'Lỗi/Cũ'})
