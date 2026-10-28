@@ -11,5 +11,8 @@
   "include": [
     "**/*.ts",
     "**/*.tsx"
+  ],
+  "exclude": [
+    "2e08d929-02ae-4987-a7db-0a8abf10e4da/海外imou-player/demos/**"
   ]
 }

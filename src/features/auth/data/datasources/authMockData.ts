@@ -1,25 +1,22 @@
 import { AuthSession, AuthTokens, AuthUser } from '../../domain/entities/AuthUser';
 
 /**
- * Mock & Demo Authentication Data
- * Used for development testing and offline fallback matching the SmartMush ecosystem.
+ * Redirect demo/mock data to empty values so real authentication always depends on backend-issued tokens.
  */
-
 export const MOCK_AUTH_TOKENS: AuthTokens = {
-  accessToken: 'smartmush_demo_jwt_access_token_customer_tier',
-  refreshToken: 'smartmush_demo_jwt_refresh_token_customer_tier',
+  accessToken: '',
+  refreshToken: '',
   tokenType: 'Bearer',
-  expiresIn: 86400,
+  expiresIn: 0,
 };
 
 export const MOCK_CUSTOMER_USER: AuthUser = {
-  id: 'CUST-8839',
-  email: 'khachhang@smartmush.vn',
-  fullName: 'Nguyễn Văn An',
-  phoneNumber: '0912345678',
+  id: 'guest',
+  email: '',
+  fullName: 'Guest User',
+  phoneNumber: undefined,
   role: 'CUSTOMER',
-  avatarUrl: undefined,
-  createdAt: '2026-01-15T08:00:00Z',
+  createdAt: new Date(0).toISOString(),
 };
 
 export const MOCK_AUTH_SESSION: AuthSession = {

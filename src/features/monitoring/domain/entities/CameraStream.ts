@@ -12,6 +12,16 @@ export interface CameraLiveStream {
   streams: CameraStreamSource[];
 }
 
+export interface ImouPlayerConfiguration {
+  cameraId: number;
+  cameraName: string;
+  deviceId: string;
+  channelId: string;
+  streamId: number;
+  type: 1;
+  kitToken: string;
+}
+
 export interface StopCameraLiveStreamResult {
   stopped: boolean;
   channelId: string;

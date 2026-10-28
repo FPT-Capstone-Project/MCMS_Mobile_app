@@ -147,7 +147,7 @@ const customerActions: QuickActionItem[] = [
     icon: 'videocam-outline',
     iconColor: '#0EA5E9',
     iconBg: 'rgba(14, 165, 233, 0.1)',
-    route: `/camera/${ENV.cameraId}`,
+    route: `/camera/${ENV.cameraId || '0'}`,
   },
 ];
 

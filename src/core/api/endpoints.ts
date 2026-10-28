@@ -71,6 +71,7 @@ export const API_ENDPOINTS = {
     SEPAY_QR: (orderId: string | number) => `/api/payments/orders/${orderId}/payos`,
   },
   CAMERAS: {
+    IMOU_PLAYER_TOKEN: (cameraId: number) => `/api/cameras/${cameraId}/imou-player-token`,
     LIVE_STREAM: (cameraId: number) => `/api/cameras/${cameraId}/live-stream`,
     STOP_LIVE_STREAM: (cameraId: number) => `/api/cameras/${cameraId}/live-stream/stop`,
   },
