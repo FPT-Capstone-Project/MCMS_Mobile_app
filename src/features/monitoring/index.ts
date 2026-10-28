@@ -9,5 +9,6 @@ export * from './data/datasources/monitoringMockData';
 export * from './data/repositories/MonitoringRepository';
 export * from './data/repositories/CameraRepository';
 export * from './presentation/components/LiveCameraView';
+export * from './presentation/components/NativeLivePlayer';
 export * from './presentation/components/TelemetryGaugeCard';
 export * from './presentation/screens/LiveCameraScreen';

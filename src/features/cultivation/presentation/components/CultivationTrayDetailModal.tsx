@@ -269,7 +269,7 @@ export const CultivationTrayDetailModal: React.FC<CultivationTrayDetailModalProp
 
   const handleGoToCamera = () => {
     onClose();
-    router.push(`/camera/${ENV.cameraId}` as any);
+    router.push(`/camera/${ENV.cameraId || '0'}` as any);
   };
 
   const handleGoToSensors = () => {

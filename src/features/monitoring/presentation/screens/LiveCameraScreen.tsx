@@ -1,13 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEvent } from 'expo';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { VideoView, useVideoPlayer } from 'expo-video';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { ENV } from '../../../../core/config';
 import { theme } from '../../../../core/theme';
-import { useAuth } from '../../../auth';
-import { cameraRepository } from '../../data/repositories/CameraRepository';
 import {
   AppButton,
   AppCard,
@@ -16,50 +18,62 @@ import {
   AppText,
   ScreenContainer,
 } from '../../../../shared/components';
+import { useAuth } from '../../../auth';
+import { cameraRepository } from '../../data/repositories/CameraRepository';
+import { CameraLiveStream } from '../../domain/entities/CameraStream';
+import {
+  NativeLivePlayer,
+  NativeLivePlayerRef,
+} from '../components/NativeLivePlayer';
 
 export const LiveCameraScreen: React.FC = () => {
   const router = useRouter();
   const params = useLocalSearchParams<{ cameraId?: string }>();
   const { isAdmin } = useAuth();
+
   const cameraId = useMemo(() => {
     const id = Number(params.cameraId || ENV.cameraId);
     return Number.isSafeInteger(id) && id > 0 ? id : null;
   }, [params.cameraId]);
-  const player = useVideoPlayer(null);
-  const { status: playbackStatus, error: playbackError } = useEvent(
-    player,
-    'statusChange',
-    { status: player.status, error: undefined }
-  );
+
+  const nativePlayerRef = useRef<NativeLivePlayerRef | null>(null);
 
   const [cameraName, setCameraName] = useState('Camera SmartMush');
-  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [liveStream, setLiveStream] = useState<CameraLiveStream | null>(null);
+  const [selectedStreamId, setSelectedStreamId] = useState<number>(0);
+  const [isMuted, setIsMuted] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [playbackStarted, setPlaybackStarted] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     let isActive = true;
+
     void (async () => {
       if (!cameraId) {
-        setErrorMessage('Mã camera không hợp lệ. Kiểm tra EXPO_PUBLIC_CAMERA_ID.');
+        setErrorMessage('Mã camera không hợp lệ. Vui lòng kiểm tra cấu hình EXPO_PUBLIC_CAMERA_ID.');
         setLoading(false);
         return;
       }
 
       setLoading(true);
       setErrorMessage(null);
-      setStreamUrl(null);
+      setPlaybackStarted(false);
+
       try {
-        const result = await cameraRepository.startLiveStream(cameraId);
+        const result = await cameraRepository.startLiveStream(cameraId, selectedStreamId);
         if (!isActive) return;
+
         setCameraName(result.cameraName || 'Camera SmartMush');
-        setStreamUrl(result.stream.url);
+        setLiveStream(result);
       } catch (error: unknown) {
         if (isActive) {
           setErrorMessage(
-            error instanceof Error ? error.message : 'Không thể kết nối camera. Vui lòng thử lại.'
+            error instanceof Error
+              ? error.message
+              : 'Không thể kết nối luồng camera. Vui lòng thử lại.'
           );
         }
       } finally {
@@ -69,38 +83,22 @@ export const LiveCameraScreen: React.FC = () => {
 
     return () => {
       isActive = false;
-      player.pause();
     };
-  }, [cameraId, retryKey, player]);
+  }, [cameraId, selectedStreamId, retryKey]);
 
-  useEffect(() => {
-    let isActive = true;
-    if (!streamUrl) return;
+  const handleToggleQuality = () => {
+    if (loading) return;
+    const nextStreamId = selectedStreamId === 0 ? 1 : 0;
+    setSelectedStreamId(nextStreamId);
+  };
 
-    void player.replaceAsync(streamUrl)
-      .then(() => {
-        if (isActive) player.play();
-      })
-      .catch((error: unknown) => {
-        if (isActive) {
-          setErrorMessage(
-            error instanceof Error ? error.message : 'Không thể phát luồng camera.'
-          );
-        }
-      });
+  const handleToggleMute = () => {
+    setIsMuted((prev) => !prev);
+  };
 
-    return () => {
-      isActive = false;
-      player.pause();
-    };
-  }, [player, streamUrl]);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (streamUrl) player.play();
-      return () => player.pause();
-    }, [player, streamUrl])
-  );
+  const handleFullscreen = () => {
+    nativePlayerRef.current?.enterFullscreen();
+  };
 
   const handleStopStream = async () => {
     if (!cameraId || stopping) return;
@@ -108,11 +106,12 @@ export const LiveCameraScreen: React.FC = () => {
     setErrorMessage(null);
     try {
       const result = await cameraRepository.stopLiveStream(cameraId);
-      player.pause();
-      await player.replaceAsync(null);
-      setStreamUrl(null);
+      setLiveStream(null);
+      setPlaybackStarted(false);
       if (!result.stopped) {
         Alert.alert('Camera', 'Hiện không có phiên xem trực tiếp nào đang hoạt động.');
+      } else {
+        Alert.alert('Camera', 'Đã dừng phiên camera trực tiếp.');
       }
     } catch (error: unknown) {
       setErrorMessage(
@@ -123,11 +122,11 @@ export const LiveCameraScreen: React.FC = () => {
     }
   };
 
-  const handleRetry = () => setRetryKey((key) => key + 1);
+  const handleRetry = () => {
+    setRetryKey((key) => key + 1);
+  };
 
-  const currentError = errorMessage || (
-    playbackStatus === 'error' ? playbackError?.message || 'Không thể phát luồng camera.' : null
-  );
+  const currentStreamUrl = liveStream?.stream?.url;
 
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
@@ -147,68 +146,109 @@ export const LiveCameraScreen: React.FC = () => {
 
       <View style={styles.content}>
         <View style={styles.videoFrame}>
-          {streamUrl ? (
-            <VideoView
-              player={player}
-              style={StyleSheet.absoluteFill}
-              contentFit="contain"
-              nativeControls
-              allowsPictureInPicture
+          {currentStreamUrl ? (
+            <NativeLivePlayer
+              ref={nativePlayerRef}
+              streamUrl={currentStreamUrl}
+              isMuted={isMuted}
+              onReadyToPlay={() => setPlaybackStarted(true)}
+              onPlaying={() => setPlaybackStarted(true)}
+              onError={(errorMsg) => {
+                setErrorMessage(errorMsg);
+                setPlaybackStarted(false);
+              }}
             />
           ) : null}
 
+          {/* Loading Overlay */}
           {loading ? (
             <View style={styles.overlay}>
               <ActivityIndicator size="large" color="#FFFFFF" />
               <AppText variant="bodySmall" color="#FFFFFF">
-                Đang kết nối camera...
+                Đang nhận luồng HLS trực tiếp...
               </AppText>
             </View>
           ) : null}
 
-          {!loading && !currentError && streamUrl ? (
-            <View style={styles.liveBadge}>
-              <View style={styles.liveDot} />
-              <AppText variant="captionMedium" weight="bold" color="#FFFFFF">TRỰC TIẾP</AppText>
-            </View>
-          ) : null}
-
-          {!loading && !streamUrl ? (
+          {/* Error Overlay */}
+          {!loading && errorMessage ? (
             <View style={styles.overlay}>
-              <Ionicons name="videocam-off-outline" size={38} color="#FFFFFF" />
+              <Ionicons name="videocam-off-outline" size={40} color={theme.colors.error.light} />
               <AppText variant="bodySmall" color="#FFFFFF" align="center">
-                {currentError || 'Luồng camera chưa được kết nối.'}
+                {errorMessage}
               </AppText>
               <AppButton title="Thử lại" variant="secondary" size="sm" onPress={handleRetry} />
             </View>
           ) : null}
-        </View>
 
-        {currentError && streamUrl ? (
-          <AppCard elevation="xs" style={styles.errorCard}>
-            <AppText variant="bodySmall" color={theme.colors.error.main} selectable>
-              {currentError}
-            </AppText>
-            <AppButton title="Kết nối lại" variant="outline" size="sm" onPress={handleRetry} />
-          </AppCard>
-        ) : null}
+          {/* Live Badge */}
+          {!loading && !errorMessage && playbackStarted ? (
+            <View style={styles.liveBadge}>
+              <View style={styles.liveDot} />
+              <AppText variant="captionMedium" weight="bold" color="#FFFFFF">
+                TRỰC TIẾP
+              </AppText>
+            </View>
+          ) : null}
+
+          {/* Player Quick Controls (Top-Right) */}
+          {!loading && !errorMessage && currentStreamUrl ? (
+            <View style={styles.controlsBar}>
+              <TouchableOpacity
+                style={styles.controlPill}
+                onPress={handleToggleQuality}
+                activeOpacity={0.7}
+                accessibilityLabel="Đổi chất lượng video"
+              >
+                <AppText variant="captionMedium" weight="bold" color="#FFFFFF">
+                  {selectedStreamId === 0 ? 'HD' : 'SD'}
+                </AppText>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.controlButton}
+                onPress={handleToggleMute}
+                activeOpacity={0.7}
+                accessibilityLabel={isMuted ? 'Bật âm thanh' : 'Tắt âm thanh'}
+              >
+                <Ionicons
+                  name={isMuted ? 'volume-mute-outline' : 'volume-high-outline'}
+                  size={16}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.controlButton}
+                onPress={handleFullscreen}
+                activeOpacity={0.7}
+                accessibilityLabel="Xem toàn màn hình"
+              >
+                <Ionicons name="scan-outline" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+        </View>
 
         <AppCard elevation="xs" style={styles.infoCard}>
           <View style={styles.infoHeading}>
-            <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary[600]} />
-            <AppText variant="label" weight="bold">Camera dùng chung</AppText>
+            <Ionicons name="videocam-outline" size={20} color={theme.colors.primary[600]} />
+            <AppText variant="label" weight="bold">
+              Camera SmartMush
+            </AppText>
           </View>
           <AppText variant="caption" color={theme.colors.text.secondary}>
-            Đường truyền trực tiếp HLS từ camera {cameraId ?? '—'}. Khi rời màn hình, ứng dụng dừng
-            phát trên thiết bị. Dừng phiên trên máy chủ chỉ dành cho quản trị viên.
+            Đang phát luồng video trực tiếp chuẩn HLS (Native) từ camera {cameraId ?? '—'}.
+            Hỗ trợ tăng tốc phần cứng, chuyển đổi chất lượng HD/SD và tự động dừng khi chuyển trang.
           </AppText>
+
           {isAdmin ? (
             <AppButton
               title="Dừng phiên camera"
               variant="outline"
               size="sm"
               loading={stopping}
-              disabled={!streamUrl || stopping}
+              disabled={!liveStream || stopping}
               leftIcon={
                 <Ionicons name="stop-circle-outline" size={18} color={theme.colors.error.main} />
               }
@@ -235,6 +275,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: theme.borderRadius.lg,
     backgroundColor: '#0F172A',
+    position: 'relative',
   },
   overlay: {
     ...StyleSheet.absoluteFill,
@@ -243,6 +284,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
     padding: theme.spacing.lg,
     backgroundColor: '#0F172A',
+    zIndex: 10,
   },
   liveBadge: {
     position: 'absolute',
@@ -255,6 +297,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: theme.borderRadius.full,
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    zIndex: 5,
   },
   liveDot: {
     width: 8,
@@ -262,10 +305,30 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: theme.colors.error.main,
   },
-  errorCard: {
-    gap: theme.spacing.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.error.light,
+  controlsBar: {
+    position: 'absolute',
+    top: theme.spacing.sm,
+    right: theme.spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    zIndex: 5,
+  },
+  controlPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  controlButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   infoCard: {
     gap: theme.spacing.sm,

@@ -146,7 +146,7 @@ function NavigationGuard() {
         }}
       />
       <Stack.Screen
-        name="camera/[trayId]"
+        name="camera/[cameraId]"
         options={{
           headerShown: false,
         }}

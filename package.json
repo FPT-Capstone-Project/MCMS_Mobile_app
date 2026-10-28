@@ -9,12 +9,12 @@
     "@shopify/flash-list": "2.3.2",
     "axios": "^1.20.0",
     "babel-preset-expo": "~58.0.0",
-    "expo": "^58.0.0",
+    "expo": "~58.0.20",
     "expo-constants": "~58.0.13",
     "expo-font": "~58.0.9",
     "expo-image-picker": "~58.0.10",
     "expo-linking": "~58.0.14",
-    "expo-router": "~58.0.26",
+    "expo-router": "~58.0.27",
     "expo-secure-store": "~58.0.2",
     "expo-status-bar": "~58.0.4",
     "expo-video": "~58.0.12",
@@ -27,9 +27,10 @@
     "react-native-safe-area-context": "~5.10.1",
     "react-native-screens": "~4.30.0",
     "react-native-web": "^0.21.4",
+    "react-native-webview": "14.0.1",
     "react-native-worklets": "0.13.0",
     "react-redux": "^9.3.0",
-    "zod": "^4.5.4"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/react": "~19.3.0",
@@ -46,5 +47,12 @@
     "lint": "eslint .",
     "type-check": "tsc --noEmit"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "zod-validation-error": "^5.0.0",
+    "postcss": "^8.5.32",
+    "send": "^1.2.1",
+    "tar": "^7.5.22",
+    "uuid": "^14.0.3"
+  }
 }

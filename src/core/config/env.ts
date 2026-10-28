@@ -20,5 +20,5 @@ export const ENV: AppEnvConfig = {
   environment: (process.env.EXPO_PUBLIC_APP_ENV as AppEnvConfig['environment']) || (isDev ? 'development' : 'production'),
   isDevelopment: isDev,
   isProduction: !isDev,
-  cameraId: process.env.EXPO_PUBLIC_CAMERA_ID || '1',
+  cameraId: process.env.EXPO_PUBLIC_CAMERA_ID || '',
 };
