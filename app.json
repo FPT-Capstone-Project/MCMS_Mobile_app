@@ -30,7 +30,8 @@
           "root": "./app"
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-video"
     ]
   }
 }
