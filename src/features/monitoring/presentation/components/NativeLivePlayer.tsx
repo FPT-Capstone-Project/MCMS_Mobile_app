@@ -73,13 +73,19 @@ export const NativeLivePlayer = forwardRef<NativeLivePlayerRef, NativeLivePlayer
 
     return (
       <View style={StyleSheet.absoluteFill}>
+        {/*
+          nativeControls={true}: Bật controls gốc của iOS/Android.
+          Trên iOS, AVPlayer tự động hiển thị nút fullscreen và nút "Done" (thu nhỏ)
+          bên trong giao diện fullscreen — không cần custom button nữa.
+          Các control tùy chỉnh (HD/SD, mute) vẫn nằm ngoài VideoView ở LiveCameraScreen.
+        */}
         <VideoView
           ref={videoViewRef}
           style={StyleSheet.absoluteFill}
           player={player}
           allowsPictureInPicture
           contentFit="contain"
-          nativeControls={false}
+          nativeControls
         />
       </View>
     );
