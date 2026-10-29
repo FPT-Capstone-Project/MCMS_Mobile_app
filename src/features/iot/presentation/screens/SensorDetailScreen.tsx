@@ -23,6 +23,7 @@ import {
   IotSensor,
 } from '../../domain/entities/Iot';
 import { iotRepository } from '../../data/repositories/IotRepository';
+import { formatMistingBoolean, formatMistingCode } from '../../utils/mistingI18n';
 
 export const SensorDetailScreen: React.FC = () => {
   const router = useRouter();
@@ -185,7 +186,7 @@ export const SensorDetailScreen: React.FC = () => {
                     weight={isSel ? 'bold' : 'normal'}
                     color={isSel ? '#FFFFFF' : theme.colors.text.primary}
                   >
-                    {m.masterId} ({m.reportedStatus === 'online' ? 'Trực tuyến' : m.reportedStatus === 'offline' ? 'Ngoại tuyến' : 'Sẵn sàng'})
+                    {m.masterId} ({formatMistingCode('reportedStatus', m.reportedStatus)})
                   </AppText>
                 </Pressable>
               );
@@ -256,7 +257,7 @@ export const SensorDetailScreen: React.FC = () => {
                   weight="bold"
                   color={selectedSensor.ok ? theme.colors.success.dark : theme.colors.error.main}
                 >
-                  {selectedSensor.ok ? 'Hoạt động tốt' : 'Lỗi cảm biến'}
+                  {formatMistingBoolean('sensorValid', selectedSensor.ok)}
                 </AppText>
               </View>
             </View>

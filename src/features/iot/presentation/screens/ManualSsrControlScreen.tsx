@@ -20,6 +20,7 @@ import {
 } from '../../../../shared/components';
 import { iotRepository } from '../../data/repositories/IotRepository';
 import { IotMaster, IotSsr, IotSsrChannel } from '../../domain/entities/Iot';
+import { formatMistingCode } from '../../utils/mistingI18n';
 
 const DEFAULT_MASTER_ID = 'master01';
 const TOTAL_CHANNELS = 8;
@@ -133,12 +134,7 @@ export const ManualSsrControlScreen: React.FC = () => {
     try {
       const command = await iotRepository.sendSsrCommand(selectedMasterId, channel, action);
 
-      const initStatus =
-        command.status === 'PUBLISHED'
-          ? 'Đã gửi tới Broker (QoS 1)'
-          : command.status === 'PENDING'
-          ? 'Đang chờ Broker xác nhận...'
-          : command.status;
+      const initStatus = formatMistingCode('iotCommandStatus', command.status);
 
       setChannelStatusMsg((prev) => ({
         ...prev,
@@ -162,10 +158,12 @@ export const ManualSsrControlScreen: React.FC = () => {
 
             const resultText =
               cmdStatus.status === 'PUBLISHED'
-                ? `Đã gửi Broker thành công (QoS 1)`
+                ? formatMistingCode('iotCommandStatus', 'PUBLISHED')
                 : cmdStatus.status === 'FAILED'
-                ? `Thất bại: ${cmdStatus.errorMessage || 'Lỗi MQTT'}`
-                : 'Hết thời gian chờ phản hồi (5s)';
+                ? `Gửi thất bại: ${cmdStatus.errorMessage || 'Lỗi MQTT'}`
+                : cmdStatus.status === 'TIMED_OUT'
+                ? formatMistingCode('iotCommandStatus', 'TIMED_OUT')
+                : formatMistingCode('iotCommandStatus', cmdStatus.status);
 
             setChannelStatusMsg((prev) => ({ ...prev, [channel]: resultText }));
             setChannelLoading((prev) => ({ ...prev, [channel]: false }));
@@ -360,11 +358,7 @@ export const ManualSsrControlScreen: React.FC = () => {
                     : theme.colors.neutral[600]
                 }
               >
-                {currentMasterObj?.reportedStatus === 'online'
-                  ? 'Trực tuyến'
-                  : currentMasterObj?.reportedStatus === 'offline'
-                  ? 'Ngoại tuyến'
-                  : 'Sẵn sàng điều khiển'}
+                {formatMistingCode('reportedStatus', currentMasterObj?.reportedStatus)}
               </AppText>
             </View>
           </View>
@@ -474,11 +468,7 @@ export const ManualSsrControlScreen: React.FC = () => {
                             : theme.colors.warning.dark
                         }
                       >
-                        {isReportedOn
-                          ? 'Đang bật'
-                          : isReportedOff
-                          ? 'Đang tắt'
-                          : 'Chưa có dữ liệu'}
+                        {formatMistingCode('ssrState', chObj?.reportedState)}
                       </AppText>
                     </View>
                   </View>
@@ -490,11 +480,7 @@ export const ManualSsrControlScreen: React.FC = () => {
                         Trạng thái mong muốn:
                       </AppText>
                       <AppText variant="captionMedium">
-                        {chObj?.desiredState === 'ON'
-                          ? 'Bật'
-                          : chObj?.desiredState === 'OFF'
-                          ? 'Tắt'
-                          : 'Chưa đặt'}
+                        {formatMistingCode('ssrState', chObj?.desiredState)}
                       </AppText>
                     </View>
 
