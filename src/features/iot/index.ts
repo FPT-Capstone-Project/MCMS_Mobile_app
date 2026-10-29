@@ -4,3 +4,4 @@ export * from './presentation/screens/ControlCenterScreen';
 export * from './presentation/screens/AutomaticWizardScreen';
 export * from './presentation/screens/SensorDetailScreen';
 export * from './presentation/screens/ManualSsrControlScreen';
+export * from './utils/mistingI18n';

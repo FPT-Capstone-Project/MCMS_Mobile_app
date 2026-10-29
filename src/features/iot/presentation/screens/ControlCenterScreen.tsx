@@ -29,6 +29,7 @@ import {
   IotSsrChannel,
 } from '../../domain/entities/Iot';
 import { iotRepository } from '../../data/repositories/IotRepository';
+import { formatMistingCode } from '../../utils/mistingI18n';
 
 export const ControlCenterScreen: React.FC = () => {
   const router = useRouter();
@@ -156,10 +157,10 @@ export const ControlCenterScreen: React.FC = () => {
 
     try {
       const command = await iotRepository.sendSsrCommand(masterIdString, channelNum, action);
-      const brokerStatus = command.status === 'PUBLISHED' ? 'Đã xuất bản tới broker' : 'Đang xử lý';
+      const brokerStatus = formatMistingCode('iotCommandStatus', command.status);
       setChannelStatusMsg((prev) => ({
         ...prev,
-        [key]: `Lệnh ${brokerStatus}. Đang kiểm tra phản hồi từ thiết bị...`,
+        [key]: `Lệnh: ${brokerStatus}. Đang kiểm tra phản hồi từ thiết bị...`,
       }));
 
       // Poll command status until final state
@@ -179,10 +180,12 @@ export const ControlCenterScreen: React.FC = () => {
 
             const statusText =
               cmdStatus.status === 'PUBLISHED'
-                ? 'Thiết bị đã ghi nhận lệnh'
+                ? formatMistingCode('iotCommandStatus', 'PUBLISHED')
                 : cmdStatus.status === 'FAILED'
-                ? `Thất bại: ${cmdStatus.errorMessage || 'Lỗi MQTT'}`
-                : 'Hết thời gian chờ phản hồi (5s)';
+                ? `Gửi thất bại: ${cmdStatus.errorMessage || 'Lỗi MQTT'}`
+                : cmdStatus.status === 'TIMED_OUT'
+                ? formatMistingCode('iotCommandStatus', 'TIMED_OUT')
+                : formatMistingCode('iotCommandStatus', cmdStatus.status);
 
             setChannelStatusMsg((prev) => ({ ...prev, [key]: statusText }));
             setChannelLoading((prev) => ({ ...prev, [key]: false }));
@@ -408,11 +411,7 @@ export const ControlCenterScreen: React.FC = () => {
                     : theme.colors.warning.dark
                 }
               >
-                {channelInfo1?.reportedState === 'ON'
-                  ? 'Đang bật'
-                  : channelInfo1?.reportedState === 'OFF'
-                  ? 'Đang tắt'
-                  : 'Chưa có dữ liệu'}
+                {formatMistingCode('ssrState', channelInfo1?.reportedState)}
               </AppText>
             </View>
           </View>
@@ -510,11 +509,7 @@ export const ControlCenterScreen: React.FC = () => {
                     : theme.colors.warning.dark
                 }
               >
-                {channelInfo2?.reportedState === 'ON'
-                  ? 'Đang bật'
-                  : channelInfo2?.reportedState === 'OFF'
-                  ? 'Đang tắt'
-                  : 'Chưa có dữ liệu'}
+                {formatMistingCode('ssrState', channelInfo2?.reportedState)}
               </AppText>
             </View>
           </View>
@@ -708,11 +703,7 @@ export const ControlCenterScreen: React.FC = () => {
                         ? 'Chưa cấu hình'
                         : isChLoading
                         ? 'Chờ phản hồi'
-                        : isReportedOn
-                        ? 'Đang bật'
-                        : isReportedOff
-                        ? 'Đang tắt'
-                        : 'Chưa xác định'}
+                        : formatMistingCode('ssrState', channelInfo?.reportedState)}
                     </AppText>
                   </View>
                 </View>

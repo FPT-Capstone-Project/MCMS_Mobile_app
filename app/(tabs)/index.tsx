@@ -13,7 +13,9 @@ import {
   orderRepository,
 } from '../../src/features/order';
 import { useAuth } from '../../src/features/auth';
+
 import {
+  formatMistingCode,
   IotMaster,
   iotRepository,
   IotSensor,
@@ -440,11 +442,11 @@ export default function HomeScreen() {
                 weight="bold"
                 color={firstMaster?.reportedStatus === 'online' ? theme.colors.success.main : theme.colors.warning.main}
               >
-                {firstMaster?.reportedStatus === 'online'
-                  ? 'Trực tuyến'
-                  : firstMaster?.reportedStatus === 'offline'
-                  ? 'Ngoại tuyến'
-                  : 'Chưa xác định'}
+                {formatMistingCode('reportedStatus', firstMaster?.reportedStatus)}
+
+
+
+
               </AppText>
             </View>
           </View>

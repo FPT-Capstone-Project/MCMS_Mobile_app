@@ -42,21 +42,20 @@ import {
   IotMaster,
 } from '../../domain/entities/Iot';
 import { iotRepository } from '../../data/repositories/IotRepository';
+import {
+  formatMistingCode,
+  formatMistingBoolean,
+  formatBackendMessage,
+  getMistingFilterOptions,
+  NO_DATA_TEXT,
+  CONTROL_STATE_MAP,
+} from '../../utils/mistingI18n';
 
 /**
  * State label mapping matching SmartMush IoT contracts
  */
-export const AUTO_CONTROL_STATE_LABELS: Record<AutoControlState, string> = {
-  IDLE: 'Đang theo dõi',
-  ON_REQUESTED: 'Đang gửi lệnh bật',
-  MISTING: 'Đã gửi lệnh phun',
-  OFF_PENDING: 'Đang chờ xác nhận tắt',
-  COOLDOWN: 'Đang nghỉ giữa các nhịp',
-  DISABLED: 'Đã dừng điều khiển tự động',
-  SENSOR_FAULT: 'Lỗi dữ liệu cảm biến',
-  DEVICE_OFFLINE: 'Thiết bị mất kết nối',
-  FAULT: 'Lỗi hệ thống',
-};
+export const AUTO_CONTROL_STATE_LABELS: Record<AutoControlState, string> =
+  CONTROL_STATE_MAP as Record<AutoControlState, string>;
 
 /**
  * Dịch các thông báo warning, issue và reason từ hệ thống backend IoT sang tiếng Việt
@@ -255,6 +254,7 @@ export const AutomaticWizardScreen: React.FC = () => {
   const [logsOffset, setLogsOffset] = useState(0);
   const [hasMoreLogs, setHasMoreLogs] = useState(false);
   const [loadingMoreLogs, setLoadingMoreLogs] = useState(false);
+  const [selectedLogEventType, setSelectedLogEventType] = useState<string>('ALL');
 
   // Status of all floors to track active sessions across the farm
   const [floorStatuses, setFloorStatuses] = useState<Record<number, AutoControlStatus>>({});
@@ -1209,8 +1209,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                       status.runtime?.control_state === 'FAULT' ||
                       status.runtime?.control_state === 'SENSOR_FAULT';
                     const ssrOn = status.ssr?.reported_state === 'ON';
-                    const stateLabel =
-                      AUTO_CONTROL_STATE_LABELS[status.runtime?.control_state] || status.runtime?.control_state;
+                    const stateLabel = formatMistingCode('controlState', status.runtime?.control_state);
 
                     return (
                       <AppCard key={floorId} elevation="sm" style={styles.activeCard}>
@@ -1247,7 +1246,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                               color="#FFFFFF"
                             />
                             <AppText variant="caption" weight="bold" color="#FFFFFF" style={{ marginLeft: 4, fontSize: 10 }}>
-                              {isFault ? 'LỖI' : isDryRun ? 'MÔ PHỎNG' : 'AUTO THẬT'}
+                              {isFault ? 'LỖI' : isDryRun ? 'MÔ PHỎNG' : formatMistingCode('runStatus', status.run?.status)}
                             </AppText>
                           </View>
                         </View>
@@ -1275,7 +1274,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                               weight="bold"
                               color={ssrOn ? theme.colors.success.main : theme.colors.text.secondary}
                             >
-                              {ssrOn ? 'ĐANG BẬT' : 'TẮT'}
+                              {formatMistingCode('ssrState', status.ssr?.reported_state)}
                             </AppText>
                           </View>
                           {status.environment && (
@@ -1463,7 +1462,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                 />
 
                 <View style={styles.switchRow}>
-                  <AppText variant="label">Trạng thái tầng hoạt động (ACTIVE)</AppText>
+                  <AppText variant="label">Trạng thái tầng: {formatMistingCode('floorStatus', floorStatusInput)}</AppText>
                   <Switch
                     value={floorStatusInput === 'ACTIVE'}
                     onValueChange={(val) => setFloorStatusInput(val ? 'ACTIVE' : 'INACTIVE')}
@@ -1502,7 +1501,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                       status?.runtime?.control_state === 'FAULT' ||
                       status?.runtime?.control_state === 'SENSOR_FAULT';
                     const stateLabel = status?.runtime?.control_state
-                      ? AUTO_CONTROL_STATE_LABELS[status.runtime.control_state] || status.runtime.control_state
+                      ? formatMistingCode('controlState', status.runtime.control_state)
                       : null;
 
                     return (
@@ -1531,13 +1530,13 @@ export const AutomaticWizardScreen: React.FC = () => {
                                   ]}
                                 >
                                   <AppText variant="caption" weight="bold" color="#FFFFFF" style={{ fontSize: 10 }}>
-                                    {isFault ? 'LỖI' : isDryRun ? 'MÔ PHỎNG' : 'AUTO ĐANG CHẠY'}
+                                    {isFault ? 'LỖI' : isDryRun ? 'MÔ PHỎNG' : formatMistingCode('runStatus', status?.run?.status)}
                                   </AppText>
                                 </View>
                               )}
                             </View>
                             <AppText variant="caption" color={theme.colors.text.secondary}>
-                              Master: {masterMatch?.masterId || floor.master_id} • Node: {floor.node_address} • SSR Kênh {floor.misting_ssr_channel}
+                              Master: {masterMatch?.masterId || floor.master_id} • Node: {floor.node_address} • SSR Kênh {floor.misting_ssr_channel} • {formatMistingCode('floorStatus', floor.status)}
                             </AppText>
                             {stateLabel && (
                               <AppText variant="caption" color={isFault ? theme.colors.error.main : theme.colors.primary[700]} weight="bold">
@@ -1936,7 +1935,7 @@ export const AutomaticWizardScreen: React.FC = () => {
 
               <View style={styles.switchCard}>
                 <View style={styles.cardInfo}>
-                  <AppText variant="label">Bật làm mát bằng phun sương (Cooling)</AppText>
+                  <AppText variant="label">Làm mát bằng phun sương: {formatMistingBoolean('coolingEnabled', coolingEnabled)}</AppText>
                   <AppText variant="caption" color={theme.colors.text.secondary}>
                     Kích hoạt phun sương hạ nhiệt khi nhiệt độ vượt ngưỡng cho phép
                   </AppText>
@@ -1954,7 +1953,7 @@ export const AutomaticWizardScreen: React.FC = () => {
               <View style={[styles.switchCard, { backgroundColor: profileApproved ? 'rgba(34, 197, 94, 0.08)' : 'rgba(234, 179, 8, 0.08)' }]}>
                 <View style={styles.cardInfo}>
                   <AppText variant="label" weight="bold" color={profileApproved ? theme.colors.success.dark : theme.colors.warning.dark}>
-                    Xác nhận duyệt cấu hình (Profile Approved) *
+                    Phê duyệt cấu hình: {formatMistingBoolean('profileApproved', profileApproved)} *
                   </AppText>
                   <AppText variant="caption" color={theme.colors.text.secondary}>
                     Người vận hành xác nhận đã kiểm tra khoảng vi khí hậu phù hợp với nấm
@@ -2258,7 +2257,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                       weight="bold"
                       color={statusData?.mode === 'AUTO' ? theme.colors.success.dark : theme.colors.text.secondary}
                     >
-                      {statusData?.mode === 'AUTO' ? 'CHẾ ĐỘ AUTO' : 'CHẾ ĐỘ MANUAL'}
+                      {statusData?.mode ? `CHẾ ĐỘ ${formatMistingCode('mode', statusData.mode).toUpperCase()}` : NO_DATA_TEXT}
                     </AppText>
                   </View>
 
@@ -2278,7 +2277,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                         weight="bold"
                         color={statusData.run.dry_run ? theme.colors.warning.dark : '#2563EB'}
                       >
-                        {statusData.run.dry_run ? 'MÔ PHỎNG (DRY RUN)' : 'CHẠY THẬT (PHẦN CỨNG)'}
+                        {formatMistingBoolean('dryRun', statusData.run.dry_run).toUpperCase()}
                       </AppText>
                     </View>
                   )}
@@ -2293,9 +2292,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                   Trạng thái điều khiển:
                 </AppText>
                 <AppText variant="h3" weight="bold" color={theme.colors.primary[700]}>
-                  {statusData?.runtime?.control_state
-                    ? AUTO_CONTROL_STATE_LABELS[statusData.runtime.control_state] || statusData.runtime.control_state
-                    : 'Đang kết nối...'}
+                  {formatMistingCode('controlState', statusData?.runtime?.control_state)}
                 </AppText>
 
                 {statusData?.runtime?.control_state === 'MISTING' && (
@@ -2324,7 +2321,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                     Rơ-le SSR thực tế:
                   </AppText>
                   <AppText variant="title" weight="bold">
-                    {statusData?.ssr?.reported_state === 'ON' ? 'BẬT (ON)' : statusData?.ssr?.reported_state === 'OFF' ? 'TẮT (OFF)' : (statusData?.ssr?.reported_state || '—')}
+                    {formatMistingCode('ssrState', statusData?.ssr?.reported_state)}
                   </AppText>
                 </View>
                 <View style={styles.ssrGridItem}>
@@ -2332,7 +2329,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                     Rơ-le SSR mong muốn:
                   </AppText>
                   <AppText variant="title" weight="bold">
-                    {statusData?.ssr?.desired_state === 'ON' ? 'BẬT (ON)' : statusData?.ssr?.desired_state === 'OFF' ? 'TẮT (OFF)' : (statusData?.ssr?.desired_state || '—')}
+                    {formatMistingCode('ssrState', statusData?.ssr?.desired_state)}
                   </AppText>
                 </View>
                 <View style={styles.ssrGridItem}>
@@ -2345,21 +2342,40 @@ export const AutomaticWizardScreen: React.FC = () => {
                 </View>
                 <View style={styles.ssrGridItem}>
                   <AppText variant="caption" color={theme.colors.text.muted}>
-                    Nhu cầu hiện tại:
+                    Nhu cầu độ ẩm:
                   </AppText>
-                  <AppText variant="title" weight="bold">
-                    {statusData?.runtime?.demand ? 'Bù ẩm' : ''}
-                    {statusData?.runtime?.demand && statusData?.runtime?.cooling_demand ? ' + ' : ''}
-                    {statusData?.runtime?.cooling_demand ? 'Làm mát' : ''}
-                    {!statusData?.runtime?.demand && !statusData?.runtime?.cooling_demand ? 'Không có' : ''}
+                  <AppText variant="captionMedium" weight="bold">
+                    {formatMistingBoolean('demand', statusData?.runtime?.demand)}
                   </AppText>
                 </View>
+              </View>
+
+              {/* Second row of demands & details */}
+              <View style={[styles.ssrGrid, { marginTop: 8 }]}>
+                <View style={styles.ssrGridItem}>
+                  <AppText variant="caption" color={theme.colors.text.muted}>
+                    Nhu cầu làm mát:
+                  </AppText>
+                  <AppText variant="captionMedium" weight="bold">
+                    {formatMistingBoolean('coolingDemand', statusData?.runtime?.cooling_demand)}
+                  </AppText>
+                </View>
+                {statusData?.run?.status && (
+                  <View style={styles.ssrGridItem}>
+                    <AppText variant="caption" color={theme.colors.text.muted}>
+                      Trạng thái phiên:
+                    </AppText>
+                    <AppText variant="captionMedium" weight="bold">
+                      {formatMistingCode('runStatus', statusData.run.status)}
+                    </AppText>
+                  </View>
+                )}
               </View>
 
               {statusData?.runtime?.last_reason && (
                 <View style={styles.reasonRow}>
                   <AppText variant="caption" color={theme.colors.text.muted}>
-                    Lý do: <AppText variant="caption" color={theme.colors.text.primary}>{translateIotMessage(statusData.runtime.last_reason)}</AppText>
+                    Lý do: <AppText variant="caption" color={theme.colors.text.primary}>{formatBackendMessage(statusData.runtime.last_reason)}</AppText>
                   </AppText>
                 </View>
               )}
@@ -2368,7 +2384,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                 <View style={styles.errorBox}>
                   <Ionicons name="warning" size={14} color={theme.colors.error.main} />
                   <AppText variant="caption" color={theme.colors.error.main}>
-                    {translateIotMessage(statusData.runtime.last_error)}
+                    {formatBackendMessage(statusData.runtime.last_error)}
                   </AppText>
                 </View>
               )}
@@ -2443,7 +2459,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                     weight="bold"
                     color={envData?.healthy ? theme.colors.success.dark : theme.colors.error.main}
                   >
-                    {envData?.healthy ? 'Cảm biến khỏe' : envData?.reason || 'Lỗi cảm biến'}
+                    {formatMistingBoolean('environmentHealthy', envData?.healthy)}
                   </AppText>
                 </View>
               </View>
@@ -2480,13 +2496,64 @@ export const AutomaticWizardScreen: React.FC = () => {
                         {s.humidity != null ? `${s.humidity.toFixed(2)}%` : 'N/A'} • {s.temperature != null ? `${s.temperature.toFixed(2)}°C` : 'N/A'}
                       </AppText>
                       <AppText variant="caption" color={s.valid ? theme.colors.success.main : theme.colors.error.main}>
-                        ({s.valid ? 'Hợp lệ' : 'Lỗi/Cũ'})
+                        ({formatMistingBoolean('sensorValid', s.valid)})
                       </AppText>
                     </View>
                   ))}
                 </View>
               )}
             </AppCard>
+
+            {/* Last Decision Card */}
+            {statusData?.lastDecision && (
+              <AppCard elevation="xs" style={[styles.logsCard, { marginBottom: 12 }]}>
+                <View style={styles.sectionHeaderRow}>
+                  <AppText variant="label" color={theme.colors.text.muted}>
+                    QUYẾT ĐỊNH ĐIỀU KHIỂN GẦN NHẤT
+                  </AppText>
+                  {statusData.lastDecision.created_at && (
+                    <AppText variant="caption" color={theme.colors.text.muted}>
+                      {new Date(statusData.lastDecision.created_at).toLocaleTimeString('vi-VN')}
+                    </AppText>
+                  )}
+                </View>
+
+                <View style={styles.ssrGrid}>
+                  <View style={styles.ssrGridItem}>
+                    <AppText variant="caption" color={theme.colors.text.muted}>
+                      Sự kiện:
+                    </AppText>
+                    <AppText variant="captionMedium" weight="bold">
+                      {formatMistingCode('eventType', statusData.lastDecision.event_type)}
+                    </AppText>
+                  </View>
+                  <View style={styles.ssrGridItem}>
+                    <AppText variant="caption" color={theme.colors.text.muted}>
+                      Hành động:
+                    </AppText>
+                    <AppText variant="captionMedium" weight="bold" color={theme.colors.primary[700]}>
+                      {formatMistingCode('action', statusData.lastDecision.action)}
+                    </AppText>
+                  </View>
+                  <View style={styles.ssrGridItem}>
+                    <AppText variant="caption" color={theme.colors.text.muted}>
+                      Trạng thái:
+                    </AppText>
+                    <AppText variant="captionMedium" weight="bold">
+                      {formatMistingCode('controlState', statusData.lastDecision.state)}
+                    </AppText>
+                  </View>
+                </View>
+
+                {statusData.lastDecision.reason && (
+                  <View style={[styles.reasonRow, { marginTop: 8 }]}>
+                    <AppText variant="caption" color={theme.colors.text.muted}>
+                      Lý do: <AppText variant="caption" color={theme.colors.text.primary}>{formatBackendMessage(statusData.lastDecision.reason)}</AppText>
+                    </AppText>
+                  </View>
+                )}
+              </AppCard>
+            )}
 
             {/* Decision Logs Card */}
             <AppCard elevation="xs" style={styles.logsCard}>
@@ -2505,33 +2572,92 @@ export const AutomaticWizardScreen: React.FC = () => {
                 )}
               </View>
 
+              {/* Event Type Filter Pills */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.logFilterPills}
+              >
+                {[
+                  { label: 'Tất cả sự kiện', value: 'ALL' },
+                  ...getMistingFilterOptions('eventType'),
+                ].map((opt) => {
+                  const isSel = selectedLogEventType === opt.value;
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      onPress={() => setSelectedLogEventType(opt.value)}
+                      style={[styles.logFilterPill, isSel && styles.logFilterPillActive]}
+                    >
+                      <AppText
+                        variant="caption"
+                        weight={isSel ? 'bold' : 'normal'}
+                        color={isSel ? '#FFFFFF' : theme.colors.text.secondary}
+                      >
+                        {opt.label}
+                      </AppText>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+
               {logs.length === 0 ? (
                 <AppText variant="caption" color={theme.colors.text.secondary}>
                   Chưa có nhật ký quyết định nào.
                 </AppText>
               ) : (
-                <View style={styles.logsList}>
-                  {logs.map((log, idx) => (
-                    <View key={log.id ?? idx} style={styles.logItem}>
-                      <Ionicons name="time-outline" size={14} color={theme.colors.text.muted} />
-                      <View style={styles.logTextGroup}>
-                        <View style={styles.titleRow}>
-                          <AppText variant="caption" weight="bold">
-                            {log.event_type}
-                          </AppText>
-                          {log.created_at && (
-                            <AppText variant="caption" color={theme.colors.text.muted}>
-                              {new Date(log.created_at).toLocaleTimeString()}
-                            </AppText>
-                          )}
-                        </View>
-                        <AppText variant="caption" color={theme.colors.text.secondary}>
-                          {log.reason}
-                        </AppText>
-                      </View>
+                (() => {
+                  const filteredLogs =
+                    selectedLogEventType === 'ALL'
+                      ? logs
+                      : logs.filter((l) => l.event_type === selectedLogEventType);
+
+                  if (filteredLogs.length === 0) {
+                    return (
+                      <AppText variant="caption" color={theme.colors.text.secondary}>
+                        Không có nhật ký nào cho sự kiện này.
+                      </AppText>
+                    );
+                  }
+
+                  return (
+                    <View style={styles.logsList}>
+                      {filteredLogs.map((log, idx) => {
+                        const isSimulation =
+                          (log as any).dry_run === true ||
+                          (log as any).dryRun === true;
+
+                        return (
+                          <View key={log.id ?? idx} style={styles.logItem}>
+                            <Ionicons name="time-outline" size={14} color={theme.colors.text.muted} />
+                            <View style={styles.logTextGroup}>
+                              <View style={styles.titleRow}>
+                                <AppText variant="caption" weight="bold">
+                                  {formatMistingCode('eventType', log.event_type)}
+                                </AppText>
+                                {isSimulation && (
+                                  <View style={styles.simulationLogBadge}>
+                                    <AppText style={styles.simulationLogBadgeText}>
+                                      Mô phỏng
+                                    </AppText>
+                                  </View>
+                                )}
+                                {log.created_at && (
+                                  <AppText variant="caption" color={theme.colors.text.muted}>
+                                    {new Date(log.created_at).toLocaleTimeString('vi-VN')}
+                                  </AppText>
+                                )}
+                              </View>
+                              <AppText variant="caption" color={theme.colors.text.secondary}>
+                                {formatBackendMessage(log.reason)}
+                              </AppText>
+                            </View>
+                          </View>
+                        );
+                      })}
                     </View>
-                  ))}
-                </View>
+                  );
+                })()
               )}
             </AppCard>
           </View>
@@ -3164,5 +3290,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.spacing.sm,
     marginTop: theme.spacing.sm,
+  },
+  simulationLogBadge: {
+    backgroundColor: 'rgba(234, 179, 8, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.full,
+    marginLeft: 6,
+  },
+  simulationLogBadgeText: {
+    color: theme.colors.warning.dark,
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  logFilterPills: {
+    gap: 8,
+    paddingVertical: 6,
+    marginBottom: 8,
+  },
+  logFilterPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.neutral[100],
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+  },
+  logFilterPillActive: {
+    backgroundColor: theme.colors.primary[600],
+    borderColor: theme.colors.primary[700],
   },
 });
