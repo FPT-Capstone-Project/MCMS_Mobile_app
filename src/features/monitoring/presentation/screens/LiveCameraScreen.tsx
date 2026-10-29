@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -23,7 +23,6 @@ import { cameraRepository } from '../../data/repositories/CameraRepository';
 import { CameraLiveStream } from '../../domain/entities/CameraStream';
 import {
   NativeLivePlayer,
-  NativeLivePlayerRef,
 } from '../components/NativeLivePlayer';
 
 export const LiveCameraScreen: React.FC = () => {
@@ -35,8 +34,6 @@ export const LiveCameraScreen: React.FC = () => {
     const id = Number(params.cameraId || ENV.cameraId);
     return Number.isSafeInteger(id) && id > 0 ? id : null;
   }, [params.cameraId]);
-
-  const nativePlayerRef = useRef<NativeLivePlayerRef | null>(null);
 
   const [cameraName, setCameraName] = useState('Camera SmartMush');
   const [liveStream, setLiveStream] = useState<CameraLiveStream | null>(null);
@@ -96,10 +93,6 @@ export const LiveCameraScreen: React.FC = () => {
     setIsMuted((prev) => !prev);
   };
 
-  const handleFullscreen = () => {
-    nativePlayerRef.current?.enterFullscreen();
-  };
-
   const handleStopStream = async () => {
     if (!cameraId || stopping) return;
     setStopping(true);
@@ -148,7 +141,6 @@ export const LiveCameraScreen: React.FC = () => {
         <View style={styles.videoFrame}>
           {currentStreamUrl ? (
             <NativeLivePlayer
-              ref={nativePlayerRef}
               streamUrl={currentStreamUrl}
               isMuted={isMuted}
               onReadyToPlay={() => setPlaybackStarted(true)}
@@ -216,15 +208,6 @@ export const LiveCameraScreen: React.FC = () => {
                   size={16}
                   color="#FFFFFF"
                 />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.controlButton}
-                onPress={handleFullscreen}
-                activeOpacity={0.7}
-                accessibilityLabel="Xem toàn màn hình"
-              >
-                <Ionicons name="scan-outline" size={16} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
           ) : null}
