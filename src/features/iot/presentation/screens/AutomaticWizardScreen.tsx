@@ -173,9 +173,37 @@ export const translateIotMessage = (rawMsg: string): string => {
   return trimmed;
 };
 
+/**
+ * Chuẩn hóa và dịch mã lỗi HTTP từ backend IoT sang tiếng Việt rõ ràng
+ */
+function formatApiErrorMessage(err: unknown, fallbackMessage: string): string {
+  if (err && typeof err === 'object') {
+    const errorObj = err as any;
+    const status = errorObj.statusCode || errorObj.response?.status;
+    const msg = errorObj.message || errorObj.response?.data?.message || fallbackMessage;
+    switch (status) {
+      case 400:
+        return `Dữ liệu không hợp lệ (400): ${msg}`;
+      case 401:
+        return 'Phiên đăng nhập đã hết hạn (401). Vui lòng đăng nhập lại.';
+      case 403:
+        return 'Không có quyền thực hiện thao tác (403). Yêu cầu quyền iot.automation.manage.';
+      case 409:
+        return `Xung đột hoặc chưa đủ điều kiện (409): ${msg}`;
+      case 503:
+        return `Dịch vụ chưa sẵn sàng (503): ${msg}`;
+      case 504:
+        return `Quá thời gian gửi lệnh / chờ phản hồi từ thiết bị (504): ${msg}`;
+      default:
+        return msg;
+    }
+  }
+  return typeof err === 'string' ? err : fallbackMessage;
+}
+
 export const AutomaticWizardScreen: React.FC = () => {
   const router = useRouter();
-  const { canControlIot } = useAuth();
+  const { canControlIot, canManageAutomation } = useAuth();
 
   // Wizard Step: 1. Phòng, 2. Tầng & Thiết bị, 3. Khay & Phiên Trồng, 4. Cấu hình AUTO, 5. Vận hành
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
@@ -199,6 +227,8 @@ export const AutomaticWizardScreen: React.FC = () => {
   const [nodeAddressInput, setNodeAddressInput] = useState('1');
   const [ssrChannelInput, setSsrChannelInput] = useState('1');
   const [floorStatusInput, setFloorStatusInput] = useState<'ACTIVE' | 'INACTIVE'>('ACTIVE');
+  const [totalRowsInput, setTotalRowsInput] = useState('');
+  const [totalColumnsInput, setTotalColumnsInput] = useState('');
 
   // Cultivation Trays on current Floor
   const [floorCultivationTrays, setFloorCultivationTrays] = useState<CultivationTrayInfo[]>([]);
@@ -250,6 +280,7 @@ export const AutomaticWizardScreen: React.FC = () => {
   // Step 5: Runtime status & Monitoring
   const [statusData, setStatusData] = useState<AutoControlStatus | null>(null);
   const [envData, setEnvData] = useState<FloorEnvironment | null>(null);
+  const [isNetworkError, setIsNetworkError] = useState(false);
   const [logs, setLogs] = useState<AutoControlLogItem[]>([]);
   const [logsOffset, setLogsOffset] = useState(0);
   const [hasMoreLogs, setHasMoreLogs] = useState(false);
@@ -493,9 +524,12 @@ export const AutomaticWizardScreen: React.FC = () => {
           if (currentFloorIdRef.current === floorId) {
             setStatusData(status);
             if (status.environment) setEnvData(status.environment);
+            setIsNetworkError(false);
           }
         } catch {
-          // Ignore transient polling failure
+          if (currentFloorIdRef.current === floorId) {
+            setIsNetworkError(true);
+          }
         } finally {
           isPollingRef.current = false;
         }
@@ -558,8 +592,11 @@ export const AutomaticWizardScreen: React.FC = () => {
 
   // ================= STEP 2 ACTIONS: CREATE / EDIT FLOOR MAPPING =================
   const handleOpenCreateFloor = () => {
-    if (currentFloorBusy) {
-      Alert.alert('Không thể thực hiện', 'Tầng đang chạy AUTO hoặc có lệnh điều khiển đang chờ. Vui lòng dừng AUTO trước.');
+    if (currentFloorBusy || statusData?.runtime?.control_state === 'OFF_PENDING') {
+      Alert.alert(
+        'Không thể thực hiện',
+        'Tầng đang chạy AUTO hoặc có lệnh điều khiển đang chờ / đang tắt (OFF_PENDING). Vui lòng dừng AUTO trước.'
+      );
       return;
     }
     setEditingFloorId(null);
@@ -568,13 +605,21 @@ export const AutomaticWizardScreen: React.FC = () => {
     setNodeAddressInput('');
     setSsrChannelInput('');
     setFloorStatusInput('ACTIVE');
+    setTotalRowsInput('');
+    setTotalColumnsInput('');
     if (masters.length > 0) setMasterIdInput(String(masters[0].id));
     setIsCreatingFloor(true);
   };
 
   const handleOpenEditFloor = (floor: FloorMapping) => {
-    if (currentFloorBusy && (floor.floor_id === selectedFloor?.floor_id || floor.id === selectedFloor?.id)) {
-      Alert.alert('Không thể sửa', 'Tầng đang chạy AUTO hoặc có lệnh ON/OFF đang xử lý. Dừng AUTO trước khi sửa mapping.');
+    if (
+      (currentFloorBusy || statusData?.runtime?.control_state === 'OFF_PENDING') &&
+      (floor.floor_id === selectedFloor?.floor_id || floor.id === selectedFloor?.id)
+    ) {
+      Alert.alert(
+        'Không thể sửa',
+        'Tầng đang chạy AUTO hoặc có lệnh ON/OFF đang xử lý (OFF_PENDING). Dừng AUTO và đợi xác nhận tắt trước khi sửa mapping.'
+      );
       return;
     }
     setEditingFloorId(floor.floor_id ?? floor.id ?? null);
@@ -584,6 +629,8 @@ export const AutomaticWizardScreen: React.FC = () => {
     setNodeAddressInput(String(floor.node_address));
     setSsrChannelInput(String(floor.misting_ssr_channel));
     setFloorStatusInput(floor.status || 'ACTIVE');
+    setTotalRowsInput(floor.total_rows != null ? String(floor.total_rows) : '');
+    setTotalColumnsInput(floor.total_columns != null ? String(floor.total_columns) : '');
     setIsCreatingFloor(true);
   };
 
@@ -614,6 +661,30 @@ export const AutomaticWizardScreen: React.FC = () => {
       return;
     }
 
+    let totalRows: number | null | undefined = undefined;
+    if (totalRowsInput.trim()) {
+      const rows = parseInt(totalRowsInput.trim(), 10);
+      if (isNaN(rows) || rows < 1 || rows > 32767) {
+        Alert.alert('Lỗi số hàng', 'Số hàng phải nằm trong khoảng 1 đến 32767.');
+        return;
+      }
+      totalRows = rows;
+    } else if (editingFloorId) {
+      totalRows = null;
+    }
+
+    let totalCols: number | null | undefined = undefined;
+    if (totalColumnsInput.trim()) {
+      const cols = parseInt(totalColumnsInput.trim(), 10);
+      if (isNaN(cols) || cols < 1 || cols > 32767) {
+        Alert.alert('Lỗi số cột', 'Số cột phải nằm trong khoảng 1 đến 32767.');
+        return;
+      }
+      totalCols = cols;
+    } else if (editingFloorId) {
+      totalCols = null;
+    }
+
     const mappingPayload: FloorMapping = {
       room_id: selectedRoomId,
       floor_number: floorNum,
@@ -622,6 +693,8 @@ export const AutomaticWizardScreen: React.FC = () => {
       node_address: nodeAddr,
       misting_ssr_channel: ssrChan,
       status: floorStatusInput,
+      ...(totalRows !== undefined && { total_rows: totalRows }),
+      ...(totalCols !== undefined && { total_columns: totalCols }),
     };
 
     try {
@@ -641,10 +714,7 @@ export const AutomaticWizardScreen: React.FC = () => {
       setIsCreatingFloor(false);
       setEditingFloorId(null);
     } catch (err: unknown) {
-      Alert.alert(
-        'Lỗi lưu mapping',
-        typeof err === 'string' ? err : err instanceof Error ? err.message : 'Không thể lưu mapping tầng.'
-      );
+      Alert.alert('Lỗi lưu mapping', formatApiErrorMessage(err, 'Không thể lưu mapping tầng.'));
     } finally {
       setActionLoading(false);
     }
@@ -655,8 +725,11 @@ export const AutomaticWizardScreen: React.FC = () => {
     const floorId = selectedFloor?.floor_id ?? selectedFloor?.id;
     if (!floorId) return;
 
-    if (currentFloorBusy) {
-      Alert.alert('Khóa thao tác', 'Không thể gán khay khi tầng đang chạy AUTO hoặc có lệnh chưa xác nhận.');
+    if (currentFloorBusy || statusData?.runtime?.control_state === 'OFF_PENDING') {
+      Alert.alert(
+        'Khóa thao tác',
+        'Không thể gán khay khi tầng đang chạy AUTO hoặc có lệnh chưa xác nhận / đang chờ tắt (OFF_PENDING).'
+      );
       return;
     }
 
@@ -674,7 +747,7 @@ export const AutomaticWizardScreen: React.FC = () => {
     } catch (err: unknown) {
       Alert.alert(
         'Không thể gán khay',
-        typeof err === 'string' ? err : err instanceof Error ? err.message : 'Lỗi gán khay vào tầng.'
+        formatApiErrorMessage(err, 'Lỗi gán khay vào tầng.')
       );
     } finally {
       setActionLoading(false);
@@ -834,8 +907,16 @@ export const AutomaticWizardScreen: React.FC = () => {
     const floorId = selectedFloor?.floor_id ?? selectedFloor?.id;
     if (!floorId) return;
 
-    if (currentFloorBusy) {
-      Alert.alert('Khóa sửa cấu hình', 'Không thể sửa cấu hình khi AUTO đang chạy hoặc van đang mở/chờ tắt.');
+    if (!canManageAutomation) {
+      Alert.alert('Không có quyền', 'Bạn không có quyền quản lý tự động hóa (yêu cầu quyền iot.automation.manage).');
+      return;
+    }
+
+    if (currentFloorBusy || statusData?.runtime?.control_state === 'OFF_PENDING') {
+      Alert.alert(
+        'Khóa sửa cấu hình',
+        'Không thể sửa cấu hình khi AUTO đang chạy hoặc van đang mở/chờ tắt (OFF_PENDING).'
+      );
       return;
     }
 
@@ -851,10 +932,7 @@ export const AutomaticWizardScreen: React.FC = () => {
       );
       setStep(5);
     } catch (err: unknown) {
-      Alert.alert(
-        'Lưu cấu hình thất bại',
-        typeof err === 'string' ? err : err instanceof Error ? err.message : 'Không thể lưu cấu hình.'
-      );
+      Alert.alert('Lưu cấu hình thất bại', formatApiErrorMessage(err, 'Không thể lưu cấu hình.'));
     } finally {
       setActionLoading(false);
     }
@@ -865,6 +943,11 @@ export const AutomaticWizardScreen: React.FC = () => {
     const floorId = selectedFloor?.floor_id ?? selectedFloor?.id;
     if (!floorId) return;
 
+    if (!canManageAutomation) {
+      Alert.alert('Không có quyền', 'Bạn không có quyền quản lý tự động hóa (yêu cầu quyền iot.automation.manage).');
+      return;
+    }
+
     try {
       setActionLoading(true);
       const res = await iotRepository.evaluateAutoControl(floorId);
@@ -873,10 +956,7 @@ export const AutomaticWizardScreen: React.FC = () => {
         `Hành động: ${res.decision.action}\nTrạng thái: ${res.decision.state}\nLý do: ${res.decision.reason}`
       );
     } catch (err: unknown) {
-      Alert.alert(
-        'Lỗi đánh giá',
-        typeof err === 'string' ? err : err instanceof Error ? err.message : 'Không thể đánh giá vi khí hậu.'
-      );
+      Alert.alert('Lỗi đánh giá', formatApiErrorMessage(err, 'Không thể đánh giá vi khí hậu.'));
     } finally {
       setActionLoading(false);
     }
@@ -885,6 +965,16 @@ export const AutomaticWizardScreen: React.FC = () => {
   const handleStartDryRun = async () => {
     const floorId = selectedFloor?.floor_id ?? selectedFloor?.id;
     if (!floorId) return;
+
+    if (!canManageAutomation) {
+      Alert.alert('Không có quyền', 'Bạn không có quyền quản lý tự động hóa (yêu cầu quyền iot.automation.manage).');
+      return;
+    }
+
+    if (currentFloorBusy || statusData?.runtime?.control_state === 'OFF_PENDING') {
+      Alert.alert('Không thể khởi chạy', 'Tầng đang chạy hoặc đang chờ tắt (OFF_PENDING). Vui lòng đợi hoàn tất.');
+      return;
+    }
 
     try {
       setActionLoading(true);
@@ -900,7 +990,7 @@ export const AutomaticWizardScreen: React.FC = () => {
     } catch (err: unknown) {
       Alert.alert(
         'Lỗi khởi chạy mô phỏng',
-        typeof err === 'string' ? err : err instanceof Error ? err.message : 'Không thể bắt đầu mô phỏng.'
+        formatApiErrorMessage(err, 'Không thể bắt đầu mô phỏng.')
       );
       // Re-check status on timeout / error
       iotRepository.getAutoControlStatus(floorId).then((st) => {
@@ -915,6 +1005,16 @@ export const AutomaticWizardScreen: React.FC = () => {
   const handleStartRealRun = () => {
     const floorId = selectedFloor?.floor_id ?? selectedFloor?.id;
     if (!floorId) return;
+
+    if (!canManageAutomation) {
+      Alert.alert('Không có quyền', 'Bạn không có quyền quản lý tự động hóa (yêu cầu quyền iot.automation.manage).');
+      return;
+    }
+
+    if (currentFloorBusy || statusData?.runtime?.control_state === 'OFF_PENDING') {
+      Alert.alert('Không thể khởi chạy', 'Tầng đang chạy hoặc đang chờ tắt (OFF_PENDING). Vui lòng đợi hoàn tất.');
+      return;
+    }
 
     Alert.alert(
       'XÁC NHẬN BẬT PHUN THẬT',
@@ -935,7 +1035,7 @@ export const AutomaticWizardScreen: React.FC = () => {
             } catch (err: unknown) {
               Alert.alert(
                 'Khởi chạy thực tế thất bại',
-                typeof err === 'string' ? err : err instanceof Error ? err.message : 'Không thể kích hoạt chạy thật.'
+                formatApiErrorMessage(err, 'Không thể kích hoạt chạy thật.')
               );
               // Re-check real state
               iotRepository.getAutoControlStatus(floorId).then((st) => {
@@ -955,6 +1055,11 @@ export const AutomaticWizardScreen: React.FC = () => {
     const floorId = selectedFloor?.floor_id ?? selectedFloor?.id;
     if (!floorId) return;
 
+    if (!canManageAutomation) {
+      Alert.alert('Không có quyền', 'Bạn không có quyền quản lý tự động hóa (yêu cầu quyền iot.automation.manage).');
+      return;
+    }
+
     try {
       setActionLoading(true);
       const res = await iotRepository.stopAutoControl(floorId);
@@ -967,7 +1072,7 @@ export const AutomaticWizardScreen: React.FC = () => {
     } catch (err: unknown) {
       Alert.alert(
         'Lỗi dừng AUTO',
-        typeof err === 'string' ? err : err instanceof Error ? err.message : 'Không thể dừng tiến trình.'
+        formatApiErrorMessage(err, 'Không thể dừng tiến trình.')
       );
       iotRepository.getAutoControlStatus(floorId).then((st) => {
         setStatusData(st);
@@ -1028,6 +1133,11 @@ export const AutomaticWizardScreen: React.FC = () => {
       const floorId = floor.floor_id ?? floor.id;
       if (!floorId) return;
 
+      if (!canManageAutomation) {
+        Alert.alert('Không có quyền', 'Bạn không có quyền quản lý tự động hóa (yêu cầu quyền iot.automation.manage).');
+        return;
+      }
+
       Alert.alert(
         'DỪNG TỰ ĐỘNG KHẨN CẤP',
         `Bạn có chắc chắn muốn dừng chế độ tự động cho "${floor.floor_name}"${roomName ? ` (${roomName})` : ''} và tắt rơ-le phun sương ngay lập tức?`,
@@ -1046,10 +1156,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                   setStatusData(res);
                 }
               } catch (err: unknown) {
-                Alert.alert(
-                  'Lỗi dừng tự động',
-                  typeof err === 'string' ? err : err instanceof Error ? err.message : 'Không thể dừng tiến trình.'
-                );
+                Alert.alert('Lỗi dừng tự động', formatApiErrorMessage(err, 'Không thể dừng tiến trình.'));
               } finally {
                 setActionLoading(false);
               }
@@ -1058,7 +1165,7 @@ export const AutomaticWizardScreen: React.FC = () => {
         ]
       );
     },
-    [selectedFloor]
+    [selectedFloor, canManageAutomation]
   );
 
   // Active running sessions across all floors
@@ -1461,6 +1568,27 @@ export const AutomaticWizardScreen: React.FC = () => {
                   required
                 />
 
+                <View style={styles.rowTwoInputs}>
+                  <View style={styles.flexOne}>
+                    <AppInput
+                      label="Số hàng khay (1 - 32767)"
+                      placeholder="Tùy chọn, ví dụ: 10"
+                      value={totalRowsInput}
+                      onChangeText={setTotalRowsInput}
+                      keyboardType="number-pad"
+                    />
+                  </View>
+                  <View style={styles.flexOne}>
+                    <AppInput
+                      label="Số cột khay (1 - 32767)"
+                      placeholder="Tùy chọn, ví dụ: 5"
+                      value={totalColumnsInput}
+                      onChangeText={setTotalColumnsInput}
+                      keyboardType="number-pad"
+                    />
+                  </View>
+                </View>
+
                 <View style={styles.switchRow}>
                   <AppText variant="label">Trạng thái tầng: {formatMistingCode('floorStatus', floorStatusInput)}</AppText>
                   <Switch
@@ -1692,6 +1820,25 @@ export const AutomaticWizardScreen: React.FC = () => {
                               {tray.tray_status ? `Trạng thái: ${tray.tray_status} • ` : ''}Sẵn sàng gán lượt thuê
                             </AppText>
                           )}
+
+                          {(tray.row_number != null ||
+                            tray.column_number != null ||
+                            tray.position_id != null) && (
+                            <AppText
+                              variant="caption"
+                              color={theme.colors.text.secondary}
+                              style={{ marginTop: 2 }}
+                            >
+                              Vị trí:{' '}
+                              {tray.row_number != null && tray.column_number != null
+                                ? `Hàng ${tray.row_number}, Cột ${tray.column_number}`
+                                : ''}
+                              {tray.position_id != null ? ` (Vị trí #${tray.position_id})` : ''}
+                              {tray.position_status
+                                ? ` • ${formatMistingCode('positionStatus', tray.position_status)}`
+                                : ''}
+                            </AppText>
+                          )}
                         </View>
                       </View>
 
@@ -1860,6 +2007,20 @@ export const AutomaticWizardScreen: React.FC = () => {
                     />
                   )}
                 </View>
+
+                {!suggestions.config && (
+                  <View style={styles.noSuggestionNotice}>
+                    <Ionicons name="alert-circle-outline" size={18} color={theme.colors.warning.dark} />
+                    <AppText
+                      variant="caption"
+                      weight="bold"
+                      color={theme.colors.warning.dark}
+                      style={{ flex: 1, marginLeft: 6 }}
+                    >
+                      Không thể tạo cấu hình gợi ý tự động. Vui lòng kiểm tra các vấn đề bên dưới hoặc nhập thông số thủ công.
+                    </AppText>
+                  </View>
+                )}
 
                 {/* Shared common conditions */}
                 <View style={styles.commonGrid}>
@@ -2208,7 +2369,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                   variant="primary"
                   size="md"
                   loading={actionLoading}
-                  disabled={currentFloorBusy || suggestions?.config === null}
+                  disabled={currentFloorBusy || statusData?.runtime?.control_state === 'OFF_PENDING' || suggestions?.config === null}
                   onPress={handleSaveConfig}
                   style={styles.flexOne}
                 />
@@ -2232,6 +2393,36 @@ export const AutomaticWizardScreen: React.FC = () => {
         {/* ================= STEP 5: VẬN HÀNH & GIÁM SÁT ================= */}
         {step === 5 && (
           <View style={styles.section}>
+            {/* Network Offline Banner */}
+            {isNetworkError && (
+              <View style={styles.networkErrorBanner}>
+                <Ionicons name="cloud-offline" size={20} color={theme.colors.error.main} />
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <AppText variant="caption" weight="bold" color={theme.colors.error.dark}>
+                    Mất kết nối, chưa xác định trạng thái mới nhất
+                  </AppText>
+                  <AppText variant="caption" color={theme.colors.error.dark}>
+                    Không thể kết nối máy chủ. Thao tác điều khiển tạm khóa để đảm bảo an toàn. Không tự động ngầm định van đã đóng.
+                  </AppText>
+                </View>
+              </View>
+            )}
+
+            {/* OFF_PENDING Banner */}
+            {statusData?.runtime?.control_state === 'OFF_PENDING' && (
+              <View style={styles.offPendingBanner}>
+                <ActivityIndicator size="small" color={theme.colors.warning.dark} />
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <AppText variant="caption" weight="bold" color={theme.colors.warning.dark}>
+                    Đang chờ thiết bị xác nhận tắt
+                  </AppText>
+                  <AppText variant="caption" color={theme.colors.warning.dark}>
+                    Đã gửi lệnh tắt, hệ thống đang đợi phản hồi xác nhận từ rơ-le SSR. Khóa Start và sửa cấu hình cho đến khi hoàn tất.
+                  </AppText>
+                </View>
+              </View>
+            )}
+
             {/* Real-time Status Card */}
             <AppCard elevation="sm" style={styles.statusCard}>
               <View style={styles.cardHeaderRow}>
@@ -2380,6 +2571,17 @@ export const AutomaticWizardScreen: React.FC = () => {
                 </View>
               )}
 
+              {statusData?.run?.stop_reason && (
+                <View style={styles.reasonRow}>
+                  <AppText variant="caption" color={theme.colors.text.muted}>
+                    Lý do dừng phiên:{' '}
+                    <AppText variant="caption" color={theme.colors.error.main} weight="bold">
+                      {formatBackendMessage(statusData.run.stop_reason)}
+                    </AppText>
+                  </AppText>
+                </View>
+              )}
+
               {statusData?.runtime?.last_error && (
                 <View style={styles.errorBox}>
                   <Ionicons name="warning" size={14} color={theme.colors.error.main} />
@@ -2396,6 +2598,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                   variant="outline"
                   size="sm"
                   loading={actionLoading}
+                  disabled={actionLoading || isNetworkError}
                   onPress={handleEvaluate}
                   leftIcon={<Ionicons name="eye-outline" size={16} color={theme.colors.primary[600]} />}
                 />
@@ -2407,7 +2610,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                     size="md"
                     style={styles.flexOne}
                     loading={actionLoading}
-                    disabled={currentFloorBusy}
+                    disabled={currentFloorBusy || isNetworkError || statusData?.runtime?.control_state === 'OFF_PENDING'}
                     onPress={handleStartDryRun}
                   />
                   <AppButton
@@ -2416,7 +2619,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                     size="md"
                     style={styles.flexOne}
                     loading={actionLoading}
-                    disabled={currentFloorBusy}
+                    disabled={currentFloorBusy || isNetworkError || statusData?.runtime?.control_state === 'OFF_PENDING'}
                     onPress={handleStartRealRun}
                   />
                 </View>
@@ -2426,7 +2629,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                   variant="danger"
                   size="md"
                   loading={actionLoading}
-                  disabled={!currentFloorBusy && statusData?.runtime?.control_state === 'DISABLED'}
+                  disabled={isNetworkError || (!currentFloorBusy && statusData?.runtime?.control_state === 'DISABLED')}
                   onPress={handleStopAuto}
                   leftIcon={<Ionicons name="stop-circle" size={18} color="#FFFFFF" />}
                 />
@@ -3319,5 +3522,35 @@ const styles = StyleSheet.create({
   logFilterPillActive: {
     backgroundColor: theme.colors.primary[600],
     borderColor: theme.colors.primary[700],
+  },
+  networkErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderColor: theme.colors.error.main,
+    borderWidth: 1,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
+  },
+  offPendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(234, 179, 8, 0.12)',
+    borderColor: theme.colors.warning.main,
+    borderWidth: 1,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
+  },
+  noSuggestionNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(234, 179, 8, 0.1)',
+    borderColor: theme.colors.warning.light,
+    borderWidth: 1,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.sm,
+    marginTop: theme.spacing.xs,
   },
 });

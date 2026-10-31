@@ -28,7 +28,8 @@ import {
 export const LiveCameraScreen: React.FC = () => {
   const router = useRouter();
   const params = useLocalSearchParams<{ cameraId?: string }>();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isFarmOperator } = useAuth();
+  const canManageCamera = isAdmin || isFarmOperator;
 
   const cameraId = useMemo(() => {
     const id = Number(params.cameraId || ENV.cameraId);
@@ -225,7 +226,7 @@ export const LiveCameraScreen: React.FC = () => {
             Hỗ trợ tăng tốc phần cứng, chuyển đổi chất lượng HD/SD và tự động dừng khi chuyển trang.
           </AppText>
 
-          {isAdmin ? (
+          {canManageCamera ? (
             <AppButton
               title="Dừng phiên camera"
               variant="outline"

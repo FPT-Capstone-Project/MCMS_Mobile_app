@@ -94,6 +94,15 @@ const staffActions: QuickActionItem[] = [
     iconBg: 'rgba(236, 72, 153, 0.1)',
     route: '/mushrooms',
   },
+  {
+    id: 'camera',
+    title: 'Camera buồng nuôi',
+    desc: 'Giám sát hình ảnh trực tiếp',
+    icon: 'videocam-outline',
+    iconColor: '#0EA5E9',
+    iconBg: 'rgba(14, 165, 233, 0.1)',
+    route: `/camera/${ENV.cameraId || '3'}`,
+  },
 ];
 
 const customerActions: QuickActionItem[] = [

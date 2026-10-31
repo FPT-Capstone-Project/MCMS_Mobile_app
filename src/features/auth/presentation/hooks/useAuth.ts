@@ -112,6 +112,10 @@ export function useAuth() {
     isAdmin: user?.role === 'ADMIN',
     isFarmOperator: user?.role === 'FARM_OPERATOR',
     canControlIot: user?.role === 'ADMIN' || user?.role === 'FARM_OPERATOR',
+    canManageAutomation:
+      Boolean(user?.permissions?.includes('iot.automation.manage')) ||
+      user?.role === 'ADMIN' ||
+      user?.role === 'FARM_OPERATOR',
     isCustomer: user?.role === 'CUSTOMER' || !user?.role,
     initialize: handleInitialize,
     login: handleLogin,
