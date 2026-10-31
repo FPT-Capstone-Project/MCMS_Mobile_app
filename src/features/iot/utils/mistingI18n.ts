@@ -118,6 +118,15 @@ export const FLOOR_STATUS_MAP: Record<string, string> = {
 };
 
 /**
+ * 11. position_status
+ */
+export const POSITION_STATUS_MAP: Record<string, string> = {
+  AVAILABLE: 'Còn trống',
+  OCCUPIED: 'Đã có khay',
+  MAINTENANCE: 'Bảo trì',
+};
+
+/**
  * Group types for safe lookup
  */
 export type MistingMapGroup =
@@ -130,7 +139,8 @@ export type MistingMapGroup =
   | 'iotCommandStatus'
   | 'reportedStatus'
   | 'configSource'
-  | 'floorStatus';
+  | 'floorStatus'
+  | 'positionStatus';
 
 const GROUP_MAPS: Record<MistingMapGroup, Record<string, string>> = {
   eventType: EVENT_TYPE_MAP,
@@ -143,6 +153,7 @@ const GROUP_MAPS: Record<MistingMapGroup, Record<string, string>> = {
   reportedStatus: REPORTED_STATUS_MAP,
   configSource: CONFIG_SOURCE_MAP,
   floorStatus: FLOOR_STATUS_MAP,
+  positionStatus: POSITION_STATUS_MAP,
 };
 
 /**

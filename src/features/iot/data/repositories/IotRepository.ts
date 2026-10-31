@@ -209,7 +209,7 @@ export class IotRepository {
    */
   async createFloor(mapping: FloorMapping): Promise<FloorMapping> {
     try {
-      const payload = {
+      const payload: Record<string, any> = {
         room_id: Number(mapping.room_id),
         floor_number: Number(mapping.floor_number),
         floor_name: mapping.floor_name.trim(),
@@ -218,6 +218,9 @@ export class IotRepository {
         misting_ssr_channel: Number(mapping.misting_ssr_channel),
         status: mapping.status || 'ACTIVE',
       };
+      if (mapping.total_rows !== undefined) payload.total_rows = mapping.total_rows;
+      if (mapping.total_columns !== undefined) payload.total_columns = mapping.total_columns;
+
       const response = await axiosClient.post<{ data: FloorMapping } | FloorMapping>(
         API_ENDPOINTS.AUTOMATIC.FLOORS,
         payload
@@ -235,10 +238,11 @@ export class IotRepository {
 
   /**
    * Update an existing floor mapping
+   * Omitting total_rows or total_columns preserves existing values
    */
   async updateFloor(floorId: number, mapping: FloorMapping): Promise<FloorMapping> {
     try {
-      const payload = {
+      const payload: Record<string, any> = {
         room_id: Number(mapping.room_id),
         floor_number: Number(mapping.floor_number),
         floor_name: mapping.floor_name.trim(),
@@ -247,6 +251,9 @@ export class IotRepository {
         misting_ssr_channel: Number(mapping.misting_ssr_channel),
         status: mapping.status || 'ACTIVE',
       };
+      if (mapping.total_rows !== undefined) payload.total_rows = mapping.total_rows;
+      if (mapping.total_columns !== undefined) payload.total_columns = mapping.total_columns;
+
       const response = await axiosClient.put<{ data: FloorMapping } | FloorMapping>(
         API_ENDPOINTS.AUTOMATIC.FLOOR_DETAIL(floorId),
         payload
@@ -263,11 +270,12 @@ export class IotRepository {
   }
 
   /**
-   * Assign a same-room tray to a stopped floor
+   * Assign a same-room tray to a stopped floor, optionally setting a position
    */
-  async assignTrayToFloor(floorId: number, trayId: number): Promise<void> {
+  async assignTrayToFloor(floorId: number, trayId: number, positionId?: number | null): Promise<void> {
     try {
-      await axiosClient.put(API_ENDPOINTS.AUTOMATIC.ASSIGN_TRAY(floorId, trayId));
+      const payload = positionId !== undefined ? { position_id: positionId } : {};
+      await axiosClient.put(API_ENDPOINTS.AUTOMATIC.ASSIGN_TRAY(floorId, trayId), payload);
     } catch (error) {
       throw error instanceof AppError ? error : handleApiError(error);
     }
@@ -325,9 +333,9 @@ export class IotRepository {
   async saveAutoControlConfig(floorId: number, config: AutoMistingConfig): Promise<void> {
     try {
       const payload: Record<string, any> = {
-        config_source: config.config_source || 'FLOOR',
+        config_source: 'FLOOR',
         profile_name: config.profile_name?.trim() || 'Shared floor profile',
-        profile_approved: Boolean(config.profile_approved),
+        profile_approved: true,
         humidity_min: Number(config.humidity_min),
         humidity_max: Number(config.humidity_max),
         humidity_start_threshold: Number(config.humidity_start_threshold),
@@ -342,11 +350,6 @@ export class IotRepository {
         max_activations_per_hour: Number(config.max_activations_per_hour),
         max_cumulative_on_ms_per_hour: Number(config.max_cumulative_on_ms_per_hour),
       };
-
-      if (payload.config_source === 'LEGACY' && config.mushroom_type_id != null) {
-        payload.mushroom_type_id = Number(config.mushroom_type_id);
-      }
-      // Notice: For FLOOR config, mushroom_type_id must be omitted so backend derives from tray sessions.
 
       if (payload.cooling_enabled) {
         if (config.temperature_min != null) payload.temperature_min = Number(config.temperature_min);

@@ -85,6 +85,8 @@ export interface FloorMapping {
   node_address: number;
   misting_ssr_channel: number;
   status: 'ACTIVE' | 'INACTIVE';
+  total_rows?: number | null;
+  total_columns?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -153,6 +155,10 @@ export interface CultivationTrayInfo {
   mushroom_type_id?: number | null;
   mushroom_name?: string | null;
   cultivation_status?: string | null;
+  position_id?: number | null;
+  row_number?: number | null;
+  column_number?: number | null;
+  position_status?: string | null;
 }
 
 export interface AutoControlConfigResponse {
@@ -206,6 +212,7 @@ export interface AutoControlStatus {
     status: 'RUNNING' | 'STOPPED' | 'FAULT';
     dry_run: boolean;
     started_by: number | null;
+    stop_reason?: string | null;
   } | null;
   runtime: {
     control_state: AutoControlState;

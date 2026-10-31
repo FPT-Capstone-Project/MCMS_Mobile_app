@@ -19,6 +19,7 @@ export interface BackendUser {
   updated_at?: string;
   role?: string | { role_id?: number; role_name?: string };
   role_name?: string;
+  permissions?: string[];
 }
 
 export interface AuthUser {
@@ -35,6 +36,7 @@ export interface AuthUser {
   status?: string;
   avatarUrl?: string;
   createdAt?: string;
+  permissions?: string[];
 }
 
 export interface AuthSession {
