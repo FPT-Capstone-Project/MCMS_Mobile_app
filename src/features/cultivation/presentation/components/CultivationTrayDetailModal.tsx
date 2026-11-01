@@ -50,7 +50,6 @@ interface EnrichedCultivationData {
   totalDays?: number;
   temperature?: number | null;
   humidity?: number | null;
-  co2?: number | null;
   floorMapping?: FloorMapping | null;
   customerName?: string | null;
   cultivationStatus?: string | null;
@@ -180,34 +179,7 @@ export const CultivationTrayDetailModal: React.FC<CultivationTrayDetailModalProp
           // Ignore mushroom lookup error
         }
 
-        // 4. Fallback / sensible values for demo / mock occupied trays
-        if (tray.status === 'OCCUPIED') {
-          if (!enriched.mushroomName) {
-            enriched.mushroomName = 'Nấm sò trắng';
-          }
-          if (!enriched.totalDays) {
-            enriched.totalDays = 14;
-          }
-          if (enriched.temperature == null) {
-            enriched.temperature = 24.5;
-          }
-          if (enriched.humidity == null) {
-            enriched.humidity = 85.0;
-          }
-          if (enriched.co2 == null) {
-            enriched.co2 = 640;
-          }
-          if (!enriched.daysElapsed) {
-            enriched.daysElapsed = 7;
-          }
-          if (!enriched.startDate) {
-            enriched.startDate = '2026-09-01T08:00:00.000Z';
-          }
-          if (!enriched.endDate) {
-            enriched.endDate = '2026-09-15T08:00:00.000Z';
-          }
-        }
-
+        // 4. Set enriched data without fabricating mock session data
         if (isMounted) {
           setData(enriched);
         }
@@ -229,43 +201,48 @@ export const CultivationTrayDetailModal: React.FC<CultivationTrayDetailModalProp
     return null;
   }
 
+  const hasActiveSession = Boolean(
+    (data?.sessionId ?? tray.session_id) && (data?.mushroomName ?? tray.mushroom_name)
+  );
   const isOccupied = tray.status === 'OCCUPIED';
   const isAvailable = tray.status === 'AVAILABLE';
   const isMaintenance = tray.status === 'MAINTENANCE';
 
-  const statusColor = isOccupied
-    ? theme.colors.primary[600]
-    : isAvailable
-    ? theme.colors.success.main
-    : isMaintenance
-    ? theme.colors.warning.main
-    : theme.colors.neutral[500];
+  let statusColor: string = theme.colors.neutral[500];
+  let statusLabel = 'Không khả dụng';
 
-  const statusLabel = isOccupied
-    ? 'Đang nuôi trồng'
-    : isAvailable
-    ? 'Khay sẵn sàng'
-    : isMaintenance
-    ? 'Đang bảo trì'
-    : 'Không khả dụng';
+  if (hasActiveSession) {
+    statusColor = theme.colors.success.main;
+    statusLabel = 'Đang nuôi trồng';
+  } else if (isOccupied) {
+    statusColor = theme.colors.warning.main;
+    statusLabel = 'Đã xếp khay (Chưa có phiên)';
+  } else if (isAvailable) {
+    statusColor = theme.colors.info?.main ?? '#0284C7';
+    statusLabel = 'Khay trống sẵn sàng';
+  } else if (isMaintenance) {
+    statusColor = theme.colors.error.main;
+    statusLabel = 'Đang bảo trì';
+  }
 
-  // Calculate timeline progress percentage
-  const totalDays = data?.totalDays || 14;
-  const daysElapsed = data?.daysElapsed || 7;
-  const progressPercent = Math.min(100, Math.round((daysElapsed / totalDays) * 100));
+  // Calculate timeline progress percentage if valid data exists
+  const totalDays = data?.totalDays;
+  const daysElapsed = data?.daysElapsed;
+  const progressPercent =
+    totalDays && daysElapsed != null
+      ? Math.min(100, Math.round((daysElapsed / totalDays) * 100))
+      : null;
 
   // Range evaluation helpers
   const tempIdeal =
     data?.condition?.temperature_min != null && data?.condition?.temperature_max != null
       ? `${data.condition.temperature_min}° - ${data.condition.temperature_max}°C`
-      : '20° - 26°C';
+      : 'Theo chuẩn giống nấm';
 
   const humIdeal =
     data?.condition?.humidity_min != null && data?.condition?.humidity_max != null
       ? `${data.condition.humidity_min}% - ${data.condition.humidity_max}%`
-      : '80% - 90%';
-
-  const co2Ideal = '< 800 ppm';
+      : 'Theo chuẩn giống nấm';
 
   const handleGoToCamera = () => {
     onClose();
@@ -352,7 +329,7 @@ export const CultivationTrayDetailModal: React.FC<CultivationTrayDetailModalProp
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}
             >
-              {isOccupied ? (
+              {hasActiveSession ? (
                 <>
                   {/* Mushroom Variety Hero Card */}
                   <AppCard elevation="xs" style={styles.mushroomHeroCard}>
@@ -397,12 +374,14 @@ export const CultivationTrayDetailModal: React.FC<CultivationTrayDetailModalProp
                           </AppText>
                         </View>
                       ) : null}
-                      <View style={styles.metaTag}>
-                        <Ionicons name="hourglass-outline" size={13} color={theme.colors.text.secondary} />
-                        <AppText variant="caption" color={theme.colors.text.secondary}>
-                          Chu kỳ: {totalDays} ngày
-                        </AppText>
-                      </View>
+                      {totalDays ? (
+                        <View style={styles.metaTag}>
+                          <Ionicons name="hourglass-outline" size={13} color={theme.colors.text.secondary} />
+                          <AppText variant="caption" color={theme.colors.text.secondary}>
+                            Chu kỳ: {totalDays} ngày
+                          </AppText>
+                        </View>
+                      ) : null}
                     </View>
                   </AppCard>
 
@@ -414,15 +393,23 @@ export const CultivationTrayDetailModal: React.FC<CultivationTrayDetailModalProp
                         Tiến độ chu kỳ sinh trưởng
                       </AppText>
                       <View style={styles.spacer} />
-                      <AppText variant="caption" weight="bold" color={theme.colors.primary[600]}>
-                        Ngày {daysElapsed}/{totalDays} ({progressPercent}%)
-                      </AppText>
+                      {progressPercent != null && totalDays != null ? (
+                        <AppText variant="caption" weight="bold" color={theme.colors.primary[600]}>
+                          Ngày {daysElapsed ?? 0}/{totalDays} ({progressPercent}%)
+                        </AppText>
+                      ) : (
+                        <AppText variant="caption" color={theme.colors.text.secondary}>
+                          Đang cập nhật
+                        </AppText>
+                      )}
                     </View>
 
                     {/* Progress Bar */}
-                    <View style={styles.progressBarTrack}>
-                      <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
-                    </View>
+                    {progressPercent != null && (
+                      <View style={styles.progressBarTrack}>
+                        <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
+                      </View>
+                    )}
 
                     <View style={styles.datesRow}>
                       <View>
@@ -430,7 +417,7 @@ export const CultivationTrayDetailModal: React.FC<CultivationTrayDetailModalProp
                           Cấy phôi
                         </AppText>
                         <AppText variant="caption" weight="bold">
-                          {formatDate(data?.startDate)}
+                          {data?.startDate ? formatDate(data.startDate) : 'Chưa cập nhật'}
                         </AppText>
                       </View>
 
@@ -439,7 +426,7 @@ export const CultivationTrayDetailModal: React.FC<CultivationTrayDetailModalProp
                           Dự kiến thu hoạch
                         </AppText>
                         <AppText variant="caption" weight="bold" color={theme.colors.success.dark}>
-                          {formatDate(data?.endDate)}
+                          {data?.endDate ? formatDate(data.endDate) : 'Chưa cập nhật'}
                         </AppText>
                       </View>
                     </View>
@@ -490,21 +477,125 @@ export const CultivationTrayDetailModal: React.FC<CultivationTrayDetailModalProp
                           </AppText>
                         </View>
                       </View>
+                    </View>
+                  </View>
 
-                      {/* CO2 */}
+                  {/* Chamber Hardware Setup */}
+                  {data?.floorMapping && (
+                    <AppCard elevation="xs" variant="outlined" style={styles.hardwareCard}>
+                      <View style={styles.hardwareHeader}>
+                        <Ionicons name="hardware-chip-outline" size={16} color={theme.colors.text.secondary} />
+                        <AppText variant="caption" weight="bold" color={theme.colors.text.secondary}>
+                          THÔNG TIN PHẦN CỨNG BUỒNG NUÔI TRỒNG
+                        </AppText>
+                      </View>
+                      <View style={styles.hardwareGrid}>
+                        <View style={styles.hardwareCol}>
+                          <AppText variant="caption" color={theme.colors.text.muted}>
+                            Master Gateway:
+                          </AppText>
+                          <AppText variant="caption" weight="semibold">
+                            {data.floorMapping.master_id}
+                          </AppText>
+                        </View>
+                        <View style={styles.hardwareCol}>
+                          <AppText variant="caption" color={theme.colors.text.muted}>
+                            Địa chỉ Node:
+                          </AppText>
+                          <AppText variant="caption" weight="semibold">
+                            Node #{data.floorMapping.node_address}
+                          </AppText>
+                        </View>
+                        <View style={styles.hardwareCol}>
+                          <AppText variant="caption" color={theme.colors.text.muted}>
+                            Van SSR phun ẩm:
+                          </AppText>
+                          <AppText variant="caption" weight="semibold">
+                            Kênh {data.floorMapping.misting_ssr_channel}
+                          </AppText>
+                        </View>
+                      </View>
+                    </AppCard>
+                  )}
+                </>
+              ) : isOccupied ? (
+                /* Occupied Tray without Active Session */
+                <>
+                  <AppCard elevation="xs" style={styles.unassignedSessionCard}>
+                    <View style={styles.unassignedIconBox}>
+                      <Ionicons name="cube" size={32} color={theme.colors.warning.dark} />
+                    </View>
+                    <AppText variant="title" weight="bold" style={styles.textCenter}>
+                      Khay đã xếp vị trí • Chưa có phiên trồng
+                    </AppText>
+                    <AppText
+                      variant="bodySmall"
+                      color={theme.colors.text.secondary}
+                      style={styles.textCenter}
+                    >
+                      Khay {tray.tray_code} đã được xếp vào tầng{' '}
+                      {data?.floorMapping?.floor_name ||
+                        (floor?.floor_number ? `Tầng ${floor.floor_number}` : 'nuôi trồng')}
+                      . Hiện chưa có phiên nuôi trồng nào đang hoạt động. Sẵn sàng gán lượt thuê để bắt đầu canh tác.
+                    </AppText>
+
+                    {onAssignRental ? (
+                      <AppButton
+                        title="Gán lượt thuê để bắt đầu phiên trồng"
+                        variant="primary"
+                        size="md"
+                        leftIcon={<Ionicons name="add-circle" size={18} color="#FFFFFF" />}
+                        onPress={() => {
+                          onClose();
+                          onAssignRental(tray);
+                        }}
+                        style={styles.actionBtnFull}
+                      />
+                    ) : null}
+                  </AppCard>
+
+                  {/* Real-time Environment Telemetry for the floor */}
+                  <View style={styles.metricsSection}>
+                    <View style={styles.sectionHeaderRow}>
+                      <Ionicons name="pulse" size={16} color={theme.colors.primary[600]} />
+                      <AppText variant="label" weight="bold">
+                        Vi khí hậu buồng trồng hiện tại
+                      </AppText>
+                    </View>
+
+                    <View style={styles.metricsGrid}>
+                      {/* Temperature */}
                       <View style={styles.metricCard}>
                         <View style={styles.metricTop}>
-                          <Ionicons name="leaf-outline" size={18} color="#10B981" />
+                          <Ionicons name="thermometer-outline" size={18} color="#EF4444" />
                           <AppText variant="caption" color={theme.colors.text.muted}>
-                            Khí CO₂
+                            Nhiệt độ đo
                           </AppText>
                         </View>
                         <AppText variant="h3" weight="bold" color={theme.colors.text.primary}>
-                          {data?.co2 != null ? `${data.co2} ppm` : '640 ppm'}
+                          {data?.temperature != null ? `${Number(data.temperature).toFixed(2)}°C` : '--'}
                         </AppText>
                         <View style={styles.idealBadge}>
                           <AppText variant="caption" color={theme.colors.text.secondary}>
-                            Chuẩn: <AppText variant="caption" weight="semibold">{co2Ideal}</AppText>
+                            {data?.floorMapping?.floor_name || (floor?.floor_number ? `Tầng ${floor.floor_number}` : 'Cảm biến buồng')}
+                          </AppText>
+                        </View>
+                      </View>
+
+                      {/* Humidity */}
+                      <View style={styles.metricCard}>
+                        <View style={styles.metricTop}>
+                          <Ionicons name="water-outline" size={18} color="#0EA5E9" />
+                          <AppText variant="caption" color={theme.colors.text.muted}>
+                            Độ ẩm đo
+                          </AppText>
+                        </View>
+                        <AppText variant="h3" weight="bold" color={theme.colors.text.primary}>
+                          {data?.humidity != null ? `${Number(data.humidity).toFixed(2)}%` : '--'}
+                        </AppText>
+                        <View style={styles.idealBadge}>
+                          <AppText variant="caption" color={theme.colors.text.secondary}>
+                            {data?.floorMapping?.floor_name || (floor?.floor_number ? `Tầng ${floor.floor_number}` : 'Cảm biến buồng')}
                           </AppText>
                         </View>
                       </View>
@@ -601,7 +692,7 @@ export const CultivationTrayDetailModal: React.FC<CultivationTrayDetailModalProp
 
               {/* Action Buttons */}
               <View style={styles.actionButtonsCol}>
-                {isOccupied && (
+                {hasActiveSession && (
                   <AppButton
                     title="Xem camera buồng trồng trực tiếp"
                     variant="primary"
@@ -807,6 +898,24 @@ const styles = StyleSheet.create({
   },
   hardwareCol: {
     flex: 1,
+  },
+  unassignedSessionCard: {
+    alignItems: 'center',
+    padding: theme.spacing.lg,
+    gap: theme.spacing.sm,
+    backgroundColor: 'rgba(234, 179, 8, 0.05)',
+    borderColor: 'rgba(234, 179, 8, 0.25)',
+    borderWidth: 1,
+    borderRadius: theme.borderRadius.md,
+  },
+  unassignedIconBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(234, 179, 8, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
   emptyStateCard: {
     alignItems: 'center',

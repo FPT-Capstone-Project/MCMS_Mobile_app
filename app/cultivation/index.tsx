@@ -19,6 +19,7 @@ import {
 import { iotRepository } from '../../src/features/iot/data/repositories/IotRepository';
 import type { FloorMapping } from '../../src/features/iot/domain/entities/Iot';
 import {
+  AppButton,
   AppCard,
   AppHeader,
   AppText,
@@ -32,6 +33,7 @@ export default function CultivationScreen() {
 
   const [floors, setFloors] = useState<FloorMapping[]>([]);
   const [trays, setTrays] = useState<CultivationTray[]>([]);
+  const [selectedFloorId, setSelectedFloorId] = useState<number | 'ALL'>('ALL');
 
   // Tray Detail Modal State
   const [selectedTrayForDetail, setSelectedTrayForDetail] = useState<CultivationTray | null>(null);
@@ -91,6 +93,7 @@ export default function CultivationScreen() {
       const targetRoomId = selectedRoomId || (roomsData.length > 0 ? roomsData[0].room_id : null);
       if (targetRoomId) {
         setSelectedRoomId(targetRoomId);
+        setSelectedFloorId('ALL');
         const rawTrays = await cultivationRepository.getTrays(targetRoomId);
         const roomFloors = floorsData.filter((f) => f.room_id === targetRoomId);
         const enriched = await enrichTraysWithFloorCultivation(rawTrays, roomFloors);
@@ -118,6 +121,7 @@ export default function CultivationScreen() {
 
   const handleSelectRoom = async (roomId: number) => {
     setSelectedRoomId(roomId);
+    setSelectedFloorId('ALL');
     try {
       const rawTrays = await cultivationRepository.getTrays(roomId);
       const roomFloors = floors.filter((f) => f.room_id === roomId);
@@ -136,31 +140,14 @@ export default function CultivationScreen() {
   const selectedRoom = rooms.find((r) => r.room_id === selectedRoomId);
   const roomFloors = floors.filter((f) => f.room_id === selectedRoomId);
 
-  const getTrayStatusColor = (status: string) => {
-    switch (status) {
-      case 'AVAILABLE':
-        return theme.colors.success.main;
-      case 'OCCUPIED':
-        return theme.colors.primary[600];
-      case 'MAINTENANCE':
-        return theme.colors.warning.main;
-      default:
-        return theme.colors.neutral[400];
-    }
-  };
+  // Filter trays by selected floor
+  const filteredTrays = trays.filter((t) => {
+    if (selectedFloorId === 'ALL') return true;
+    return t.floor_id === selectedFloorId;
+  });
 
-  const getTrayStatusText = (status: string) => {
-    switch (status) {
-      case 'AVAILABLE':
-        return 'Sẵn sàng';
-      case 'OCCUPIED':
-        return 'Đang trồng';
-      case 'MAINTENANCE':
-        return 'Bảo trì';
-      default:
-        return 'Không khả dụng';
-    }
-  };
+  const countTraysForFloor = (fid: number) =>
+    trays.filter((t) => t.floor_id === fid).length;
 
   if (loading) {
     return (
@@ -250,50 +237,197 @@ export default function CultivationScreen() {
 
         {/* Floors Section */}
         <View style={styles.sectionHeader}>
-          <AppText variant="label" color={theme.colors.text.muted}>
-            CÁC TẦNG ({roomFloors.length})
-          </AppText>
+          <View style={styles.sectionTitleRow}>
+            <AppText variant="label" color={theme.colors.text.muted}>
+              CÁC TẦNG TRONG PHÒNG ({roomFloors.length})
+            </AppText>
+            {selectedFloorId !== 'ALL' && (
+              <Pressable onPress={() => setSelectedFloorId('ALL')}>
+                <AppText variant="caption" color={theme.colors.primary[600]} weight="bold">
+                  Xem tất cả tầng
+                </AppText>
+              </Pressable>
+            )}
+          </View>
+
           <View style={styles.floorsGrid}>
             {roomFloors.length === 0 ? (
               <AppText variant="caption" color={theme.colors.text.muted}>
                 Chưa có cấu hình tầng cho phòng này.
               </AppText>
             ) : (
-              roomFloors.map((floor) => (
-                <AppCard key={floor.id || floor.floor_number} elevation="xs" style={styles.floorCard}>
-                  <View style={styles.floorHeader}>
-                    <Ionicons name="layers" size={20} color={theme.colors.primary[500]} />
-                    <AppText variant="label" weight="bold">
-                      {floor.floor_name} (Tầng {floor.floor_number})
-                    </AppText>
-                  </View>
-                  <AppText variant="caption" color={theme.colors.text.secondary}>
-                    Master #{floor.master_id} • Node {floor.node_address} • SSR #{floor.misting_ssr_channel}
-                  </AppText>
-                </AppCard>
-              ))
+              roomFloors.map((floor) => {
+                const fid = floor.floor_id ?? floor.id;
+                const isSelected = fid != null && selectedFloorId === fid;
+                const trayCount = fid != null ? countTraysForFloor(fid) : 0;
+
+                return (
+                  <Pressable
+                    key={floor.id || floor.floor_number}
+                    onPress={() => {
+                      if (fid != null) {
+                        setSelectedFloorId(selectedFloorId === fid ? 'ALL' : fid);
+                      }
+                    }}
+                  >
+                    <AppCard
+                      elevation="xs"
+                      style={[
+                        styles.floorCard,
+                        isSelected && styles.floorCardSelected,
+                      ]}
+                    >
+                      <View style={styles.floorHeader}>
+                        <View style={styles.floorHeaderLeft}>
+                          <Ionicons
+                            name="layers"
+                            size={18}
+                            color={isSelected ? theme.colors.primary[600] : theme.colors.primary[500]}
+                          />
+                          <AppText
+                            variant="label"
+                            weight="bold"
+                            color={isSelected ? theme.colors.primary[700] : undefined}
+                          >
+                            {floor.floor_name} (Tầng {floor.floor_number})
+                          </AppText>
+                        </View>
+
+                        <View
+                          style={[
+                            styles.floorCountBadge,
+                            isSelected && styles.floorCountBadgeSelected,
+                          ]}
+                        >
+                          <AppText
+                            variant="caption"
+                            weight="bold"
+                            color={isSelected ? '#FFFFFF' : theme.colors.primary[600]}
+                            style={{ fontSize: 11 }}
+                          >
+                            {trayCount} khay
+                          </AppText>
+                        </View>
+                      </View>
+
+                      <AppText variant="caption" color={theme.colors.text.secondary}>
+                        Master #{floor.master_id} • Node {floor.node_address} • SSR #{floor.misting_ssr_channel}
+                      </AppText>
+                    </AppCard>
+                  </Pressable>
+                );
+              })
             )}
           </View>
         </View>
 
+        {/* Floor Filter Pills for Quick Switch */}
+        {roomFloors.length > 1 && (
+          <View style={styles.filterPillsContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterPillsRow}>
+              <Pressable
+                onPress={() => setSelectedFloorId('ALL')}
+                style={[
+                  styles.filterPill,
+                  selectedFloorId === 'ALL' && styles.filterPillActive,
+                ]}
+              >
+                <AppText
+                  variant="caption"
+                  weight={selectedFloorId === 'ALL' ? 'bold' : 'normal'}
+                  color={selectedFloorId === 'ALL' ? '#FFFFFF' : theme.colors.text.primary}
+                >
+                  Tất cả các tầng ({trays.length})
+                </AppText>
+              </Pressable>
+
+              {roomFloors.map((floor) => {
+                const fid = floor.floor_id ?? floor.id;
+                const isSelected = fid != null && selectedFloorId === fid;
+                const trayCount = fid != null ? countTraysForFloor(fid) : 0;
+
+                return (
+                  <Pressable
+                    key={fid || floor.floor_number}
+                    onPress={() => setSelectedFloorId(isSelected ? 'ALL' : (fid as number))}
+                    style={[
+                      styles.filterPill,
+                      isSelected && styles.filterPillActive,
+                    ]}
+                  >
+                    <AppText
+                      variant="caption"
+                      weight={isSelected ? 'bold' : 'normal'}
+                      color={isSelected ? '#FFFFFF' : theme.colors.text.primary}
+                    >
+                      {floor.floor_name} ({trayCount})
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Trays Section */}
         <View style={styles.sectionHeader}>
-          <AppText variant="label" color={theme.colors.text.muted}>
-            DANH SÁCH KHAY NUÔI TRỒNG ({trays.length})
-          </AppText>
+          <View style={styles.sectionTitleRow}>
+            <AppText variant="label" color={theme.colors.text.muted}>
+              DANH SÁCH KHAY NUÔI TRỒNG ({filteredTrays.length})
+            </AppText>
+            {selectedFloorId !== 'ALL' && (
+              <AppText variant="caption" color={theme.colors.primary[600]}>
+                Đang lọc theo tầng
+              </AppText>
+            )}
+          </View>
 
           <View style={styles.traysGrid}>
-            {trays.length === 0 ? (
+            {filteredTrays.length === 0 ? (
               <AppCard elevation="xs" style={styles.emptyCard}>
-                <AppText variant="caption" color={theme.colors.text.muted}>
-                  Chưa có khay nào trong phòng này.
+                <Ionicons name="cube-outline" size={32} color={theme.colors.text.muted} />
+                <AppText variant="caption" color={theme.colors.text.muted} style={{ marginTop: 6 }}>
+                  {selectedFloorId !== 'ALL'
+                    ? 'Chưa có khay nào được gán vào tầng này.'
+                    : 'Chưa có khay nào trong phòng này.'}
                 </AppText>
+                {selectedFloorId !== 'ALL' && (
+                  <AppButton
+                    title="Xem tất cả khay"
+                    variant="ghost"
+                    size="sm"
+                    onPress={() => setSelectedFloorId('ALL')}
+                    style={{ marginTop: 8 }}
+                  />
+                )}
               </AppCard>
             ) : (
-              trays.map((tray) => {
-                const statusColor = getTrayStatusColor(tray.status);
-                const statusText = getTrayStatusText(tray.status);
+              filteredTrays.map((tray) => {
+                const hasActiveSession = Boolean(tray.session_id && tray.mushroom_name);
                 const isOccupied = tray.status === 'OCCUPIED';
+                const isAvailable = tray.status === 'AVAILABLE';
+                const isMaintenance = tray.status === 'MAINTENANCE';
+
+                let statusColor: string = theme.colors.neutral[400];
+                let statusText = 'Không khả dụng';
+
+                if (hasActiveSession) {
+                  statusColor = theme.colors.success.main;
+                  statusText = 'Đang trồng';
+                } else if (isOccupied) {
+                  statusColor = theme.colors.warning.main;
+                  statusText = 'Chưa có phiên';
+                } else if (isAvailable) {
+                  statusColor = theme.colors.info?.main ?? '#0284C7';
+                  statusText = 'Khay trống';
+                } else if (isMaintenance) {
+                  statusColor = theme.colors.error.main;
+                  statusText = 'Bảo trì';
+                }
+
+                const trayFloor = floors.find(
+                  (f) => (f.floor_id ?? f.id) === tray.floor_id
+                );
 
                 return (
                   <Pressable
@@ -308,9 +442,11 @@ export default function CultivationScreen() {
                       elevation="xs"
                       style={[
                         styles.trayCard,
-                        isOccupied && styles.trayCardOccupied,
+                        hasActiveSession && styles.trayCardActiveSession,
+                        isOccupied && !hasActiveSession && styles.trayCardOccupiedNoSession,
                       ]}
                     >
+                      {/* Tray Header */}
                       <View style={styles.trayHeader}>
                         <View style={styles.trayHeaderLeft}>
                           <View style={[styles.trayDot, { backgroundColor: statusColor }]} />
@@ -318,17 +454,20 @@ export default function CultivationScreen() {
                             {tray.tray_code}
                           </AppText>
                         </View>
-                        <Ionicons
-                          name="chevron-forward"
-                          size={14}
-                          color={theme.colors.text.muted}
-                        />
+                        {trayFloor ? (
+                          <View style={styles.trayFloorBadge}>
+                            <AppText variant="caption" color={theme.colors.text.secondary} style={{ fontSize: 10 }}>
+                              {trayFloor.floor_name}
+                            </AppText>
+                          </View>
+                        ) : null}
                       </View>
 
-                      {isOccupied ? (
-                        <View style={styles.trayOccupiedBody}>
+                      {/* Tray Body depending on real session status */}
+                      {hasActiveSession ? (
+                        <View style={styles.traySessionBody}>
                           <View style={styles.mushroomRow}>
-                            <Ionicons name="leaf" size={13} color={theme.colors.primary[600]} />
+                            <Ionicons name="leaf" size={13} color={theme.colors.success.dark} />
                             <AppText
                               variant="caption"
                               weight="bold"
@@ -336,26 +475,50 @@ export default function CultivationScreen() {
                               numberOfLines={1}
                               style={styles.mushroomNameText}
                             >
-                              {tray.mushroom_name || 'Nấm đang trồng'}
+                              {tray.mushroom_name}
                             </AppText>
                           </View>
-                          {tray.session_id ? (
-                            <AppText variant="caption" color={theme.colors.text.secondary}>
-                              Phiên #{tray.session_id} • Xem chi tiết →
-                            </AppText>
-                          ) : (
-                            <AppText variant="caption" color={theme.colors.primary[600]}>
-                              Xem chi tiết →
-                            </AppText>
-                          )}
+                          <AppText variant="caption" color={theme.colors.text.secondary}>
+                            Phiên #{tray.session_id} • Xem chi tiết →
+                          </AppText>
                         </View>
-                      ) : tray.tray_name ? (
-                        <AppText variant="caption" color={theme.colors.text.secondary} numberOfLines={1}>
-                          {tray.tray_name}
-                        </AppText>
-                      ) : null}
+                      ) : isOccupied ? (
+                        <View style={styles.trayUnassignedBody}>
+                          <View style={styles.mushroomRow}>
+                            <Ionicons name="cube-outline" size={13} color={theme.colors.warning.dark} />
+                            <AppText
+                              variant="caption"
+                              weight="bold"
+                              color={theme.colors.text.primary}
+                              numberOfLines={1}
+                              style={styles.mushroomNameText}
+                            >
+                              Đã xếp khay
+                            </AppText>
+                          </View>
+                          <AppText variant="caption" color={theme.colors.text.secondary}>
+                            Chưa có phiên • Chi tiết →
+                          </AppText>
+                        </View>
+                      ) : isAvailable ? (
+                        <View style={styles.trayAvailableBody}>
+                          <AppText variant="caption" color={theme.colors.text.secondary} numberOfLines={1}>
+                            {tray.tray_name || 'Khay sẵn sàng gán thuê'}
+                          </AppText>
+                          <AppText variant="caption" color={theme.colors.info?.main ?? '#0284C7'}>
+                            Xem chi tiết →
+                          </AppText>
+                        </View>
+                      ) : (
+                        <View style={styles.trayMaintenanceBody}>
+                          <AppText variant="caption" color={theme.colors.error.main}>
+                            Đang bảo dưỡng
+                          </AppText>
+                        </View>
+                      )}
 
-                      <View style={[styles.trayBadge, { backgroundColor: `${statusColor}15` }]}>
+                      {/* Tray Badge */}
+                      <View style={[styles.trayBadge, { backgroundColor: `${statusColor}18` }]}>
                         <AppText variant="overline" color={statusColor} weight="bold">
                           {statusText}
                         </AppText>
@@ -399,6 +562,11 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     gap: theme.spacing.xs,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   pillsRow: {
     gap: theme.spacing.xs,
@@ -444,11 +612,49 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
     padding: theme.spacing.sm,
     gap: 4,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+  },
+  floorCardSelected: {
+    borderColor: theme.colors.primary[600],
+    backgroundColor: 'rgba(34, 197, 94, 0.04)',
   },
   floorHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  floorHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: theme.spacing.xs,
+  },
+  floorCountBadge: {
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.full,
+  },
+  floorCountBadgeSelected: {
+    backgroundColor: theme.colors.primary[600],
+  },
+  filterPillsContainer: {
+    marginVertical: -2,
+  },
+  filterPillsRow: {
+    gap: theme.spacing.xs,
+  },
+  filterPill: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 6,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.neutral[100],
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+  },
+  filterPillActive: {
+    backgroundColor: theme.colors.primary[600],
+    borderColor: theme.colors.primary[600],
   },
   traysGrid: {
     flexDirection: 'row',
@@ -470,9 +676,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border.light,
   },
-  trayCardOccupied: {
+  trayCardActiveSession: {
     borderColor: 'rgba(34, 197, 94, 0.4)',
     backgroundColor: '#FAFCFA',
+  },
+  trayCardOccupiedNoSession: {
+    borderColor: 'rgba(234, 179, 8, 0.35)',
+    backgroundColor: '#FFFEFA',
   },
   trayHeader: {
     flexDirection: 'row',
@@ -489,12 +699,39 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
   },
-  trayOccupiedBody: {
+  trayFloorBadge: {
+    backgroundColor: theme.colors.neutral[100],
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  traySessionBody: {
     backgroundColor: 'rgba(34, 197, 94, 0.08)',
     paddingHorizontal: 6,
     paddingVertical: 4,
     borderRadius: 4,
     gap: 2,
+    marginVertical: 2,
+  },
+  trayUnassignedBody: {
+    backgroundColor: 'rgba(234, 179, 8, 0.08)',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 4,
+    gap: 2,
+    marginVertical: 2,
+  },
+  trayAvailableBody: {
+    paddingHorizontal: 2,
+    paddingVertical: 4,
+    gap: 2,
+    marginVertical: 2,
+  },
+  trayMaintenanceBody: {
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 4,
     marginVertical: 2,
   },
   mushroomRow: {
@@ -518,4 +755,3 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
-

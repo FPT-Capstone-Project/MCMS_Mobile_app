@@ -18,6 +18,7 @@ import {
   AppText,
   ScreenContainer,
 } from '../../../../shared/components';
+import { useAuth } from '../../../auth';
 import { iotRepository } from '../../data/repositories/IotRepository';
 import { IotMaster, IotSsr, IotSsrChannel } from '../../domain/entities/Iot';
 import { formatMistingCode } from '../../utils/mistingI18n';
@@ -27,6 +28,7 @@ const TOTAL_CHANNELS = 8;
 
 export const ManualSsrControlScreen: React.FC = () => {
   const router = useRouter();
+  const { canControlIot } = useAuth();
 
   // Master selection & custom input
   const [masters, setMasters] = useState<IotMaster[]>([]);
@@ -122,6 +124,10 @@ export const ManualSsrControlScreen: React.FC = () => {
 
   // Send single channel SSR command (ON/OFF)
   const handleSendCommand = async (channel: number, action: 'ON' | 'OFF') => {
+    if (!canControlIot) {
+      Alert.alert('Không có quyền', 'Yêu cầu vai trò Admin hoặc Farm Operator để điều khiển thiết bị.');
+      return;
+    }
     if (channelLoading[channel]) return;
 
     setChannelLoading((prev) => ({ ...prev, [channel]: true }));
@@ -201,6 +207,10 @@ export const ManualSsrControlScreen: React.FC = () => {
 
   // Batch toggle all 8 channels
   const handleBatchToggle = (action: 'ON' | 'OFF') => {
+    if (!canControlIot) {
+      Alert.alert('Không có quyền', 'Yêu cầu vai trò Admin hoặc Farm Operator để điều khiển thiết bị.');
+      return;
+    }
     const actionText = action === 'ON' ? 'BẬT' : 'TẮT';
     Alert.alert(
       `Xác nhận ${actionText} tất cả`,
@@ -243,9 +253,15 @@ export const ManualSsrControlScreen: React.FC = () => {
     <ScreenContainer scrollable edges={['left', 'right']}>
       <AppHeader
         title="Điều khiển SSR thủ công"
-        subtitle="Quản lý toàn diện 8 rơ-le Master"
+        subtitle="Quản lý toàn diện 8 rơ-le Master • Admin & Farm Operator"
         showBack
-        onBack={() => router.back()}
+        onBack={() => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/(tabs)');
+          }
+        }}
         rightAction={
           <AppButton
             title=""
@@ -264,6 +280,14 @@ export const ManualSsrControlScreen: React.FC = () => {
       />
 
       <View style={styles.content}>
+        {/* Role Access Indicator */}
+        <View style={styles.roleAccessBanner}>
+          <Ionicons name="shield-checkmark" size={14} color={theme.colors.primary[700]} />
+          <AppText variant="caption" weight="bold" color={theme.colors.primary[700]}>
+            Quyền vận hành thiết bị: Quản trị viên & Kỹ thuật viên (Admin & Farm Operator)
+          </AppText>
+        </View>
+
         {/* ================= SECTION 1: MASTER SELECTION ================= */}
         <AppCard elevation="xs" style={styles.masterConfigCard}>
           <View style={styles.sectionTitleRow}>
@@ -372,7 +396,7 @@ export const ManualSsrControlScreen: React.FC = () => {
             size="md"
             leftIcon={<Ionicons name="flash-outline" size={16} color={theme.colors.primary[700]} />}
             loading={batchLoading}
-            disabled={batchLoading}
+            disabled={batchLoading || !canControlIot}
             onPress={() => handleBatchToggle('ON')}
             style={styles.batchBtn}
           />
@@ -382,7 +406,7 @@ export const ManualSsrControlScreen: React.FC = () => {
             size="md"
             leftIcon={<Ionicons name="power-outline" size={16} color={theme.colors.error.main} />}
             loading={batchLoading}
-            disabled={batchLoading}
+            disabled={batchLoading || !canControlIot}
             onPress={() => handleBatchToggle('OFF')}
             style={styles.batchBtn}
           />
@@ -513,7 +537,7 @@ export const ManualSsrControlScreen: React.FC = () => {
                       variant="primary"
                       size="sm"
                       loading={isChLoading}
-                      disabled={isChLoading}
+                      disabled={isChLoading || !canControlIot}
                       leftIcon={<Ionicons name="power" size={14} color="#FFFFFF" />}
                       onPress={() => handleSendCommand(channelNum, 'ON')}
                       style={styles.chBtn}
@@ -523,7 +547,7 @@ export const ManualSsrControlScreen: React.FC = () => {
                       variant="outline"
                       size="sm"
                       loading={isChLoading}
-                      disabled={isChLoading}
+                      disabled={isChLoading || !canControlIot}
                       leftIcon={<Ionicons name="power-outline" size={14} color={theme.colors.error.main} />}
                       onPress={() => handleSendCommand(channelNum, 'OFF')}
                       style={styles.chBtn}
@@ -720,5 +744,16 @@ const styles = StyleSheet.create({
   },
   noticeText: {
     lineHeight: 18,
+  },
+  roleAccessBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.primary[50],
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 6,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary[200],
   },
 });

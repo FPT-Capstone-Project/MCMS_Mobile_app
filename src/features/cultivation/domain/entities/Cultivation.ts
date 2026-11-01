@@ -58,7 +58,6 @@ export interface CultivatedTrayDetail {
   environment?: {
     temperature?: number | null;
     humidity?: number | null;
-    co2?: number | null;
   } | null;
 }
 

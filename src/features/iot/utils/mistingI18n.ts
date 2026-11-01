@@ -127,6 +127,16 @@ export const POSITION_STATUS_MAP: Record<string, string> = {
 };
 
 /**
+ * 12. tray.status / tray_status (Trạng thái khay vật lý)
+ */
+export const TRAY_STATUS_MAP: Record<string, string> = {
+  AVAILABLE: 'Khay trống',
+  OCCUPIED: 'Đã xếp khay',
+  MAINTENANCE: 'Bảo trì',
+  INACTIVE: 'Ngừng sử dụng',
+};
+
+/**
  * Group types for safe lookup
  */
 export type MistingMapGroup =
@@ -140,7 +150,8 @@ export type MistingMapGroup =
   | 'reportedStatus'
   | 'configSource'
   | 'floorStatus'
-  | 'positionStatus';
+  | 'positionStatus'
+  | 'trayStatus';
 
 const GROUP_MAPS: Record<MistingMapGroup, Record<string, string>> = {
   eventType: EVENT_TYPE_MAP,
@@ -154,6 +165,7 @@ const GROUP_MAPS: Record<MistingMapGroup, Record<string, string>> = {
   configSource: CONFIG_SOURCE_MAP,
   floorStatus: FLOOR_STATUS_MAP,
   positionStatus: POSITION_STATUS_MAP,
+  trayStatus: TRAY_STATUS_MAP,
 };
 
 /**
