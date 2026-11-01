@@ -1817,7 +1817,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                             </AppText>
                           ) : (
                             <AppText variant="caption" color={theme.colors.text.secondary} style={styles.traySubtitle}>
-                              {tray.tray_status ? `Trạng thái: ${tray.tray_status} • ` : ''}Sẵn sàng gán lượt thuê
+                              {tray.tray_status ? `Trạng thái: ${formatMistingCode('trayStatus', tray.tray_status)} • ` : ''}Sẵn sàng gán lượt thuê
                             </AppText>
                           )}
 
@@ -1911,7 +1911,7 @@ export const AutomaticWizardScreen: React.FC = () => {
                         {tray.tray_code} {tray.tray_name ? `(${tray.tray_name})` : ''}
                       </AppText>
                       <AppText variant="caption" color={theme.colors.text.secondary}>
-                        Trạng thái: {tray.status}
+                        Trạng thái: {formatMistingCode('trayStatus', tray.status)}
                       </AppText>
                     </View>
                     {canControlIot && (

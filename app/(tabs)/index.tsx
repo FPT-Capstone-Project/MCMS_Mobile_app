@@ -236,19 +236,19 @@ export default function HomeScreen() {
     <ScreenContainer scrollable edges={['left', 'right']}>
       <AppHeader
         title="SmartMush"
-        subtitle={isStaff ? 'Hệ thống Quản trị & Điều hành IoT' : 'Hệ thống quản lý vi khí hậu & nuôi trồng nấm'}
+        subtitle={isStaff ? 'Hệ thống Điều hành & Vận hành IoT (Admin & Farm Operator)' : 'Hệ thống quản lý vi khí hậu & nuôi trồng nấm'}
       />
 
       <View style={styles.content}>
         {/* ================= HERO CTA BANNER ================= */}
         {isStaff ? (
-          /* Admin / Operator Banner */
+          /* Admin & Farm Operator Banner */
           <AppCard elevation="sm" style={styles.adminCtaCard}>
             <View style={styles.ctaHeader}>
               <View style={[styles.ctaBadge, { backgroundColor: 'rgba(59, 130, 246, 0.3)' }]}>
                 <Ionicons name="shield-checkmark" size={16} color="#FFFFFF" />
                 <AppText variant="overline" color="#FFFFFF">
-                  {isAdmin ? 'Quản trị viên (ADMIN)' : 'Kỹ thuật viên (OPERATOR)'}
+                  {isAdmin ? 'Quản trị viên (ADMIN)' : 'Kỹ thuật viên vận hành (FARM OPERATOR)'}
                 </AppText>
               </View>
               <AppText variant="caption" color="rgba(255, 255, 255, 0.85)">
@@ -258,7 +258,7 @@ export default function HomeScreen() {
 
             <View style={styles.ctaContent}>
               <AppText variant="h2" weight="bold" color="#FFFFFF">
-                Điều hành IoT & Hạ tầng
+                Điều hành IoT & Hạ tầng (Admin & Farm Operator)
               </AppText>
               <AppText variant="bodySmall" color="rgba(255, 255, 255, 0.9)" style={styles.ctaSubtitle}>
                 Điều khiển rơ-le 8 kênh SSR cho master01 hoặc các Master khác, giám sát cảm biến và cấu hình tự động.
@@ -464,7 +464,7 @@ export default function HomeScreen() {
         {/* Quick Action Navigation Grid */}
         <View style={styles.quickActionsSection}>
           <AppText variant="label" color={theme.colors.text.muted}>
-            {isStaff ? 'CÔNG CỤ QUẢN TRỊ & ĐIỀU KHIỂN' : 'TRUY CẬP NHANH CHỨC NĂNG HỆ THỐNG'}
+            {isStaff ? 'CÔNG CỤ ĐIỀU KHIỂN & VẬN HÀNH (ADMIN & FARM OPERATOR)' : 'TRUY CẬP NHANH CHỨC NĂNG HỆ THỐNG'}
           </AppText>
 
           <View style={styles.actionGrid}>

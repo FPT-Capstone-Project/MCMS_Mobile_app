@@ -308,7 +308,18 @@ export const ControlCenterScreen: React.FC = () => {
   if (loading) {
     return (
       <ScreenContainer edges={['top', 'left', 'right']}>
-        <AppHeader title="Điều khiển thiết bị" subtitle="Van phun sương & Đèn phòng" />
+        <AppHeader
+          title="Điều khiển thiết bị"
+          subtitle="Van phun sương & Đèn phòng • Admin & Farm Operator"
+          showBack
+          onBack={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)');
+            }
+          }}
+        />
         <View style={styles.centerLoading}>
           <ActivityIndicator size="large" color={theme.colors.primary[500]} />
           <AppText variant="bodySmall" color={theme.colors.text.secondary} style={styles.loadingText}>
@@ -321,9 +332,28 @@ export const ControlCenterScreen: React.FC = () => {
 
   return (
     <ScreenContainer scrollable edges={['left', 'right']}>
-      <AppHeader title="Điều khiển thiết bị" subtitle="Van phun sương & Đèn phòng" />
+      <AppHeader
+        title="Điều khiển thiết bị"
+        subtitle="Van phun sương & Đèn phòng • Admin & Farm Operator"
+        showBack
+        onBack={() => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/(tabs)');
+          }
+        }}
+      />
 
       <View style={styles.content}>
+        {/* Role Access Indicator */}
+        <View style={styles.roleAccessBanner}>
+          <Ionicons name="shield-checkmark" size={14} color={theme.colors.primary[700]} />
+          <AppText variant="caption" weight="bold" color={theme.colors.primary[700]}>
+            Quyền vận hành thiết bị: Quản trị viên & Kỹ thuật viên (Admin & Farm Operator)
+          </AppText>
+        </View>
+
         {/* Banner linking to Manual SSR 8-channel Control */}
         <Pressable onPress={() => router.push('/control/manual' as any)}>
           <AppCard elevation="xs" style={styles.ssrBannerCard}>
@@ -1205,5 +1235,16 @@ const styles = StyleSheet.create({
   },
   modalSaveBtn: {
     flex: 1,
+  },
+  roleAccessBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.primary[50],
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 6,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary[200],
   },
 });
