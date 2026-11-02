@@ -134,7 +134,14 @@ export const RentalFlowScreen: React.FC = () => {
   if (loading) {
     return (
       <ScreenContainer edges={['top', 'left', 'right']}>
-        <AppHeader title="Thuê khay nuôi trồng" showBack onBack={() => router.back()} />
+        <AppHeader
+          title="Thuê khay nuôi trồng"
+          showBack
+          onBack={() => {
+            if (router.canGoBack()) router.back();
+            else router.replace('/(tabs)');
+          }}
+        />
         <View style={styles.centerLoading}>
           <ActivityIndicator size="large" color={theme.colors.primary[500]} />
           <AppText variant="bodySmall" color={theme.colors.text.secondary} style={styles.loadingText}>
@@ -153,7 +160,14 @@ export const RentalFlowScreen: React.FC = () => {
         title="Thuê khay nuôi trồng"
         subtitle="Dịch vụ thông minh SmartMush"
         showBack
-        onBack={step > 1 ? () => setStep((prev) => (prev - 1) as 1 | 2) : () => router.back()}
+        onBack={
+          step > 1
+            ? () => setStep((prev) => (prev - 1) as 1 | 2)
+            : () => {
+                if (router.canGoBack()) router.back();
+                else router.replace('/(tabs)');
+              }
+        }
       />
 
       <View style={styles.content}>

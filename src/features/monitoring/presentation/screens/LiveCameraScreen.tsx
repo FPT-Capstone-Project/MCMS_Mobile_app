@@ -128,7 +128,10 @@ export const LiveCameraScreen: React.FC = () => {
         title="Camera trực tiếp"
         subtitle={cameraName}
         showBack
-        onBack={() => router.back()}
+        onBack={() => {
+          if (router.canGoBack()) router.back();
+          else router.replace('/(tabs)');
+        }}
         rightAction={
           <AppIconButton
             icon={<Ionicons name="refresh" size={20} color={theme.colors.text.primary} />}

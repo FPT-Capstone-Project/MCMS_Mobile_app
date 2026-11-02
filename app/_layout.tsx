@@ -40,13 +40,15 @@ function NavigationGuard() {
       currentSegment === 'automatic' ||
       currentSegment === 'sensors' ||
       currentSegment === 'cultivation' ||
+      currentSegment === 'admin-orders' ||
       currentSegment === 'mushrooms';
     const inShipperRoutes = currentSegment === '(shipper)';
     const inStaffOnlyRoute =
       currentSegment === 'control' ||
       currentSegment === 'automatic' ||
       currentSegment === 'sensors' ||
-      currentSegment === 'cultivation';
+      currentSegment === 'cultivation' ||
+      currentSegment === 'admin-orders';
     if (status === 'unauthenticated' && !inAuthGroup) {
       // Route unauthenticated visitors to login screen
       router.replace('/(auth)/login' as Href);
@@ -147,6 +149,12 @@ function NavigationGuard() {
       />
       <Stack.Screen
         name="camera/[cameraId]"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="admin-orders/index"
         options={{
           headerShown: false,
         }}

@@ -1,9 +1,11 @@
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { useAuth } from '../../src/features/auth';
 import { AutomaticWizardScreen } from '../../src/features/iot';
 import { AccessDeniedScreen } from '../../src/shared/components';
 
 export default function AutomaticRoute() {
+  const router = useRouter();
   const { canControlIot, user } = useAuth();
 
   if (!canControlIot) {
@@ -16,5 +18,15 @@ export default function AutomaticRoute() {
     );
   }
 
-  return <AutomaticWizardScreen />;
+  return (
+    <AutomaticWizardScreen
+      onBack={() => {
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/(tabs)');
+        }
+      }}
+    />
+  );
 }

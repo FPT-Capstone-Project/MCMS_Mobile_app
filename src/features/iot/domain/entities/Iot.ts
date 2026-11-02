@@ -93,6 +93,7 @@ export interface FloorMapping {
 
 export interface SourceProfile {
   mushroom_type_id: number;
+  mushroom_name?: string | null;
   temperature_min: number | null;
   temperature_max: number | null;
   humidity_min: number | null;
@@ -132,6 +133,7 @@ export interface AutoMistingConfig {
   max_activations_per_hour: number;
   max_cumulative_on_ms_per_hour: number;
   mushroom_type_id?: number | null;
+  mushroom_type_ids?: number[];
   source_profiles?: SourceProfile[] | null;
   configured_by?: number;
   created_at?: string;
@@ -151,6 +153,7 @@ export interface CultivationTrayInfo {
   tray_code: string;
   tray_status: string;
   session_id?: number | null;
+  session_tray_id?: number | null;
   rental_id?: number | null;
   mushroom_type_id?: number | null;
   mushroom_name?: string | null;
@@ -159,6 +162,226 @@ export interface CultivationTrayInfo {
   row_number?: number | null;
   column_number?: number | null;
   position_status?: string | null;
+}
+
+export type FarmSessionStatus =
+  | 'PENDING'
+  | 'SPAWN_RESTING'
+  | 'MYCELIAL_DEVELOPMENT'
+  | 'READY_FOR_CULTIVATION'
+  | 'CULTIVATING'
+  | 'HARVEST_READY'
+  | 'HARVESTING'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export type GrowthStage =
+  | 'FRUITING_INITIATION'
+  | 'PINNING'
+  | 'YOUNG_FRUITING'
+  | 'MATURATION';
+
+export interface CultivationSessionAdmin {
+  session_id: number;
+  id?: number;
+  order_id?: number | null;
+  order_item_id?: number | null;
+  package_id?: number | null;
+  package_name?: string | null;
+  rental_id?: number | null;
+  status: FarmSessionStatus;
+  spawn_status?: string | null;
+  spawn_issued?: boolean;
+  mushroom_type_id: number;
+  mushroom_name?: string | null;
+  required_trays?: number;
+  tray_quantity?: number;
+  tray_count?: number;
+  spawn_quantity?: number;
+  start_at?: string | null;
+  start_date?: string | null;
+  end_at?: string | null;
+  end_date?: string | null;
+  harvest_date?: string | null;
+  duration_days?: number | null;
+  harvest_status?: 'NOT_READY' | 'HARVEST_READY' | null;
+  harvest_ready?: boolean;
+  harvest_ready_at?: string | null;
+  harvest_ready_by?: number | null;
+  growth_status?: GrowthStage | string | null;
+  current_stage?: GrowthStage | string | null;
+  progress_percent?: number | null;
+  condition?: string | null;
+  notes?: string | null;
+  progress_updated_at?: string | null;
+  last_inspected_at?: string | null;
+  customer_name?: string | null;
+  customer_email?: string | null;
+  customer_phone?: string | null;
+  floor_id?: number | null;
+  floor_name?: string | null;
+  room_id?: number | null;
+  room_name?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  trays?: {
+    session_tray_id: number;
+    tray_id: number;
+    tray_code: string;
+    floor_id?: number | null;
+    floor_name?: string | null;
+    floor_number?: number | null;
+    position_id?: number | null;
+    row_number?: number | null;
+    column_number?: number | null;
+    status: string;
+  }[];
+}
+
+export type FarmSessionItem = CultivationSessionAdmin;
+
+export interface ProgressHistoryItem {
+  progress_id?: number;
+  session_id: number;
+  current_stage: GrowthStage | string;
+  progress_percent: number;
+  condition: string;
+  description?: string | null;
+  start_date?: string | null;
+  expected_harvest_date?: string | null;
+  created_at?: string;
+}
+
+export interface SessionProgressResponse {
+  session_id: number;
+  status: FarmSessionStatus;
+  harvest_status?: 'NOT_READY' | 'HARVEST_READY' | null;
+  harvest_ready: boolean;
+  expected_harvest_date?: string | null;
+  growth_status?: GrowthStage | string | null;
+  current_stage?: GrowthStage | string | null;
+  progress_percent?: number | null;
+  condition?: string | null;
+  latest_progress?: ProgressHistoryItem | null;
+  progress_history: ProgressHistoryItem[];
+}
+
+export interface UpdateGrowthRequest {
+  growthStatus: GrowthStage;
+  progressPercent: number;
+  condition: string;
+  notes?: string;
+  expectedHarvestDate?: string;
+}
+
+export interface UpdateHarvestReadinessRequest {
+  harvestReady: boolean;
+  notes?: string;
+}
+
+export type HarvestStatus = 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+
+export interface HarvestItem {
+  harvest_id: number;
+  id?: number;
+  session_id: number;
+  order_id?: number;
+  user_id?: number;
+  customer_name?: string;
+  customer_email?: string;
+  customer_phone?: string;
+  mushroom_type_id?: number;
+  mushroom_name?: string;
+  status: HarvestStatus;
+  harvest_date?: string | null;
+  harvest_method?: 'PICKUP' | 'DELIVERY' | null;
+  scheduled_at?: string | null;
+  customer_note?: string | null;
+  harvest_request_status?: string | null;
+  total_weight_kg?: number | null;
+  usable_weight_kg?: number | null;
+  rejected_weight_kg?: number | null;
+  quality_grade?: string | null;
+  notes?: string | null;
+  harvested_by?: number | null;
+  harvested_at?: string | null;
+  confirmed_by?: number | null;
+  confirmed_at?: string | null;
+  completed_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateHarvestRequest {
+  sessionId: number;
+}
+
+export interface RecordYieldRequest {
+  totalWeightKg: number;
+  usableWeightKg: number;
+  rejectedWeightKg: number;
+  qualityGrade?: string;
+  notes?: string;
+}
+
+export interface SpawnInspection {
+  inspection_id?: number;
+  id?: number;
+  session_id: number;
+  total_checked: number;
+  normal_quantity: number;
+  warning_quantity: number;
+  abnormal_quantity: number;
+  condition: 'NORMAL' | 'WARNING' | 'ABNORMAL';
+  replacement_quantity?: number | null;
+  notes?: string | null;
+  next_check_at?: string | null;
+  inspected_at?: string;
+  created_at?: string;
+  created_by?: number | string | null;
+  inspector_name?: string | null;
+  images?: {
+    image_id?: number;
+    image_url: string;
+    caption?: string | null;
+  }[];
+}
+
+export interface RecordSpawnInspectionRequest {
+  totalChecked: number;
+  normalQuantity: number;
+  warningQuantity: number;
+  abnormalQuantity: number;
+  condition: 'NORMAL' | 'WARNING' | 'ABNORMAL';
+  replacementQuantity?: number;
+  notes?: string;
+  nextCheckAt?: string;
+}
+
+export interface UpdateSessionStageRequest {
+  stage: 'SPAWN_RESTING' | 'MYCELIAL_DEVELOPMENT' | 'READY_FOR_CULTIVATION';
+}
+
+export interface AvailableTrayForSession {
+  tray_id: number;
+  tray_code: string;
+  floor_id: number;
+  room_id: number;
+  position_id?: number | null;
+  row_number?: number | null;
+  column_number?: number | null;
+  position_status?: string | null;
+  status: string;
+}
+
+export interface AssignTraysToSessionRequest {
+  floorId: number;
+  trayIds: number[];
+}
+
+export interface GenerateTraysRequest {
+  total_rows?: number;
+  total_columns?: number;
 }
 
 export interface AutoControlConfigResponse {

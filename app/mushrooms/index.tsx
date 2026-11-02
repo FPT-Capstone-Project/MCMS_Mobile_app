@@ -123,7 +123,15 @@ export default function MushroomsScreen() {
   if (loading) {
     return (
       <ScreenContainer edges={['top', 'left', 'right']}>
-        <AppHeader title="Danh mục nấm" subtitle="Giống nấm & Điều kiện sinh trưởng" />
+        <AppHeader
+          title="Danh mục nấm"
+          subtitle="Giống nấm & Điều kiện sinh trưởng"
+          showBack
+          onBack={() => {
+            if (router.canGoBack()) router.back();
+            else router.replace('/(tabs)');
+          }}
+        />
         <View style={styles.centerLoading}>
           <ActivityIndicator size="large" color={theme.colors.primary[500]} />
           <AppText variant="bodySmall" color={theme.colors.text.secondary} style={styles.loadingText}>
@@ -140,7 +148,10 @@ export default function MushroomsScreen() {
         title="Danh mục nấm & Điều kiện"
         subtitle="Catalog & Ngưỡng vi khí hậu tối ưu"
         showBack
-        onBack={() => router.back()}
+        onBack={() => {
+          if (router.canGoBack()) router.back();
+          else router.replace('/(tabs)');
+        }}
       />
 
       <View style={styles.content}>

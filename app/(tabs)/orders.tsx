@@ -9,7 +9,9 @@ import {
 } from 'react-native';
 import { theme } from '../../src/core/theme';
 import { formatVND } from '../../src/core/utils/currency';
+import { useAuth } from '../../src/features/auth';
 import {
+  AdminOrdersScreen,
   CustomerOrder,
   orderRepository,
   PaymentQrModal,
@@ -29,6 +31,17 @@ import {
  * Displays real customer orders, status, cancel action, and PayOS payment flow.
  */
 export default function OrdersScreen() {
+  const { user } = useAuth();
+  const isStaff = user?.role === 'ADMIN' || user?.role === 'FARM_OPERATOR';
+
+  if (isStaff) {
+    return <AdminOrdersScreen />;
+  }
+
+  return <CustomerOrdersContent />;
+}
+
+function CustomerOrdersContent() {
   const router = useRouter();
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [loading, setLoading] = useState(true);
