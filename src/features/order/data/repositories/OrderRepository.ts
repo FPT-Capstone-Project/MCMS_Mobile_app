@@ -140,10 +140,11 @@ export class OrderRepository {
   /**
    * List orders belonging to the authenticated customer
    */
-  async getCustomerOrders(): Promise<CustomerOrder[]> {
+  async getCustomerOrders(status?: string): Promise<CustomerOrder[]> {
     try {
       const response = await axiosClient.get<{ data: BackendCustomerOrder[] }>(
-        API_ENDPOINTS.ORDERS.BASE
+        API_ENDPOINTS.ORDERS.BASE,
+        { params: status ? { status } : undefined }
       );
       if (!Array.isArray(response.data?.data)) {
         throw new AppError('Danh sách đơn hàng từ máy chủ không hợp lệ.', 'API_ERROR', 500);

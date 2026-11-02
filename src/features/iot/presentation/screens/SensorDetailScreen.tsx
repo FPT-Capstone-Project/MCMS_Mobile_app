@@ -137,7 +137,15 @@ export const SensorDetailScreen: React.FC = () => {
   if (loading) {
     return (
       <ScreenContainer edges={['top', 'left', 'right']}>
-        <AppHeader title="Cảm biến IoT" subtitle="Chi tiết & Lịch sử vi khí hậu" />
+        <AppHeader
+          title="Cảm biến IoT"
+          subtitle="Chi tiết & Lịch sử vi khí hậu"
+          showBack
+          onBack={() => {
+            if (router.canGoBack()) router.back();
+            else router.replace('/(tabs)');
+          }}
+        />
         <View style={styles.centerLoading}>
           <ActivityIndicator size="large" color={theme.colors.primary[500]} />
           <AppText variant="bodySmall" color={theme.colors.text.secondary} style={styles.loadingText}>
@@ -158,7 +166,10 @@ export const SensorDetailScreen: React.FC = () => {
         title="Cảm biến IoT"
         subtitle="Chi tiết & Lịch sử vi khí hậu"
         showBack
-        onBack={() => router.back()}
+        onBack={() => {
+          if (router.canGoBack()) router.back();
+          else router.replace('/(tabs)');
+        }}
       />
 
       <View style={styles.content}>

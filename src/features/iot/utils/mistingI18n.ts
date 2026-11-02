@@ -137,6 +137,19 @@ export const TRAY_STATUS_MAP: Record<string, string> = {
 };
 
 /**
+ * 13. cultivation_status / session.status
+ */
+export const CULTIVATION_STATUS_MAP: Record<string, string> = {
+  PENDING: 'Chờ xử lý',
+  READY_FOR_CULTIVATION: 'Sẵn sàng gán khay',
+  CULTIVATING: 'Đang trồng',
+  HARVEST_READY: 'Chờ thu hoạch',
+  HARVESTING: 'Đang thu hoạch',
+  COMPLETED: 'Đã hoàn thành',
+  CANCELLED: 'Đã hủy',
+};
+
+/**
  * Group types for safe lookup
  */
 export type MistingMapGroup =
@@ -151,7 +164,8 @@ export type MistingMapGroup =
   | 'configSource'
   | 'floorStatus'
   | 'positionStatus'
-  | 'trayStatus';
+  | 'trayStatus'
+  | 'cultivationStatus';
 
 const GROUP_MAPS: Record<MistingMapGroup, Record<string, string>> = {
   eventType: EVENT_TYPE_MAP,
@@ -166,6 +180,7 @@ const GROUP_MAPS: Record<MistingMapGroup, Record<string, string>> = {
   floorStatus: FLOOR_STATUS_MAP,
   positionStatus: POSITION_STATUS_MAP,
   trayStatus: TRAY_STATUS_MAP,
+  cultivationStatus: CULTIVATION_STATUS_MAP,
 };
 
 /**

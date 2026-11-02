@@ -2,6 +2,8 @@ export * from './domain/entities/Iot';
 export * from './data/repositories/IotRepository';
 export * from './presentation/screens/ControlCenterScreen';
 export * from './presentation/screens/AutomaticWizardScreen';
+export * from './presentation/screens/FloorListScreen';
+export * from './presentation/screens/FloorDetailScreen';
 export * from './presentation/screens/SensorDetailScreen';
 export * from './presentation/screens/ManualSsrControlScreen';
 export * from './utils/mistingI18n';

@@ -41,6 +41,15 @@ interface QuickActionItem {
 
 const staffActions: QuickActionItem[] = [
   {
+    id: 'admin-orders',
+    title: 'Đơn của khách',
+    desc: 'Đơn thuê khay & Đơn nông sản',
+    icon: 'receipt-outline',
+    iconColor: '#059669',
+    iconBg: 'rgba(5, 150, 105, 0.1)',
+    route: '/admin-orders',
+  },
+  {
     id: 'ssr',
     title: 'SSR 8 kênh thủ công',
     desc: 'Điều khiển rơ-le Master',

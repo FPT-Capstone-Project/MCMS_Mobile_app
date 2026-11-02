@@ -93,6 +93,7 @@ export const API_ENDPOINTS = {
   AUTOMATIC: {
     FLOORS: '/api/iot/floors',
     FLOOR_DETAIL: (floorId: number) => `/api/iot/floors/${floorId}`,
+    GENERATE_TRAYS: (floorId: number) => `/api/iot/floors/${floorId}/trays/generate`,
     ASSIGN_TRAY: (floorId: number, trayId: number) =>
       `/api/iot/floors/${floorId}/trays/${trayId}`,
     ENVIRONMENT: (floorId: number) => `/api/iot/floors/${floorId}/environment`,
@@ -103,5 +104,42 @@ export const API_ENDPOINTS = {
     STOP: (floorId: number) => `/api/iot/floors/${floorId}/auto-control/stop`,
     STATUS: (floorId: number) => `/api/iot/floors/${floorId}/auto-control/status`,
     LOGS: (floorId: number) => `/api/iot/floors/${floorId}/auto-control/logs`,
+  },
+  // Farm Spawn Workflow & Cultivation Lifecycle
+  FARM: {
+    SESSIONS: '/api/farm/sessions',
+    SESSION_DETAIL: (sessionId: number | string) => `/api/farm/sessions/${sessionId}`,
+    SESSION_STAGE: (sessionId: number | string) => `/api/farm/sessions/${sessionId}/stage`,
+    SPAWN_INSPECTIONS: (sessionId: number | string) =>
+      `/api/farm/sessions/${sessionId}/spawn-inspections`,
+    SPAWN_REPLACEMENTS: (inspectionId: number | string) =>
+      `/api/farm/spawn-inspections/${inspectionId}/replacements`,
+    SPAWN_IMAGES: (inspectionId: number | string) =>
+      `/api/farm/spawn-inspections/${inspectionId}/images`,
+  },
+  // Cultivation Sessions (Admin & Operator)
+  CULTIVATION_SESSIONS: {
+    ADMIN_BASE: '/api/cultivation-sessions/admin',
+    ADMIN_DETAIL: (sessionId: number | string) =>
+      `/api/cultivation-sessions/admin/${sessionId}`,
+    ADMIN_PROGRESS: (sessionId: number | string) =>
+      `/api/cultivation-sessions/admin/${sessionId}/progress`,
+    ADMIN_GROWTH: (sessionId: number | string) =>
+      `/api/cultivation-sessions/admin/${sessionId}/growth`,
+    ADMIN_HARVEST_READINESS: (sessionId: number | string) =>
+      `/api/cultivation-sessions/admin/${sessionId}/harvest-readiness`,
+    ADMIN_AVAILABLE_TRAYS: (floorId: number | string) =>
+      `/api/cultivation-sessions/admin/available-trays?floorId=${floorId}`,
+    ADMIN_ASSIGN_TRAYS: (sessionId: number | string) =>
+      `/api/cultivation-sessions/admin/${sessionId}/trays`,
+  },
+  // Harvests Workflow (Admin & Operator)
+  HARVESTS: {
+    CREATE: '/api/harvests',
+    ADMIN_LIST: '/api/harvests/admin',
+    DETAIL: (harvestId: number | string) => `/api/harvests/${harvestId}`,
+    START: (harvestId: number | string) => `/api/harvests/${harvestId}/start`,
+    YIELD: (harvestId: number | string) => `/api/harvests/${harvestId}/yield`,
+    COMPLETE: (harvestId: number | string) => `/api/harvests/${harvestId}/complete`,
   },
 } as const;
