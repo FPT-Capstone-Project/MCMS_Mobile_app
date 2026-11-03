@@ -18,6 +18,7 @@ import {
   ScreenContainer,
 } from '../../../../shared/components';
 import {
+  FloorMapping,
   IotMaster,
   IotReading,
   IotSensor,
@@ -32,26 +33,63 @@ export const SensorDetailScreen: React.FC = () => {
   const [selectedMasterId, setSelectedMasterId] = useState<string>('');
   const [sensors, setSensors] = useState<IotSensor[]>([]);
   const [selectedSensor, setSelectedSensor] = useState<IotSensor | null>(null);
+  const [floors, setFloors] = useState<FloorMapping[]>([]);
 
   const [history, setHistory] = useState<IotReading[]>([]);
   const [loading, setLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  // Load masters & first sensor
+  // Map Node address to floor information:
+  // Node 1 -> Tầng 1, Node 2 -> Tầng 2, omit Tầng 3
+  const getFloorInfo = useCallback(
+    (nodeId: number) => {
+      const matched = floors.find((f) => f.node_address === nodeId);
+      if (nodeId === 1) {
+        return {
+          label: 'Tầng 1',
+          floorName: matched?.floor_name || 'Tầng 1',
+          floorNumber: 1,
+        };
+      }
+      if (nodeId === 2) {
+        return {
+          label: 'Tầng 2',
+          floorName: matched?.floor_name || 'Tầng 2',
+          floorNumber: 2,
+        };
+      }
+      return {
+        label: matched ? `Tầng ${matched.floor_number}` : `Tầng ${nodeId}`,
+        floorName: matched?.floor_name,
+        floorNumber: matched?.floor_number ?? nodeId,
+      };
+    },
+    [floors]
+  );
+
+  // Load masters, floors & first sensor
   const loadMasters = useCallback(async () => {
     try {
       setLoading(true);
-      const mastersData = await iotRepository.getMasters();
+      const [mastersData, floorsData] = await Promise.all([
+        iotRepository.getMasters(),
+        iotRepository.getFloors().catch(() => []),
+      ]);
       setMasters(mastersData);
+      setFloors(floorsData);
 
       if (mastersData.length > 0) {
         const firstMasterId = mastersData[0].masterId;
         setSelectedMasterId(firstMasterId);
 
         const sensorsData = await iotRepository.getMasterSensors(firstMasterId);
-        setSensors(sensorsData);
-        if (sensorsData.length > 0) {
-          setSelectedSensor(sensorsData[0]);
+        // Only keep Tầng 1 (Node 1) and Tầng 2 (Node 2); omit Tầng 3 (Node 3)
+        const filteredSensors = sensorsData.filter((s) => s.nodeId === 1 || s.nodeId === 2);
+        setSensors(filteredSensors);
+        if (filteredSensors.length > 0) {
+          setSelectedSensor(filteredSensors[0]);
+        } else {
+          setSelectedSensor(null);
         }
       }
     } catch (err: unknown) {
@@ -80,9 +118,11 @@ export const SensorDetailScreen: React.FC = () => {
     try {
       setHistoryLoading(true);
       const sensorsData = await iotRepository.getMasterSensors(masterId);
-      setSensors(sensorsData);
-      if (sensorsData.length > 0) {
-        setSelectedSensor(sensorsData[0]);
+      // Only keep Tầng 1 (Node 1) and Tầng 2 (Node 2); omit Tầng 3 (Node 3)
+      const filteredSensors = sensorsData.filter((s) => s.nodeId === 1 || s.nodeId === 2);
+      setSensors(filteredSensors);
+      if (filteredSensors.length > 0) {
+        setSelectedSensor(filteredSensors[0]);
       } else {
         setSelectedSensor(null);
         setHistory([]);
@@ -205,16 +245,17 @@ export const SensorDetailScreen: React.FC = () => {
           </ScrollView>
         </View>
 
-        {/* Sensors of Selected Master */}
+        {/* Sensors of Selected Master - Only Tầng 1 & Tầng 2 */}
         {sensors.length > 0 && (
           <View style={styles.selectorGroup}>
             <AppText variant="label" color={theme.colors.text.muted}>
-              CÁC CẢM BIẾN (NODE / SENSOR):
+              CHỌN TẦNG NUÔI TRỒNG (CẢM BIẾN VI KHÍ HẬU):
             </AppText>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillsRow}>
               {sensors.map((s) => {
                 const isSel =
                   selectedSensor?.nodeId === s.nodeId && selectedSensor?.sensorId === s.sensorId;
+                const floorInfo = getFloorInfo(s.nodeId);
                 return (
                   <Pressable
                     key={`${s.nodeId}_${s.sensorId}`}
@@ -222,7 +263,7 @@ export const SensorDetailScreen: React.FC = () => {
                     style={[styles.pill, isSel && styles.pillActive]}
                   >
                     <Ionicons
-                      name="radio-outline"
+                      name="layers-outline"
                       size={16}
                       color={isSel ? '#FFFFFF' : theme.colors.text.secondary}
                     />
@@ -231,7 +272,7 @@ export const SensorDetailScreen: React.FC = () => {
                       weight={isSel ? 'bold' : 'normal'}
                       color={isSel ? '#FFFFFF' : theme.colors.text.primary}
                     >
-                      Node {s.nodeId} • Cảm biến {s.sensorId}
+                      {floorInfo.label} (Node {s.nodeId}) • Cảm biến {s.sensorId}
                     </AppText>
                   </Pressable>
                 );
@@ -246,10 +287,13 @@ export const SensorDetailScreen: React.FC = () => {
             <View style={styles.cardHeaderRow}>
               <View>
                 <AppText variant="title" weight="bold">
-                  Node {selectedSensor.nodeId} — Cảm biến {selectedSensor.sensorId}
+                  {getFloorInfo(selectedSensor.nodeId).label} — Cảm biến {selectedSensor.sensorId}
                 </AppText>
                 <AppText variant="caption" color={theme.colors.text.secondary}>
-                  Master: {selectedSensor.masterId}
+                  {getFloorInfo(selectedSensor.nodeId).floorName
+                    ? `${getFloorInfo(selectedSensor.nodeId).floorName} • `
+                    : ''}
+                  Phần cứng: Node #{selectedSensor.nodeId} • Master: {selectedSensor.masterId}
                 </AppText>
               </View>
 
@@ -337,7 +381,7 @@ export const SensorDetailScreen: React.FC = () => {
         ) : (
           <View style={styles.emptyCard}>
             <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-              Không tìm thấy cảm biến nào trên Master này.
+              Không tìm thấy cảm biến hợp lệ cho Tầng 1 hoặc Tầng 2 trên Master này.
             </AppText>
           </View>
         )}
@@ -345,9 +389,14 @@ export const SensorDetailScreen: React.FC = () => {
         {/* History Chart & Readings Card */}
         <AppCard elevation="sm" style={styles.historyCard}>
           <View style={styles.cardHeaderRow}>
-            <AppText variant="title" weight="bold">
-              Biểu đồ lịch sử đo (20 mẫu gần nhất)
-            </AppText>
+            <View>
+              <AppText variant="title" weight="bold">
+                Biểu đồ lịch sử đo ({selectedSensor ? getFloorInfo(selectedSensor.nodeId).label : 'Vi khí hậu'})
+              </AppText>
+              <AppText variant="caption" color={theme.colors.text.muted}>
+                Dữ liệu 20 mẫu gần nhất theo thời gian (trái qua phải).
+              </AppText>
+            </View>
             {historyLoading && <ActivityIndicator size="small" color={theme.colors.primary[500]} />}
           </View>
 

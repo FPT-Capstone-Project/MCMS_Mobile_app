@@ -204,7 +204,9 @@ export default function HomeScreen() {
         setMasters(mastersData);
         if (mastersData.length > 0) {
           const sensors = await iotRepository.getMasterSensors(mastersData[0].masterId);
-          setActiveSensors(sensors);
+          // Only take Tầng 1 (Node 1) and Tầng 2 (Node 2); omit Tầng 3 (Node 3)
+          const floorSensors = sensors.filter((s) => s.nodeId === 1 || s.nodeId === 2);
+          setActiveSensors(floorSensors);
         } else {
           setActiveSensors([]);
         }
@@ -425,7 +427,7 @@ export default function HomeScreen() {
           <AppText variant="bodySmall" color={theme.colors.text.secondary} style={styles.heroDescription}>
             {dashboardLoading
               ? 'Đang tải dữ liệu cảm biến...'
-              : `Đang ghi nhận số đo từ ${activeSensors.length} cảm biến.`}
+              : `Đang ghi nhận số đo từ ${activeSensors.length} cảm biến (Tầng 1 & Tầng 2).`}
           </AppText>
 
           <View style={styles.metricsRow}>

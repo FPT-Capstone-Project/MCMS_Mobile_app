@@ -639,9 +639,19 @@ export const AdminOrdersScreen: React.FC = () => {
                       <AppText
                         variant="bodySmall"
                         weight="medium"
-                        color={session.floor_name ? theme.colors.text.primary : theme.colors.warning.dark}
+                        color={
+                          (session.floor_name || session.trays?.[0]?.floor_name)
+                            ? theme.colors.text.primary
+                            : theme.colors.warning.dark
+                        }
                       >
-                        {session.floor_name || 'Chưa gán tầng'}
+                        {session.floor_name || session.trays?.[0]?.floor_name
+                          ? `${session.floor_name || session.trays?.[0]?.floor_name}${
+                              session.trays && session.trays.length > 0
+                                ? ` (${session.trays.length} khay)`
+                                : ''
+                            }`
+                          : 'Chưa gán tầng'}
                       </AppText>
                     </View>
                   </View>
