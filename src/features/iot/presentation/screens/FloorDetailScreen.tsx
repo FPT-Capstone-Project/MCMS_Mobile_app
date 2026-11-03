@@ -275,7 +275,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
   const isRunning = statusData?.run?.status === 'RUNNING';
   const isDryRun = statusData?.run?.dry_run === true;
   const isFault =
-    statusData?.run?.status === 'FAULT' ||
+    (statusData?.mode === 'AUTO' && statusData?.run?.status === 'FAULT') ||
     statusData?.runtime?.control_state === 'FAULT' ||
     statusData?.runtime?.control_state === 'SENSOR_FAULT';
   const isOffPending = statusData?.runtime?.control_state === 'OFF_PENDING';
@@ -331,7 +331,10 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
 
     setActionLoading(true);
     try {
-      await iotRepository.stopAutoControl(floorId);
+      const stoppedStatus = await iotRepository.stopAutoControl(floorId);
+      if (stoppedStatus) {
+        setStatusData(stoppedStatus);
+      }
       await loadFloorData();
       Alert.alert(
         'Đã gửi lệnh dừng',

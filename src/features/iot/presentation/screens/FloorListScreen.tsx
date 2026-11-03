@@ -13,6 +13,7 @@ import {
 import { theme } from '../../../../core/theme';
 import {
   AutoControlStatus,
+  AutoMistingConfig,
   FloorEnvironment,
   FloorMapping,
   IotMaster,
@@ -60,12 +61,14 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
   const [floors, setFloors] = useState<FloorMapping[]>([]);
   const [masters, setMasters] = useState<IotMaster[]>([]);
 
-  // Cache of floor statuses and environments to avoid spamming
+  // Cache of floor statuses, environments and configs to avoid spamming
   const [floorStatuses, setFloorStatuses] = useState<Record<number, AutoControlStatus>>({});
   const [floorEnvironments, setFloorEnvironments] = useState<Record<number, FloorEnvironment>>({});
+  const [floorConfigs, setFloorConfigs] = useState<Record<number, AutoMistingConfig | null>>({});
   const [floorTrayCounts, setFloorTrayCounts] = useState<
     Record<number, { total: number; cultivating: number; availableForAssign: number }>
   >({});
+  const [hydratedFloorIds, setHydratedFloorIds] = useState<Set<number>>(new Set());
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -91,12 +94,14 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
         setMasters(mastersRes.value);
       }
 
-      if (floorsRes.status === 'fulfilled') {
-        setFloors(floorsRes.value);
-      }
+      const loadedFloors = floorsRes.status === 'fulfilled' ? floorsRes.value : [];
+      setFloors(loadedFloors);
 
-      // Default select first room if none selected
-      setSelectedRoomId((prev) => prev ?? (loadedRooms[0]?.room_id || null));
+      // Default select room that actually has floors, or first room
+      const roomWithFloors = loadedRooms.find((r) =>
+        loadedFloors.some((f) => f.room_id === r.room_id)
+      );
+      setSelectedRoomId((prev) => prev ?? (roomWithFloors?.room_id || loadedRooms[0]?.room_id || null));
     } catch {
       // Ignore
     } finally {
@@ -123,60 +128,63 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
     [floors, selectedRoomId]
   );
 
+  // Pre-hydrate all floors across all rooms in parallel so switching rooms is instant
   useEffect(() => {
-    if (activeRoomFloors.length === 0) return;
+    if (floors.length === 0) return;
 
     let isMounted = true;
 
-    // Concurrency limited fetch for visible room's floors only
-    const hydrateFloors = async () => {
-      const statusEntries: Record<number, AutoControlStatus> = {};
-      const envEntries: Record<number, FloorEnvironment> = {};
-      const countsEntries: Record<number, { total: number; cultivating: number; availableForAssign: number }> = {};
+    const hydrateFloor = async (f: FloorMapping) => {
+      const fid = f.floor_id ?? f.id;
+      if (!fid) return;
 
-      await Promise.allSettled(
-        activeRoomFloors.map(async (f) => {
-          const fid = f.floor_id ?? f.id;
-          if (!fid) return;
+      try {
+        const [status, cfg, availableTrays] = await Promise.all([
+          iotRepository.getAutoControlStatus(fid).catch(() => null),
+          iotRepository.getAutoControlConfig(fid).catch(() => null),
+          iotRepository.getAvailableTraysForFloor(fid).catch(() => []),
+        ]);
 
-          try {
-            const [status, env, cfg, availableTrays] = await Promise.all([
-              iotRepository.getAutoControlStatus(fid).catch(() => null),
-              iotRepository.getFloorEnvironment(fid).catch(() => null),
-              iotRepository.getAutoControlConfig(fid).catch(() => null),
-              iotRepository.getAvailableTraysForFloor(fid).catch(() => []),
-            ]);
+        if (!isMounted) return;
 
-            if (status) statusEntries[fid] = status;
-            if (env) envEntries[fid] = env;
-            if (cfg?.cultivation?.trays) {
-              const trays = cfg.cultivation.trays;
-              const cultivating = trays.filter((t) => t.session_id && t.mushroom_name).length;
-              countsEntries[fid] = {
-                total: trays.length,
-                cultivating,
-                availableForAssign: Array.isArray(availableTrays) ? availableTrays.length : 0,
-              };
-            }
-          } catch {
-            // Ignore
+        if (status) {
+          setFloorStatuses((prev) => ({ ...prev, [fid]: status }));
+          const env = status.environment;
+          if (env) {
+            setFloorEnvironments((prev) => ({ ...prev, [fid]: env }));
           }
-        })
-      );
+        }
 
-      if (isMounted) {
-        setFloorStatuses((prev) => ({ ...prev, ...statusEntries }));
-        setFloorEnvironments((prev) => ({ ...prev, ...envEntries }));
-        setFloorTrayCounts((prev) => ({ ...prev, ...countsEntries }));
+        const configObj = cfg?.config ?? null;
+        setFloorConfigs((prev) => ({ ...prev, [fid]: configObj }));
+
+        if (cfg?.cultivation?.trays) {
+          const trays = cfg.cultivation.trays;
+          const cultivating = trays.filter((t) => t.session_id && t.mushroom_name).length;
+          setFloorTrayCounts((prev) => ({
+            ...prev,
+            [fid]: {
+              total: trays.length,
+              cultivating,
+              availableForAssign: Array.isArray(availableTrays) ? availableTrays.length : 0,
+            },
+          }));
+        }
+
+        setHydratedFloorIds((prev) => new Set(prev).add(fid));
+      } catch {
+        // Ignore
       }
     };
 
-    hydrateFloors();
+    floors.forEach((f) => {
+      void hydrateFloor(f);
+    });
 
     return () => {
       isMounted = false;
     };
-  }, [activeRoomFloors]);
+  }, [floors]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -347,17 +355,21 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
               const status = floorStatuses[fid];
               const env = floorEnvironments[fid];
               const counts = floorTrayCounts[fid];
+              const config = floorConfigs[fid];
+              const isHydrated = hydratedFloorIds.has(fid);
 
               const isRunning = status?.run?.status === 'RUNNING';
               const isDryRun = status?.run?.dry_run === true;
               const isFault =
-                status?.run?.status === 'FAULT' ||
+                (status?.mode === 'AUTO' && status?.run?.status === 'FAULT') ||
                 status?.runtime?.control_state === 'FAULT' ||
                 status?.runtime?.control_state === 'SENSOR_FAULT';
               const isOffPending = status?.runtime?.control_state === 'OFF_PENDING';
 
-              // Has config check
-              const hasConfig = Boolean(status?.runtime?.control_state !== 'DISABLED');
+              // Has config check: Truly check if config exists in DB
+              const hasConfig = Boolean(
+                config && (config.profile_name || config.humidity_min != null || config.id)
+              );
 
               return (
                 <AppCard key={fid || floor.floor_number} elevation="xs" style={styles.floorCard}>
@@ -423,6 +435,10 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
                           <AppText variant="caption" weight="semibold">
                             {Number(env.averageTemperature).toFixed(1)}°C • {Number(env.averageHumidity).toFixed(1)}%
                           </AppText>
+                        ) : !isHydrated ? (
+                          <AppText variant="caption" color={theme.colors.text.muted}>
+                            Đang tải số đo...
+                          </AppText>
                         ) : (
                           <AppText variant="caption" color={theme.colors.text.muted}>
                             Cảm biến chưa sẵn sàng
@@ -437,16 +453,27 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
                           <AppText variant="caption" color={theme.colors.text.secondary}>
                             {counts.total} khay (Đang trồng: <AppText variant="caption" weight="bold" color={theme.colors.success.dark}>{counts.cultivating}</AppText> • Có thể gắn: <AppText variant="caption" weight="bold" color={theme.colors.primary[700]}>{counts.availableForAssign}</AppText>)
                           </AppText>
+                        ) : !isHydrated ? (
+                          <AppText variant="caption" color={theme.colors.text.muted}>
+                            Đang nạp khay...
+                          </AppText>
                         ) : (
                           <AppText variant="caption" color={theme.colors.text.muted}>
-                            Chưa nạp khay
+                            Chưa có khay
                           </AppText>
                         )}
                       </View>
                     </View>
 
-                    {/* Unconfigured state notice */}
-                    {!hasConfig && (
+                    {/* Unconfigured state notice vs Configured Profile info */}
+                    {!isHydrated ? (
+                      <View style={styles.syncingBanner}>
+                        <ActivityIndicator size="small" color={theme.colors.primary[500]} />
+                        <AppText variant="caption" color={theme.colors.text.secondary} style={{ marginLeft: 6 }}>
+                          Đang đồng bộ dữ liệu tầng...
+                        </AppText>
+                      </View>
+                    ) : !hasConfig ? (
                       <View style={styles.unconfiguredBanner}>
                         <Ionicons name="information-circle-outline" size={15} color={theme.colors.warning.dark} />
                         <AppText variant="caption" color={theme.colors.warning.dark} style={{ flex: 1 }}>
@@ -458,6 +485,21 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
                           size="sm"
                           onPress={() => onSelectFloor(floor, 'overview')}
                         />
+                      </View>
+                    ) : (
+                      <View style={styles.configuredBanner}>
+                        <Ionicons
+                          name={config?.profile_approved ? 'shield-checkmark' : 'shield-outline'}
+                          size={14}
+                          color={config?.profile_approved ? theme.colors.success.dark : theme.colors.warning.dark}
+                        />
+                        <AppText variant="caption" color={theme.colors.text.secondary} style={{ flex: 1 }} numberOfLines={1}>
+                          Hồ sơ: <AppText variant="caption" weight="semibold">{config?.profile_name || 'Cấu hình tầng'}</AppText>
+                          {config?.profile_approved ? ' (Đã duyệt)' : ' (Chờ duyệt)'}
+                          {config?.humidity_min != null && config?.humidity_max != null
+                            ? ` • Ẩm: ${config.humidity_min}–${config.humidity_max}%`
+                            : ''}
+                        </AppText>
                       </View>
                     )}
                   </Pressable>
@@ -677,6 +719,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
+  syncingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.neutral[100],
+    borderRadius: theme.borderRadius.sm,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 5,
+    marginTop: 4,
+  },
   unconfiguredBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -686,6 +737,16 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     marginTop: 4,
     gap: 4,
+  },
+  configuredBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(34, 197, 94, 0.08)',
+    borderRadius: theme.borderRadius.sm,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 4,
+    marginTop: 4,
+    gap: 6,
   },
   cardActionsBar: {
     flexDirection: 'row',

@@ -627,39 +627,101 @@ export class IotRepository {
           ? response.data
           : [];
 
-      return rawList.map((item: any) => ({
-        session_id: Number(item.session_id ?? item.id),
-        id: item.id ? Number(item.id) : undefined,
-        order_id: item.order_id != null ? Number(item.order_id) : null,
-        rental_id: item.rental_id != null ? Number(item.rental_id) : (item.order_id != null ? Number(item.order_id) : null),
-        status: item.status,
-        spawn_status: item.spawn_status ?? null,
-        mushroom_type_id: Number(item.mushroom_type_id || 1),
-        mushroom_name: item.mushroom_name ?? item.mushroom?.name ?? 'Nấm giống',
-        required_trays: Number(item.tray_quantity ?? item.required_trays ?? 1),
-        tray_quantity: Number(item.tray_quantity ?? item.required_trays ?? 1),
-        tray_count: Number(item.tray_count ?? item.tray_quantity ?? item.required_trays ?? 1),
-        customer_name: item.customer_name ?? item.customer?.full_name ?? item.customer?.name ?? 'Khách hàng',
-        customer_email: item.customer_email ?? item.customer?.email ?? null,
-        customer_phone: item.customer_phone ?? item.customer?.phone ?? item.customer?.phone_number ?? null,
-        floor_id: item.floor_id != null ? Number(item.floor_id) : null,
-        floor_name: item.floor_name ?? null,
-        room_id: item.room_id != null ? Number(item.room_id) : null,
-        room_name: item.room_name ?? null,
-        start_date: item.start_date ?? null,
-        end_date: item.end_date ?? null,
-        created_at: item.created_at ?? null,
-        updated_at: item.updated_at ?? null,
-        trays: Array.isArray(item.trays)
-          ? item.trays.map((t: any) => ({
-              session_tray_id: Number(t.session_tray_id ?? t.id ?? 0),
-              tray_id: Number(t.tray_id),
-              tray_code: String(t.tray_code || `Khay #${t.tray_id}`),
-              floor_id: t.floor_id != null ? Number(t.floor_id) : null,
-              status: String(t.status || 'ACTIVE'),
-            }))
-          : undefined,
-      }));
+      const sessions: CultivationSessionAdmin[] = rawList.map((item: any) => {
+        const rawTrays = Array.isArray(item.trays)
+          ? item.trays
+          : Array.isArray(item.assigned_trays)
+          ? item.assigned_trays
+          : [];
+
+        const floorName =
+          item.floor_name ||
+          rawTrays.find((t: any) => t.floor_name)?.floor_name ||
+          null;
+
+        const floorId =
+          item.floor_id != null
+            ? Number(item.floor_id)
+            : rawTrays.find((t: any) => t.floor_id != null)?.floor_id != null
+            ? Number(rawTrays.find((t: any) => t.floor_id != null).floor_id)
+            : null;
+
+        return {
+          session_id: Number(item.session_id ?? item.id),
+          id: item.id ? Number(item.id) : undefined,
+          order_id: item.order_id != null ? Number(item.order_id) : null,
+          rental_id: item.rental_id != null ? Number(item.rental_id) : (item.order_id != null ? Number(item.order_id) : null),
+          status: item.status,
+          harvest_status: item.harvest_status ?? null,
+          spawn_status: item.spawn_status ?? null,
+          mushroom_type_id: Number(item.mushroom_type_id || 1),
+          mushroom_name: item.mushroom_name ?? item.mushroom?.name ?? 'Nấm giống',
+          required_trays: Number(item.tray_quantity ?? item.required_trays ?? 1),
+          tray_quantity: Number(item.tray_quantity ?? item.required_trays ?? 1),
+          tray_count: Number(item.tray_count ?? item.tray_quantity ?? item.required_trays ?? 1),
+          customer_name: item.customer_name ?? item.customer?.full_name ?? item.customer?.name ?? 'Khách hàng',
+          customer_email: item.customer_email ?? item.customer?.email ?? null,
+          customer_phone: item.customer_phone ?? item.customer?.phone ?? item.customer?.phone_number ?? null,
+          floor_id: floorId,
+          floor_name: floorName,
+          room_id: item.room_id != null ? Number(item.room_id) : null,
+          room_name: item.room_name ?? null,
+          start_date: item.start_date ?? item.start_at ?? null,
+          start_at: item.start_at ?? null,
+          harvest_date: item.harvest_date ?? null,
+          end_date: item.end_date ?? null,
+          created_at: item.created_at ?? null,
+          updated_at: item.updated_at ?? null,
+          growth_status: item.growth_status ?? item.current_stage ?? null,
+          current_stage: item.current_stage ?? null,
+          progress_percent: item.progress_percent != null ? Number(item.progress_percent) : null,
+          trays: rawTrays.length > 0
+            ? rawTrays.map((t: any) => ({
+                session_tray_id: Number(t.session_tray_id ?? t.id ?? 0),
+                tray_id: Number(t.tray_id),
+                tray_code: String(t.tray_code || `Khay #${t.tray_id}`),
+                floor_id: t.floor_id != null ? Number(t.floor_id) : floorId,
+                floor_name: t.floor_name || floorName,
+                status: String(t.status || 'ACTIVE'),
+              }))
+            : undefined,
+        };
+      });
+
+      // Enrich active/cultivating sessions that lack floor_name or trays (e.g. from backend list endpoints)
+      const needingEnrich = sessions.filter(
+        (s) =>
+          (!s.floor_name || !s.trays || s.trays.length === 0) &&
+          ['CULTIVATING', 'HARVEST_READY', 'HARVESTING', 'COMPLETED'].includes(s.status)
+      );
+
+      if (needingEnrich.length > 0) {
+        await Promise.allSettled(
+          needingEnrich.map(async (sess) => {
+            try {
+              const detail = await this.getSessionAdminDetail(sess.session_id);
+              if (detail.trays && detail.trays.length > 0) {
+                sess.trays = detail.trays;
+                sess.floor_name = detail.trays[0].floor_name || detail.floor_name || sess.floor_name;
+                sess.floor_id = detail.trays[0].floor_id ?? detail.floor_id ?? sess.floor_id;
+              }
+              if (detail.growth_status && !sess.growth_status) {
+                sess.growth_status = detail.growth_status;
+              }
+              if (detail.progress_percent != null && sess.progress_percent == null) {
+                sess.progress_percent = Number(detail.progress_percent);
+              }
+              if (detail.condition && !sess.condition) {
+                sess.condition = detail.condition;
+              }
+            } catch {
+              // Silently ignore individual detail fetch failures to preserve the main session list
+            }
+          })
+        );
+      }
+
+      return sessions;
     } catch (error) {
       throw error instanceof AppError ? error : handleApiError(error);
     }
