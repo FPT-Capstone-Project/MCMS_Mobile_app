@@ -142,4 +142,9 @@ export const API_ENDPOINTS = {
     YIELD: (harvestId: number | string) => `/api/harvests/${harvestId}/yield`,
     COMPLETE: (harvestId: number | string) => `/api/harvests/${harvestId}/complete`,
   },
+  // Analytics & Aggregated Metrics
+  ANALYTICS: {
+    DASHBOARD: '/api/analytics/dashboard',
+    ENVIRONMENT_HISTORY: '/api/analytics/dashboard/environment-history',
+  },
 } as const;

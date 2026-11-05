@@ -1,8 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AppState,
+  AppStateStatus,
   Pressable,
+  RefreshControl,
   StyleSheet,
   View,
 } from 'react-native';
@@ -18,8 +21,11 @@ import {
   formatMistingCode,
   IotMaster,
   iotRepository,
-  IotSensor,
 } from '../../src/features/iot';
+import {
+  analyticsRepository,
+  EnvironmentHistoryData,
+} from '../../src/features/analytics';
 import {
   AppButton,
   AppCard,
@@ -188,9 +194,14 @@ export default function HomeScreen() {
 
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [masters, setMasters] = useState<IotMaster[]>([]);
-  const [activeSensors, setActiveSensors] = useState<IotSensor[]>([]);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
+
+  // Environment History Server State (GET /api/analytics/dashboard/environment-history)
+  const [envHistory, setEnvHistory] = useState<EnvironmentHistoryData | null>(null);
+  const [pullRefreshing, setPullRefreshing] = useState(false);
+
+  const appStateRef = useRef<AppStateStatus>((AppState.currentState as AppStateStatus) || 'active');
 
   const loadDashboardData = useCallback(async () => {
     setDashboardLoading(true);
@@ -202,14 +213,6 @@ export default function HomeScreen() {
       if (isStaff) {
         const mastersData = await iotRepository.getMasters();
         setMasters(mastersData);
-        if (mastersData.length > 0) {
-          const sensors = await iotRepository.getMasterSensors(mastersData[0].masterId);
-          // Only take Tầng 1 (Node 1) and Tầng 2 (Node 2); omit Tầng 3 (Node 3)
-          const floorSensors = sensors.filter((s) => s.nodeId === 1 || s.nodeId === 2);
-          setActiveSensors(floorSensors);
-        } else {
-          setActiveSensors([]);
-        }
       }
     } catch (error: unknown) {
       setDashboardError(
@@ -220,31 +223,107 @@ export default function HomeScreen() {
     }
   }, [isStaff]);
 
+  const loadEnvironmentHistory = useCallback(async () => {
+    // Strictly restricted to Staff (Admin & Farm Operator); NEVER call for Customer
+    if (!isStaff) return;
+
+    try {
+      const data = await analyticsRepository.getEnvironmentHistory();
+      setEnvHistory(data);
+    } catch {
+      // Retain existing chart if available
+    }
+  }, [isStaff]);
+
+  // AppState change listener: Pause when backgrounded, refresh when returning to active
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      appStateRef.current = nextState;
+      if (nextState === 'active' && isStaff) {
+        loadEnvironmentHistory();
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [isStaff, loadEnvironmentHistory]);
+
+  // Screen Focus Lifecycle: triggers initial load and sets 5-minute auto-refresh interval
   useFocusEffect(
     useCallback(() => {
       loadDashboardData();
-    }, [loadDashboardData])
+
+      if (isStaff) {
+        loadEnvironmentHistory();
+
+        // 5-minute interval timer (300,000 ms) while screen is in focus
+        const intervalId = setInterval(() => {
+          if (appStateRef.current === 'active') {
+            loadEnvironmentHistory();
+          }
+        }, 300000);
+
+        return () => {
+          clearInterval(intervalId);
+        };
+      }
+    }, [loadDashboardData, loadEnvironmentHistory, isStaff])
   );
 
-  // Calculate real average temperature & humidity from available sensors
-  const validTempSensors = activeSensors.filter((s) => s.temperature != null);
-  const validHumSensors = activeSensors.filter((s) => s.humidity != null);
-
-  const avgTemp =
-    validTempSensors.length > 0
-      ? (validTempSensors.reduce((acc, s) => acc + (s.temperature || 0), 0) / validTempSensors.length).toFixed(1)
-      : null;
-
-  const avgHum =
-    validHumSensors.length > 0
-      ? (validHumSensors.reduce((acc, s) => acc + (s.humidity || 0), 0) / validHumSensors.length).toFixed(0)
-      : null;
+  // Manual pull-to-refresh
+  const handlePullRefresh = useCallback(async () => {
+    setPullRefreshing(true);
+    try {
+      await Promise.all([
+        loadDashboardData(),
+        isStaff ? loadEnvironmentHistory() : Promise.resolve(),
+      ]);
+    } finally {
+      setPullRefreshing(false);
+    }
+  }, [loadDashboardData, loadEnvironmentHistory, isStaff]);
 
   const firstMaster = masters[0];
   const pendingOrders = orders.filter((o) => o.order_status === 'PENDING');
 
+  // Compute latest temperature and humidity across floors for high-level dashboard glance
+  const { latestDashboardTemp, latestDashboardHum } = useMemo<{
+    latestDashboardTemp: number | null;
+    latestDashboardHum: number | null;
+  }>(() => {
+    let t: number | null = null;
+    let h: number | null = null;
+    const floorList = envHistory?.floors || [];
+    for (const f of floorList) {
+      const pts = f.points || [];
+      for (let i = pts.length - 1; i >= 0; i--) {
+        const pt = pts[i];
+        if (t === null && pt.temperature !== null) {
+          t = pt.temperature;
+        }
+        if (h === null && pt.humidity !== null) {
+          h = pt.humidity;
+        }
+        if (t !== null && h !== null) break;
+      }
+      if (t !== null && h !== null) break;
+    }
+    return { latestDashboardTemp: t, latestDashboardHum: h };
+  }, [envHistory]);
+
   return (
-    <ScreenContainer scrollable edges={['left', 'right']}>
+    <ScreenContainer
+      scrollable
+      edges={['left', 'right']}
+      refreshControl={
+        <RefreshControl
+          refreshing={pullRefreshing}
+          onRefresh={handlePullRefresh}
+          colors={[theme.colors.primary[500]]}
+          tintColor={theme.colors.primary[500]}
+        />
+      }
+    >
       <AppHeader
         title="SmartMush"
         subtitle={isStaff ? 'Hệ thống Điều hành & Vận hành IoT (Admin & Farm Operator)' : 'Hệ thống quản lý vi khí hậu & nuôi trồng nấm'}
@@ -407,70 +486,94 @@ export default function HomeScreen() {
           </AppCard>
         ) : null}
 
-        {/* IoT telemetry is for staff only; customer-specific tray telemetry needs a
-            backend ownership-scoped endpoint and must not use farm-wide readings. */}
-        {isStaff ? <AppCard elevation="sm" style={styles.heroCard}>
-          <View style={styles.heroHeader}>
-            <View style={styles.heroIconBadge}>
-              <Ionicons name="hardware-chip-outline" size={24} color={theme.colors.primary[500]} />
-            </View>
-            <View style={styles.heroTextGroup}>
-              <AppText variant="overline" color={theme.colors.primary[500]}>
-                Cảm biến IoT thực tế
-              </AppText>
-              <AppText variant="h3">
-                {firstMaster ? `Master ${firstMaster.masterId}` : 'Tổng quan buồng trồng'}
-              </AppText>
-            </View>
-          </View>
-
-          <AppText variant="bodySmall" color={theme.colors.text.secondary} style={styles.heroDescription}>
-            {dashboardLoading
-              ? 'Đang tải dữ liệu cảm biến...'
-              : `Đang ghi nhận số đo từ ${activeSensors.length} cảm biến (Tầng 1 & Tầng 2).`}
-          </AppText>
-
-          <View style={styles.metricsRow}>
-            <View style={styles.metricItem}>
-              <AppText variant="caption" color={theme.colors.text.muted}>
-                Nhiệt độ trung bình
-              </AppText>
-              <AppText variant="title" weight="bold" color={theme.colors.text.primary}>
-                {avgTemp ? `${avgTemp} °C` : 'Chưa có dữ liệu'}
-              </AppText>
-            </View>
-
-            <AppDivider orientation="vertical" spacing="sm" />
-
-            <View style={styles.metricItem}>
-              <AppText variant="caption" color={theme.colors.text.muted}>
-                Độ ẩm trung bình
-              </AppText>
-              <AppText variant="title" weight="bold" color={theme.colors.primary[600]}>
-                {avgHum ? `${avgHum} %` : 'Chưa có dữ liệu'}
-              </AppText>
+        {/* IoT Telemetry Summary (Staff only) */}
+        {isStaff && (
+          <AppCard elevation="sm" style={styles.heroCard}>
+            <View style={styles.heroHeader}>
+              <View style={styles.heroIconBadge}>
+                <Ionicons name="hardware-chip-outline" size={24} color={theme.colors.primary[500]} />
+              </View>
+              <View style={styles.heroTextGroup}>
+                <AppText variant="overline" color={theme.colors.primary[500]}>
+                  Cảm biến IoT thực tế
+                </AppText>
+                <AppText variant="h3">
+                  {firstMaster ? `Master ${firstMaster.masterId}` : 'Tổng quan buồng trồng'}
+                </AppText>
+              </View>
+              {firstMaster && (
+                <View
+                  style={[
+                    styles.masterBadge,
+                    {
+                      backgroundColor:
+                        firstMaster.reportedStatus === 'online'
+                          ? 'rgba(46, 125, 50, 0.12)'
+                          : 'rgba(237, 108, 2, 0.12)',
+                    },
+                  ]}
+                >
+                  <AppText
+                    variant="caption"
+                    weight="bold"
+                    color={
+                      firstMaster.reportedStatus === 'online'
+                        ? theme.colors.success.main
+                        : theme.colors.warning.main
+                    }
+                  >
+                    {formatMistingCode('reportedStatus', firstMaster.reportedStatus)}
+                  </AppText>
+                </View>
+              )}
             </View>
 
-            <AppDivider orientation="vertical" spacing="sm" />
+            <AppText variant="bodySmall" color={theme.colors.text.secondary} style={styles.heroDescription}>
+              Giám sát vi khí hậu buồng trồng và các tầng nuôi. Nhấn nút bên dưới để mở toàn bộ 2 biểu đồ đường 24 giờ.
+            </AppText>
 
-            <View style={styles.metricItem}>
-              <AppText variant="caption" color={theme.colors.text.muted}>
-                Trạng thái Master
-              </AppText>
-              <AppText
-                variant="title"
-                weight="bold"
-                color={firstMaster?.reportedStatus === 'online' ? theme.colors.success.main : theme.colors.warning.main}
-              >
-                {formatMistingCode('reportedStatus', firstMaster?.reportedStatus)}
+            <View style={styles.metricsRow}>
+              <View style={styles.metricItem}>
+                <AppText variant="caption" color={theme.colors.text.muted}>
+                  Nhiệt độ gần nhất
+                </AppText>
+                <AppText variant="title" weight="bold" color="#8B5CF6">
+                  {latestDashboardTemp != null ? `${latestDashboardTemp.toFixed(1)} °C` : '—'}
+                </AppText>
+              </View>
 
+              <AppDivider orientation="vertical" spacing="sm" />
 
+              <View style={styles.metricItem}>
+                <AppText variant="caption" color={theme.colors.text.muted}>
+                  Độ ẩm gần nhất
+                </AppText>
+                <AppText variant="title" weight="bold" color="#14B8A6">
+                  {latestDashboardHum != null ? `${latestDashboardHum.toFixed(1)} %RH` : '—'}
+                </AppText>
+              </View>
 
+              <AppDivider orientation="vertical" spacing="sm" />
 
-              </AppText>
+              <View style={styles.metricItem}>
+                <AppText variant="caption" color={theme.colors.text.muted}>
+                  Số tầng giám sát
+                </AppText>
+                <AppText variant="title" weight="bold" color={theme.colors.text.primary}>
+                  {envHistory?.floors ? `${envHistory.floors.length} tầng` : '2 tầng'}
+                </AppText>
+              </View>
             </View>
-          </View>
-        </AppCard> : null}
+
+            <AppButton
+              title="Mở 2 biểu đồ vi khí hậu (Tầng 1 & Tầng 2)"
+              variant="secondary"
+              size="md"
+              leftIcon={<Ionicons name="stats-chart" size={18} color={theme.colors.primary[700]} />}
+              onPress={() => router.push('/sensors' as any)}
+            />
+          </AppCard>
+        )}
 
         {/* Quick Action Navigation Grid */}
         <View style={styles.quickActionsSection}>
@@ -624,6 +727,83 @@ const styles = StyleSheet.create({
   quickActionsSection: {
     gap: theme.spacing.sm,
     marginTop: theme.spacing.xs,
+  },
+  environmentSection: {
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.xs,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 2,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  refreshingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  floorsListContainer: {
+    gap: theme.spacing.md,
+  },
+  loadingCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.sm,
+  },
+  errorCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    gap: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: theme.colors.error.light,
+  },
+  errorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  retryButton: {
+    alignSelf: 'flex-start',
+    marginTop: theme.spacing.xs,
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.xs,
+  },
+  masterStatusCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+  },
+  masterStatusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  masterStatusLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  masterBadge: {
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 4,
+    borderRadius: theme.borderRadius.full,
   },
   actionGrid: {
     gap: theme.spacing.sm,
