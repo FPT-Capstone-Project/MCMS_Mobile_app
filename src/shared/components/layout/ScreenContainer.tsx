@@ -18,6 +18,7 @@ export interface ScreenContainerProps {
   style?: ViewStyle;
   contentContainerStyle?: ViewStyle;
   keyboardAvoiding?: boolean;
+  refreshControl?: React.ReactElement;
 }
 
 export const ScreenContainer: React.FC<ScreenContainerProps> = ({
@@ -28,6 +29,7 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
   style,
   contentContainerStyle,
   keyboardAvoiding = true,
+  refreshControl,
 }) => {
   const content = scrollable ? (
     <ScrollView
@@ -37,6 +39,7 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
       keyboardDismissMode="on-drag"
       contentInsetAdjustmentBehavior="automatic"
       showsVerticalScrollIndicator={false}
+      refreshControl={refreshControl}
     >
       {children}
     </ScrollView>

@@ -155,7 +155,11 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
           }
         }
 
-        const configObj = cfg?.config ?? null;
+        const configObj =
+          cfg?.config ||
+          (status?.run?.config_snapshot as any) ||
+          (status?.environment?.thresholds as any) ||
+          null;
         setFloorConfigs((prev) => ({ ...prev, [fid]: configObj }));
 
         if (cfg?.cultivation?.trays) {
@@ -167,6 +171,16 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
               total: trays.length,
               cultivating,
               availableForAssign: Array.isArray(availableTrays) ? availableTrays.length : 0,
+            },
+          }));
+        } else if (Array.isArray(availableTrays)) {
+          const total = (f.total_rows || 3) * (f.total_columns || 3);
+          setFloorTrayCounts((prev) => ({
+            ...prev,
+            [fid]: {
+              total,
+              cultivating: Math.max(0, total - availableTrays.length),
+              availableForAssign: availableTrays.length,
             },
           }));
         }

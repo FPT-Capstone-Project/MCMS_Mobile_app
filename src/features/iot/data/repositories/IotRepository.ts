@@ -313,10 +313,17 @@ export class IotRepository {
    */
   async getAutoControlConfig(floorId: number): Promise<AutoControlConfigResponse> {
     try {
-      const response = await axiosClient.get<{ data: AutoControlConfigResponse }>(
+      const response = await axiosClient.get<{ data: AutoControlConfigResponse } | AutoControlConfigResponse>(
         API_ENDPOINTS.AUTOMATIC.AUTO_CONTROL(floorId)
       );
-      return response.data?.data || { mode: 'MANUAL' };
+      const resData = response.data as any;
+      if (resData && typeof resData === 'object') {
+        if ('data' in resData && resData.data) {
+          return resData.data;
+        }
+        return resData as AutoControlConfigResponse;
+      }
+      return { mode: 'MANUAL' };
     } catch (error) {
       throw error instanceof AppError ? error : handleApiError(error);
     }
@@ -612,83 +619,231 @@ export class IotRepository {
 
   /**
    * List all cultivation sessions for admin with optional status filter
-   * GET /api/farm/sessions
+   * Merges /api/cultivation-sessions/admin (for complete trays, floor name/id, growth status)
+   * and /api/farm/sessions (for spawn workflow & inspections).
    */
   async getAdminCultivationSessions(status?: string): Promise<CultivationSessionAdmin[]> {
     try {
-      const response = await axiosClient.get<{ data: any[] } | any[]>(
-        API_ENDPOINTS.FARM.SESSIONS,
-        { params: status ? { status } : undefined }
-      );
-      const rawList =
-        'data' in response.data && Array.isArray(response.data.data)
-          ? response.data.data
-          : Array.isArray(response.data)
-          ? response.data
+      const [adminRes, farmRes] = await Promise.allSettled([
+        axiosClient.get<{ data: any[] | { sessions: any[] } } | any[]>(
+          API_ENDPOINTS.CULTIVATION_SESSIONS.ADMIN_BASE,
+          { params: status ? { status } : undefined }
+        ),
+        axiosClient.get<{ data: any[] } | any[]>(
+          API_ENDPOINTS.FARM.SESSIONS,
+          { params: status ? { status } : undefined }
+        ),
+      ]);
+
+      const sessionsMap = new Map<number, CultivationSessionAdmin>();
+
+      // 1. Process /api/cultivation-sessions/admin (primary source for trays, floors, growth, and harvest)
+      if (adminRes.status === 'fulfilled') {
+        const rawData = (adminRes.value.data as any)?.data ?? adminRes.value.data;
+        const list: any[] = Array.isArray(rawData)
+          ? rawData
+          : Array.isArray(rawData?.sessions)
+          ? rawData.sessions
           : [];
 
-      const sessions: CultivationSessionAdmin[] = rawList.map((item: any) => {
-        const rawTrays = Array.isArray(item.trays)
-          ? item.trays
-          : Array.isArray(item.assigned_trays)
-          ? item.assigned_trays
-          : [];
+        list.forEach((item: any) => {
+          const sid = Number(item.session_id ?? item.id);
+          if (!sid) return;
 
-        const floorName =
-          item.floor_name ||
-          rawTrays.find((t: any) => t.floor_name)?.floor_name ||
-          null;
+          const rawTrays = Array.isArray(item.trays)
+            ? item.trays
+            : Array.isArray(item.assigned_trays)
+            ? item.assigned_trays
+            : [];
 
-        const floorId =
-          item.floor_id != null
-            ? Number(item.floor_id)
-            : rawTrays.find((t: any) => t.floor_id != null)?.floor_id != null
-            ? Number(rawTrays.find((t: any) => t.floor_id != null).floor_id)
-            : null;
+          const floorName =
+            item.floor_name ||
+            rawTrays.find((t: any) => t.floor_name)?.floor_name ||
+            null;
 
-        return {
-          session_id: Number(item.session_id ?? item.id),
-          id: item.id ? Number(item.id) : undefined,
-          order_id: item.order_id != null ? Number(item.order_id) : null,
-          rental_id: item.rental_id != null ? Number(item.rental_id) : (item.order_id != null ? Number(item.order_id) : null),
-          status: item.status,
-          harvest_status: item.harvest_status ?? null,
-          spawn_status: item.spawn_status ?? null,
-          mushroom_type_id: Number(item.mushroom_type_id || 1),
-          mushroom_name: item.mushroom_name ?? item.mushroom?.name ?? 'Nấm giống',
-          required_trays: Number(item.tray_quantity ?? item.required_trays ?? 1),
-          tray_quantity: Number(item.tray_quantity ?? item.required_trays ?? 1),
-          tray_count: Number(item.tray_count ?? item.tray_quantity ?? item.required_trays ?? 1),
-          customer_name: item.customer_name ?? item.customer?.full_name ?? item.customer?.name ?? 'Khách hàng',
-          customer_email: item.customer_email ?? item.customer?.email ?? null,
-          customer_phone: item.customer_phone ?? item.customer?.phone ?? item.customer?.phone_number ?? null,
-          floor_id: floorId,
-          floor_name: floorName,
-          room_id: item.room_id != null ? Number(item.room_id) : null,
-          room_name: item.room_name ?? null,
-          start_date: item.start_date ?? item.start_at ?? null,
-          start_at: item.start_at ?? null,
-          harvest_date: item.harvest_date ?? null,
-          end_date: item.end_date ?? null,
-          created_at: item.created_at ?? null,
-          updated_at: item.updated_at ?? null,
-          growth_status: item.growth_status ?? item.current_stage ?? null,
-          current_stage: item.current_stage ?? null,
-          progress_percent: item.progress_percent != null ? Number(item.progress_percent) : null,
-          trays: rawTrays.length > 0
-            ? rawTrays.map((t: any) => ({
-                session_tray_id: Number(t.session_tray_id ?? t.id ?? 0),
-                tray_id: Number(t.tray_id),
-                tray_code: String(t.tray_code || `Khay #${t.tray_id}`),
-                floor_id: t.floor_id != null ? Number(t.floor_id) : floorId,
-                floor_name: t.floor_name || floorName,
-                status: String(t.status || 'ACTIVE'),
-              }))
-            : undefined,
-        };
-      });
+          const floorId =
+            item.floor_id != null
+              ? Number(item.floor_id)
+              : rawTrays.find((t: any) => t.floor_id != null)?.floor_id != null
+              ? Number(rawTrays.find((t: any) => t.floor_id != null).floor_id)
+              : null;
 
-      // Enrich active/cultivating sessions that lack floor_name or trays (e.g. from backend list endpoints)
+          const mappedTrays =
+            rawTrays.length > 0
+              ? rawTrays.map((t: any) => ({
+                  session_tray_id: Number(t.session_tray_id ?? t.id ?? 0),
+                  tray_id: Number(t.tray_id),
+                  tray_code: String(t.tray_code || `Khay #${t.tray_id}`),
+                  floor_id: t.floor_id != null ? Number(t.floor_id) : floorId,
+                  floor_name: t.floor_name || floorName,
+                  status: String(t.status || t.assignment_status || 'ACTIVE'),
+                  row_number: t.row_number != null ? Number(t.row_number) : undefined,
+                  column_number: t.column_number != null ? Number(t.column_number) : undefined,
+                }))
+              : undefined;
+
+          sessionsMap.set(sid, {
+            session_id: sid,
+            id: item.id ? Number(item.id) : undefined,
+            order_id: item.order_id != null ? Number(item.order_id) : null,
+            rental_id:
+              item.rental_id != null
+                ? Number(item.rental_id)
+                : item.order_id != null
+                ? Number(item.order_id)
+                : null,
+            status: item.status,
+            harvest_status: item.harvest_status ?? null,
+            spawn_status: item.spawn_status ?? null,
+            mushroom_type_id: Number(item.mushroom_type_id || 1),
+            mushroom_name: item.mushroom_name ?? item.mushroom?.name ?? 'Nấm giống',
+            required_trays: Number(item.tray_quantity ?? item.required_trays ?? 1),
+            tray_quantity: Number(item.tray_quantity ?? item.required_trays ?? 1),
+            tray_count: Number(item.tray_count ?? item.tray_quantity ?? item.required_trays ?? 1),
+            spawn_quantity:
+              item.spawn_quantity != null
+                ? Number(item.spawn_quantity)
+                : Number(item.tray_quantity ?? 1) * 3,
+            customer_name:
+              item.customer_name ??
+              item.customer?.full_name ??
+              item.customer?.name ??
+              'Khách hàng',
+            customer_email: item.customer_email ?? item.customer?.email ?? null,
+            customer_phone:
+              item.customer_phone ?? item.customer?.phone ?? item.customer?.phone_number ?? null,
+            floor_id: floorId,
+            floor_name: floorName,
+            room_id: item.room_id != null ? Number(item.room_id) : null,
+            room_name: item.room_name ?? null,
+            start_date: item.start_date ?? item.start_at ?? null,
+            start_at: item.start_at ?? null,
+            harvest_date: item.harvest_date ?? null,
+            end_date: item.end_date ?? null,
+            created_at: item.created_at ?? null,
+            updated_at: item.updated_at ?? null,
+            growth_status: item.growth_status ?? item.current_stage ?? null,
+            current_stage: item.current_stage ?? null,
+            progress_percent:
+              item.progress_percent != null ? Number(item.progress_percent) : null,
+            condition: item.condition ?? null,
+            notes: item.notes ?? null,
+            trays: mappedTrays,
+          });
+        });
+      }
+
+      // 2. Merge /api/farm/sessions (dedicated farm spawn lifecycle status & inspections)
+      if (farmRes.status === 'fulfilled') {
+        const rawData = (farmRes.value.data as any)?.data ?? farmRes.value.data;
+        const farmList: any[] = Array.isArray(rawData) ? rawData : [];
+
+        farmList.forEach((item: any) => {
+          const sid = Number(item.session_id ?? item.id);
+          if (!sid) return;
+
+          if (sessionsMap.has(sid)) {
+            const existing = sessionsMap.get(sid)!;
+            if (item.spawn_status && !existing.spawn_status) {
+              existing.spawn_status = item.spawn_status;
+            }
+            if (item.spawn_issued != null && existing.spawn_issued == null) {
+              existing.spawn_issued = Boolean(item.spawn_issued);
+            }
+            if (item.last_inspected_at && !existing.last_inspected_at) {
+              existing.last_inspected_at = item.last_inspected_at;
+            }
+            if (!existing.mushroom_name && item.mushroom_name) {
+              existing.mushroom_name = item.mushroom_name;
+            }
+            if (!existing.customer_name && item.customer_name) {
+              existing.customer_name = item.customer_name;
+            }
+          } else {
+            // If session was only returned by farm endpoint
+            const rawTrays = Array.isArray(item.trays)
+              ? item.trays
+              : Array.isArray(item.assigned_trays)
+              ? item.assigned_trays
+              : [];
+
+            const floorName =
+              item.floor_name ||
+              rawTrays.find((t: any) => t.floor_name)?.floor_name ||
+              null;
+
+            const floorId =
+              item.floor_id != null
+                ? Number(item.floor_id)
+                : rawTrays.find((t: any) => t.floor_id != null)?.floor_id != null
+                ? Number(rawTrays.find((t: any) => t.floor_id != null).floor_id)
+                : null;
+
+            sessionsMap.set(sid, {
+              session_id: sid,
+              id: item.id ? Number(item.id) : undefined,
+              order_id: item.order_id != null ? Number(item.order_id) : null,
+              rental_id:
+                item.rental_id != null
+                  ? Number(item.rental_id)
+                  : item.order_id != null
+                  ? Number(item.order_id)
+                  : null,
+              status: item.status,
+              harvest_status: item.harvest_status ?? null,
+              spawn_status: item.spawn_status ?? null,
+              mushroom_type_id: Number(item.mushroom_type_id || 1),
+              mushroom_name: item.mushroom_name ?? item.mushroom?.name ?? 'Nấm giống',
+              required_trays: Number(item.tray_quantity ?? item.required_trays ?? 1),
+              tray_quantity: Number(item.tray_quantity ?? item.required_trays ?? 1),
+              tray_count: Number(item.tray_count ?? item.tray_quantity ?? item.required_trays ?? 1),
+              spawn_quantity:
+                item.spawn_quantity != null
+                  ? Number(item.spawn_quantity)
+                  : Number(item.tray_quantity ?? 1) * 3,
+              customer_name:
+                item.customer_name ??
+                item.customer?.full_name ??
+                item.customer?.name ??
+                'Khách hàng',
+              customer_email: item.customer_email ?? item.customer?.email ?? null,
+              customer_phone:
+                item.customer_phone ?? item.customer?.phone ?? item.customer?.phone_number ?? null,
+              floor_id: floorId,
+              floor_name: floorName,
+              room_id: item.room_id != null ? Number(item.room_id) : null,
+              room_name: item.room_name ?? null,
+              start_date: item.start_date ?? item.start_at ?? null,
+              start_at: item.start_at ?? null,
+              harvest_date: item.harvest_date ?? null,
+              end_date: item.end_date ?? null,
+              created_at: item.created_at ?? null,
+              updated_at: item.updated_at ?? null,
+              growth_status: item.growth_status ?? item.current_stage ?? null,
+              current_stage: item.current_stage ?? null,
+              progress_percent:
+                item.progress_percent != null ? Number(item.progress_percent) : null,
+              condition: item.condition ?? null,
+              notes: item.notes ?? null,
+              trays:
+                rawTrays.length > 0
+                  ? rawTrays.map((t: any) => ({
+                      session_tray_id: Number(t.session_tray_id ?? t.id ?? 0),
+                      tray_id: Number(t.tray_id),
+                      tray_code: String(t.tray_code || `Khay #${t.tray_id}`),
+                      floor_id: t.floor_id != null ? Number(t.floor_id) : floorId,
+                      floor_name: t.floor_name || floorName,
+                      status: String(t.status || 'ACTIVE'),
+                    }))
+                  : undefined,
+            });
+          }
+        });
+      }
+
+      const sessions = Array.from(sessionsMap.values());
+
+      // Enrich active/cultivating sessions that still lack floor_name or trays
       const needingEnrich = sessions.filter(
         (s) =>
           (!s.floor_name || !s.trays || s.trays.length === 0) &&

@@ -436,6 +436,7 @@ export interface AutoControlStatus {
     dry_run: boolean;
     started_by: number | null;
     stop_reason?: string | null;
+    config_snapshot?: AutoMistingConfig | null;
   } | null;
   runtime: {
     control_state: AutoControlState;

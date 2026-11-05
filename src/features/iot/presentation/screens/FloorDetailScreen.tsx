@@ -127,10 +127,17 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
 
       if (currentFloorIdRef.current !== floorId) return;
 
+      const fallbackConfig =
+        statusRes.status === 'fulfilled'
+          ? statusRes.value.run?.config_snapshot || (statusRes.value.environment?.thresholds as any)
+          : null;
+
       if (cfgRes.status === 'fulfilled') {
-        setAutoConfig(cfgRes.value.config || null);
+        setAutoConfig(cfgRes.value.config || fallbackConfig || null);
         setFloorSuggestion(cfgRes.value.floorSuggestion || null);
         setCultivationTrays(cfgRes.value.cultivation?.trays || []);
+      } else if (fallbackConfig) {
+        setAutoConfig(fallbackConfig);
       }
 
       if (availRes.status === 'fulfilled') {
