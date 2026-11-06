@@ -6,6 +6,7 @@ import {
   LoginCredentials,
   RegisterOtpData,
   ResetPasswordData,
+  UpdateUserProfileData,
   VerifyRegistrationOtpData,
 } from '../../domain/entities/AuthUser';
 import {
@@ -20,6 +21,7 @@ import {
   registerOtpUser,
   requestChangePasswordOtpUser,
   resetPasswordUser,
+  updateUserProfile,
   verifyRegistrationOtpUser,
 } from '../slices/authSlice';
 
@@ -82,6 +84,13 @@ export function useAuth() {
     [dispatch]
   );
 
+  const handleUpdateProfile = useCallback(
+    (data: UpdateUserProfileData) => {
+      return dispatch(updateUserProfile(data)).unwrap();
+    },
+    [dispatch]
+  );
+
   const handleLogout = useCallback(() => {
     return dispatch(logoutUser()).unwrap();
   }, [dispatch]);
@@ -125,6 +134,7 @@ export function useAuth() {
     resetPassword: handleResetPassword,
     requestChangePasswordOtp: handleRequestChangePasswordOtp,
     changePasswordOtp: handleChangePasswordOtp,
+    updateProfile: handleUpdateProfile,
     logout: handleLogout,
     clearError: handleClearError,
     clearRegistrationSuccess: handleClearRegistrationSuccess,

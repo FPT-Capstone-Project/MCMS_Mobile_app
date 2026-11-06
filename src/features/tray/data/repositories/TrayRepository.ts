@@ -1,5 +1,8 @@
+import { axiosClient } from '../../../../core/api/axiosClient';
+import { API_ENDPOINTS } from '../../../../core/api/endpoints';
 import {
   CustomerFloorRack,
+  CustomerTrayDetails,
   CustomerTrayCard,
   Tray,
   TrayId,
@@ -10,6 +13,7 @@ import { cultivationRepository } from '../../../cultivation/data/repositories/Cu
 import { orderRepository } from '../../../order/data/repositories/OrderRepository';
 import { iotRepository } from '../../../iot/data/repositories/IotRepository';
 import { AppError } from '../../../../core/errors/appError';
+import { handleApiError } from '../../../../core/errors/errorHandler';
 
 /**
  * Tray repository for the live customer floor layout and legacy local tray selections.
@@ -31,6 +35,20 @@ export class TrayRepository implements ITrayRepository {
     return this.trays.filter((t) => t.status === 'MY_RENTED_TRAY');
   }
 
+  async getCustomerCultivationDetails(sessionId: number): Promise<CustomerTrayDetails> {
+    try {
+      const response = await axiosClient.get<{ data: CustomerTrayDetails }>(
+        API_ENDPOINTS.CUSTOMER.SESSION_DETAILS(sessionId)
+      );
+      if (!response.data?.data) {
+        throw new AppError('Chi tiết vụ trồng từ máy chủ không hợp lệ.', 'API_ERROR', 500);
+      }
+      return response.data.data;
+    } catch (error) {
+      throw error instanceof AppError ? error : handleApiError(error);
+    }
+  }
+
   async getCustomerFloorRacks(): Promise<CustomerFloorRack[]> {
     const [floors, trays, orders] = await Promise.all([
       iotRepository.getFloors(),
@@ -48,13 +66,16 @@ export class TrayRepository implements ITrayRepository {
       activeOrders.map((order) => orderRepository.getCustomerCultivationStatus(order.order_id))
     );
 
-    const ownedTraySessions = new Map<number, number>();
+    const ownedTraySessions = new Map<number, { sessionId: number; orderId: number }>();
     for (const result of customerSessions) {
       for (const session of result.sessions) {
         if (!['CULTIVATING', 'HARVEST_READY', 'HARVESTING'].includes(session.status)) continue;
         for (const assignedTray of session.assigned_trays) {
           if (assignedTray.status === 'ACTIVE') {
-            ownedTraySessions.set(assignedTray.tray_id, session.session_id);
+            ownedTraySessions.set(assignedTray.tray_id, {
+              sessionId: session.session_id,
+              orderId: result.orderId,
+            });
           }
         }
       }
@@ -95,9 +116,10 @@ export class TrayRepository implements ITrayRepository {
 
         const rackTrays = floorTrays.map((tray): CustomerTrayCard => {
           const activeTray = activeTrayById.get(tray.tray_id);
+          const ownedSession = ownedTraySessions.get(tray.tray_id);
           const hasOwnActiveCultivation =
             activeTray?.session_id != null &&
-            ownedTraySessions.get(tray.tray_id) === activeTray.session_id;
+            ownedSession?.sessionId === activeTray.session_id;
           const hasOtherActiveCultivation =
             activeTray?.session_id != null && !hasOwnActiveCultivation;
           const positionCode =
@@ -114,6 +136,8 @@ export class TrayRepository implements ITrayRepository {
                 ? 'OTHER_CULTIVATION'
                 : 'AVAILABLE',
             mushroomName: activeTray?.mushroom_name ?? undefined,
+            sessionId: hasOwnActiveCultivation ? ownedSession?.sessionId : undefined,
+            orderId: hasOwnActiveCultivation ? ownedSession?.orderId : undefined,
           };
         });
 

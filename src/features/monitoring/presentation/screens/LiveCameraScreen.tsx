@@ -225,8 +225,7 @@ export const LiveCameraScreen: React.FC = () => {
             </AppText>
           </View>
           <AppText variant="caption" color={theme.colors.text.secondary}>
-            Đang phát luồng video trực tiếp chuẩn HLS (Native) từ camera {cameraId ?? '—'}.
-            Hỗ trợ tăng tốc phần cứng, chuyển đổi chất lượng HD/SD và tự động dừng khi chuyển trang.
+            Đang phát luồng video trực tiếp từ camera.
           </AppText>
 
           {canManageCamera ? (

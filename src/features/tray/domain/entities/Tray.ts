@@ -46,6 +46,36 @@ export interface CustomerTrayCard {
   code: string;
   usage: CustomerTrayUsage;
   mushroomName?: string;
+  sessionId?: number;
+  orderId?: number;
+}
+
+export interface CustomerGrowthHistoryItem {
+  progress_id: number;
+  session_id: number;
+  current_stage: string;
+  progress_percent: number;
+  condition: string | null;
+  description: string | null;
+  updated_at: string;
+}
+
+export interface CustomerDeviceLogItem {
+  command_id: string;
+  action: 'ON' | 'OFF';
+  command_status: 'PENDING' | 'PUBLISHED' | 'FAILED' | 'TIMED_OUT';
+  control_mode: 'AUTOMATIC' | 'MANUAL';
+  reason: string;
+  floor_name: string;
+  requested_at: string;
+  published_at: string | null;
+  error_message: string | null;
+}
+
+export interface CustomerTrayDetails {
+  session_id: number;
+  growth_history: CustomerGrowthHistoryItem[];
+  device_logs: CustomerDeviceLogItem[];
 }
 
 export interface CustomerFloorRack {

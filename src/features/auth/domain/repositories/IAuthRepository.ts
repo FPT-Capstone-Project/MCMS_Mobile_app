@@ -7,6 +7,7 @@ import {
   LoginCredentials,
   RegisterOtpData,
   ResetPasswordData,
+  UpdateUserProfileData,
   VerifyRegistrationOtpData,
 } from '../entities/AuthUser';
 
@@ -54,6 +55,11 @@ export interface IAuthRepository {
    * Fetch current authenticated customer profile from backend
    */
   getCurrentUser(): Promise<AuthUser>;
+
+  /**
+   * Update the editable fields of the current authenticated user's profile
+   */
+  updateProfile(data: UpdateUserProfileData): Promise<AuthUser>;
 
   /**
    * Log out customer, clearing session tokens and local credentials

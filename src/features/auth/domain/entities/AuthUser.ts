@@ -39,6 +39,12 @@ export interface AuthUser {
   permissions?: string[];
 }
 
+export interface UpdateUserProfileData {
+  fullName: string;
+  phone: string | null;
+  address: string | null;
+}
+
 export interface AuthSession {
   user: AuthUser;
   tokens: AuthTokens;

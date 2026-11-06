@@ -66,6 +66,8 @@ export const API_ENDPOINTS = {
   CUSTOMER: {
     CULTIVATION_STATUS: (orderId: string | number) =>
       `/api/customer/orders/${orderId}/cultivation-status`,
+    SESSION_DETAILS: (sessionId: string | number) =>
+      `/api/customer/sessions/${sessionId}/details`,
   },
   // Payments (PayOS)
   PAYMENTS: {

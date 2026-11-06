@@ -3,8 +3,12 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   Alert,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
@@ -26,8 +30,20 @@ import {
  */
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, logout, requestChangePasswordOtp, changePasswordOtp } = useAuth();
+  const {
+    user,
+    isCustomer,
+    logout,
+    requestChangePasswordOtp,
+    changePasswordOtp,
+    updateProfile,
+  } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const [editProfileModalVisible, setEditProfileModalVisible] = useState(false);
+  const [profileForm, setProfileForm] = useState({ fullName: '', phone: '', address: '' });
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   // Change password modal states
   const [changePasswordModalVisible, setChangePasswordModalVisible] = useState(false);
@@ -37,6 +53,46 @@ export default function ProfileScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changePasswordLoading, setChangePasswordLoading] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+
+  const openEditProfile = () => {
+    setProfileForm({
+      fullName: user?.fullName || user?.full_name || '',
+      phone: user?.phone || user?.phoneNumber || '',
+      address: user?.address || '',
+    });
+    setProfileError(null);
+    setEditProfileModalVisible(true);
+  };
+
+  const handleSubmitProfile = async () => {
+    const fullName = profileForm.fullName.trim();
+    if (!fullName) {
+      setProfileError('Vui lòng nhập họ tên.');
+      return;
+    }
+
+    setProfileError(null);
+    setIsUpdatingProfile(true);
+    try {
+      await updateProfile({
+        fullName,
+        phone: profileForm.phone.trim() || null,
+        address: profileForm.address.trim() || null,
+      });
+      setEditProfileModalVisible(false);
+      Alert.alert('Thành công', 'Thông tin hồ sơ đã được cập nhật.');
+    } catch (err: unknown) {
+      setProfileError(
+        typeof err === 'string'
+          ? err
+          : err instanceof Error
+          ? err.message
+          : 'Không thể cập nhật hồ sơ. Vui lòng thử lại.'
+      );
+    } finally {
+      setIsUpdatingProfile(false);
+    }
+  };
 
   const handleRequestOtp = async () => {
     setModalError(null);
@@ -200,6 +256,27 @@ export default function ProfileScreen() {
             Cài đặt & Tài khoản
           </AppText>
 
+          {isCustomer ? (
+            <>
+              <Pressable style={styles.settingItem} onPress={openEditProfile}>
+                <View style={styles.settingLeft}>
+                  <Ionicons name="person-outline" size={20} color={theme.colors.primary[600]} />
+                  <View>
+                    <AppText variant="bodyMedium" weight="medium">
+                      Chỉnh sửa thông tin
+                    </AppText>
+                    <AppText variant="caption" color={theme.colors.text.muted}>
+                      Họ tên, số điện thoại và địa chỉ
+                    </AppText>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={theme.colors.text.muted} />
+              </Pressable>
+
+              <AppDivider spacing="xs" />
+            </>
+          ) : null}
+
           {/* Change Password with OTP */}
           <Pressable
             style={styles.settingItem}
@@ -249,9 +326,7 @@ export default function ProfileScreen() {
           <AppText variant="captionMedium" color={theme.colors.text.muted} align="center">
             MCMS Mobile App • SmartMush
           </AppText>
-          <AppText variant="caption" color={theme.colors.text.muted} align="center">
-            Nền tảng Expo SDK 58 • Kết nối Backend
-          </AppText>
+        
         </AppCard>
 
         {/* Logout Button */}
@@ -264,6 +339,100 @@ export default function ProfileScreen() {
           leftIcon={<Ionicons name="log-out-outline" size={18} color={theme.colors.primary[500]} />}
         />
       </View>
+
+      <Modal
+        visible={editProfileModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditProfileModalVisible(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={Keyboard.dismiss}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.profileKeyboardAvoidingView}
+          >
+            <ScrollView
+              contentContainerStyle={styles.profileModalScrollContent}
+              keyboardDismissMode="on-drag"
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <Pressable onPress={(event) => event.stopPropagation()}>
+                <AppCard elevation="lg" style={styles.modalCard}>
+                  <View style={styles.modalHeader}>
+                    <AppText variant="h3">Chỉnh sửa thông tin</AppText>
+                    <Pressable
+                      onPress={() => setEditProfileModalVisible(false)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Đóng chỉnh sửa thông tin"
+                    >
+                      <Ionicons name="close" size={24} color={theme.colors.text.primary} />
+                    </Pressable>
+                  </View>
+
+                  <AppDivider spacing="xs" />
+
+                  {profileError ? (
+                    <View style={styles.modalErrorBox}>
+                      <Ionicons name="alert-circle" size={18} color={theme.colors.error.main} />
+                      <AppText
+                        variant="caption"
+                        color={theme.colors.error.main}
+                        style={styles.errorText}
+                      >
+                        {profileError}
+                      </AppText>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.modalBody}>
+                    <AppInput
+                      label="Họ và tên"
+                      placeholder="Nhập họ và tên"
+                      value={profileForm.fullName}
+                      onChangeText={(fullName) =>
+                        setProfileForm((current) => ({ ...current, fullName }))
+                      }
+                      autoCapitalize="words"
+                      required
+                    />
+                    <AppInput
+                      label="Số điện thoại"
+                      placeholder="Nhập số điện thoại"
+                      value={profileForm.phone}
+                      onChangeText={(phone) => setProfileForm((current) => ({ ...current, phone }))}
+                      keyboardType="phone-pad"
+                      textContentType="telephoneNumber"
+                    />
+                    <AppInput
+                      label="Địa chỉ"
+                      placeholder="Nhập địa chỉ"
+                      value={profileForm.address}
+                      onChangeText={(address) =>
+                        setProfileForm((current) => ({ ...current, address }))
+                      }
+                      multiline
+                      numberOfLines={3}
+                      inputStyle={{ minHeight: 64, textAlignVertical: 'top' }}
+                    />
+                    <AppText variant="caption" color={theme.colors.text.muted}>
+                      Để trống số điện thoại hoặc địa chỉ nếu bạn muốn xóa thông tin đó.
+                    </AppText>
+                    <AppButton
+                      title="Lưu thay đổi"
+                      variant="primary"
+                      size="lg"
+                      loading={isUpdatingProfile}
+                      onPress={handleSubmitProfile}
+                      style={styles.modalActionBtn}
+                    />
+                  </View>
+                </AppCard>
+              </Pressable>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </Pressable>
+      </Modal>
 
       {/* Change Password Modal */}
       <Modal
@@ -443,6 +612,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: theme.spacing.lg,
+  },
+  profileKeyboardAvoidingView: {
+    flex: 1,
+    width: '100%',
+  },
+  profileModalScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.md,
   },
   modalCard: {
     width: '100%',

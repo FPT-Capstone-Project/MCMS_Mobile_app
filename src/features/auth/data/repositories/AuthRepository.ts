@@ -16,6 +16,7 @@ import {
   LoginCredentials,
   RegisterOtpData,
   ResetPasswordData,
+  UpdateUserProfileData,
   VerifyRegistrationOtpData,
   UserRole,
 } from '../../domain/entities/AuthUser';
@@ -270,6 +271,27 @@ export class AuthRepository implements IAuthRepository {
         throw new AppError('Không tìm thấy thông tin người dùng.', 'NOT_FOUND', 404);
       }
       const authUser = mapBackendUserToAuthUser(response.data.user);
+      await secureStorage.setObject<AuthUser>(STORAGE_KEYS.USER_SESSION, authUser);
+      return authUser;
+    } catch (error) {
+      throw error instanceof AppError ? error : handleApiError(error);
+    }
+  }
+
+  /**
+   * Update the current user's editable profile fields.
+   */
+  async updateProfile(data: UpdateUserProfileData): Promise<AuthUser> {
+    try {
+      const response = await axiosClient.patch<{ data: BackendUser }>(
+        API_ENDPOINTS.USERS.ME,
+        data
+      );
+      if (!response.data?.data) {
+        throw new AppError('Phản hồi cập nhật hồ sơ không hợp lệ từ máy chủ.', 'API_ERROR', 500);
+      }
+
+      const authUser = mapBackendUserToAuthUser(response.data.data);
       await secureStorage.setObject<AuthUser>(STORAGE_KEYS.USER_SESSION, authUser);
       return authUser;
     } catch (error) {
