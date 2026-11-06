@@ -18,6 +18,9 @@ export interface CultivationTray {
   tray_id: number;
   room_id: number;
   floor_id?: number | null;
+  position_id?: number | null;
+  row_number?: number | null;
+  column_number?: number | null;
   tray_code: string;
   tray_name: string | null;
   status: 'AVAILABLE' | 'OCCUPIED' | 'MAINTENANCE' | 'INACTIVE';
@@ -98,5 +101,3 @@ export interface UpdateMushroomConditionRequest {
   humidityMin?: number | null;
   humidityMax?: number | null;
 }
-
-
