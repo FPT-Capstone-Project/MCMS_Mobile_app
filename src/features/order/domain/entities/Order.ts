@@ -15,6 +15,7 @@ export interface RentalPackage {
 export interface CreateRentalOrderRequest {
   packageId: number;
   mushroomTypeId: number;
+  quantity: number;
 }
 
 export interface OrderItem {
@@ -74,6 +75,19 @@ export interface BackendCustomerOrder {
     quantity?: number | string;
     unit_price?: number | string;
     total_price?: number | string;
+  }[];
+}
+
+export interface CustomerCultivationStatus {
+  orderId: number;
+  sessions: {
+    session_id: number;
+    status: string;
+    mushroom_name: string;
+    assigned_trays: {
+      tray_id: number;
+      status: string;
+    }[];
   }[];
 }
 

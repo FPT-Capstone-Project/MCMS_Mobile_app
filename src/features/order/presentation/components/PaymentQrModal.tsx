@@ -37,6 +37,7 @@ export const PaymentQrModal: React.FC<PaymentQrModalProps> = ({
   const [paymentData, setPaymentData] = useState<PayosPaymentData | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatusData['paymentStatus']>('PENDING');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [statusSyncError, setStatusSyncError] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [openingCheckout, setOpeningCheckout] = useState(false);
 
@@ -62,27 +63,21 @@ export const PaymentQrModal: React.FC<PaymentQrModalProps> = ({
     setPaymentData(null);
     setPaymentStatus('PENDING');
     setErrorMsg(null);
+    setStatusSyncError(null);
     setTimeLeft(null);
     onClose();
   };
 
-  // Immediate payment status check
-  const checkPaymentStatus = useCallback(async () => {
-    if (isCheckingRef.current || !orderId) return;
-    isCheckingRef.current = true;
-    try {
-      const statusRes = await orderRepository.getPaymentStatus(orderId);
-      if (!isMountedRef.current) return;
-
+  const applyPaymentStatus = useCallback(
+    (statusRes: PaymentStatusData) => {
+      setStatusSyncError(null);
       const isOrderPaid =
         statusRes.paymentStatus === 'PAID' || statusRes.orderStatus === 'CONFIRMED';
 
       if (isOrderPaid) {
         setPaymentStatus('PAID');
         stopTimers();
-        if (onPaymentSuccess) {
-          onPaymentSuccess();
-        }
+        onPaymentSuccess?.();
       } else if (
         statusRes.paymentStatus === 'CANCELLED' ||
         statusRes.paymentStatus === 'FAILED'
@@ -93,12 +88,43 @@ export const PaymentQrModal: React.FC<PaymentQrModalProps> = ({
         setPaymentStatus('EXPIRED');
         stopTimers();
       }
+    },
+    [onPaymentSuccess]
+  );
+
+  // Immediate payment status check
+  const checkPaymentStatus = useCallback(async () => {
+    if (isCheckingRef.current || !orderId) return;
+    isCheckingRef.current = true;
+    try {
+      const statusRes = await orderRepository.getPaymentStatus(orderId);
+      if (!isMountedRef.current) return;
+      applyPaymentStatus(statusRes);
     } catch {
       // Ignore background transient network hiccups
     } finally {
       isCheckingRef.current = false;
     }
-  }, [orderId, onPaymentSuccess]);
+  }, [applyPaymentStatus, orderId]);
+
+  const syncPaymentStatus = useCallback(async () => {
+    if (isCheckingRef.current || !orderId) return;
+    isCheckingRef.current = true;
+    try {
+      const statusRes = await orderRepository.syncPayosPayment(orderId);
+      if (!isMountedRef.current) return;
+      setStatusSyncError(null);
+      applyPaymentStatus(statusRes);
+    } catch (error: unknown) {
+      if (isMountedRef.current) {
+        const message =
+          error instanceof Error ? error.message : 'Không thể xác nhận trạng thái thanh toán.';
+        setStatusSyncError(`Chưa đồng bộ được thanh toán: ${message}`);
+      }
+    } finally {
+      isCheckingRef.current = false;
+    }
+  }, [applyPaymentStatus, orderId]);
 
   const [retryKey, setRetryKey] = useState<number>(0);
 
@@ -107,6 +133,7 @@ export const PaymentQrModal: React.FC<PaymentQrModalProps> = ({
     setErrorMsg(null);
     setPaymentStatus('PENDING');
     setPaymentData(null);
+    setStatusSyncError(null);
     setTimeLeft(null);
     setRetryKey((prev) => prev + 1);
   };
@@ -180,14 +207,14 @@ export const PaymentQrModal: React.FC<PaymentQrModalProps> = ({
 
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active' && paymentStatus === 'PENDING') {
-        checkPaymentStatus();
+        void syncPaymentStatus();
       }
     });
 
     return () => {
       subscription.remove();
     };
-  }, [visible, paymentStatus, checkPaymentStatus]);
+  }, [visible, paymentStatus, syncPaymentStatus]);
 
   // Handle open PayOS web checkout
   const handleOpenCheckoutUrl = async () => {
@@ -404,6 +431,11 @@ export const PaymentQrModal: React.FC<PaymentQrModalProps> = ({
                   Đang chờ bạn quét mã thanh toán...
                 </AppText>
               </View>
+              {statusSyncError ? (
+                <AppText variant="caption" color={theme.colors.error.main}>
+                  {statusSyncError}
+                </AppText>
+              ) : null}
 
               {/* Payment Details */}
               <View style={styles.detailsBox}>

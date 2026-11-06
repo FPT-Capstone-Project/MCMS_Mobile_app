@@ -6,6 +6,7 @@ import {
   CreateRentalOrderRequest,
   BackendCustomerOrder,
   CustomerOrder,
+  CustomerCultivationStatus,
   PaymentStatusData,
   PayosPaymentData,
   RentalPackage,
@@ -19,6 +20,15 @@ function toAmount(value: number | string | undefined, field: string): number | u
     throw new AppError(`Giá trị ${field} từ máy chủ không hợp lệ.`, 'API_ERROR', 500);
   }
   return amount;
+}
+
+function normalizeRentalPackage(rentalPackage: RentalPackage): RentalPackage {
+  const durationDays = Number(rentalPackage.duration_days);
+  const price = Number(rentalPackage.price);
+  if (!Number.isSafeInteger(durationDays) || durationDays <= 0 || !Number.isFinite(price) || price < 0) {
+    throw new AppError('Thông tin gói thuê từ máy chủ không hợp lệ.', 'API_ERROR', 500);
+  }
+  return { ...rentalPackage, duration_days: durationDays, price };
 }
 
 function mapOrderStatus(status: string): CustomerOrder['order_status'] {
@@ -90,10 +100,8 @@ export class OrderRepository {
         API_ENDPOINTS.RENTAL_PACKAGES.BASE,
         { params: status ? { status } : undefined }
       );
-      if (Array.isArray(response.data)) {
-        return response.data;
-      }
-      return (response.data as { data: RentalPackage[] })?.data || [];
+      const packages = Array.isArray(response.data) ? response.data : response.data.data;
+      return packages.map(normalizeRentalPackage);
     } catch (error) {
       throw error instanceof AppError ? error : handleApiError(error);
     }
@@ -107,10 +115,8 @@ export class OrderRepository {
       const response = await axiosClient.get<RentalPackage | { data: RentalPackage }>(
         API_ENDPOINTS.RENTAL_PACKAGES.DETAIL(id)
       );
-      if ('package_id' in response.data) {
-        return response.data as RentalPackage;
-      }
-      return (response.data as { data: RentalPackage }).data;
+      const rentalPackage = 'package_id' in response.data ? response.data : response.data.data;
+      return normalizeRentalPackage(rentalPackage);
     } catch (error) {
       throw error instanceof AppError ? error : handleApiError(error);
     }
@@ -122,10 +128,11 @@ export class OrderRepository {
   async createRentalOrder(data: CreateRentalOrderRequest): Promise<CustomerOrder> {
     try {
       const response = await axiosClient.post<{ data: BackendCustomerOrder }>(
-        API_ENDPOINTS.ORDERS.RENTALS,
+        API_ENDPOINTS.ORDERS.CULTIVATION,
         {
           packageId: data.packageId,
           mushroomTypeId: data.mushroomTypeId,
+          quantity: data.quantity,
         }
       );
       if (!response.data?.data) {
@@ -167,6 +174,23 @@ export class OrderRepository {
         throw new AppError('Chi tiết đơn hàng từ máy chủ không hợp lệ.', 'API_ERROR', 500);
       }
       return mapBackendOrder(response.data.data);
+    } catch (error) {
+      throw error instanceof AppError ? error : handleApiError(error);
+    }
+  }
+
+  /**
+   * Get cultivation sessions and assigned trays for an order owned by the customer
+   */
+  async getCustomerCultivationStatus(orderId: number): Promise<CustomerCultivationStatus> {
+    try {
+      const response = await axiosClient.get<{ data: CustomerCultivationStatus }>(
+        API_ENDPOINTS.CUSTOMER.CULTIVATION_STATUS(orderId)
+      );
+      if (!response.data?.data || !Array.isArray(response.data.data.sessions)) {
+        throw new AppError('Dữ liệu phiên nuôi trồng từ máy chủ không hợp lệ.', 'API_ERROR', 500);
+      }
+      return response.data.data;
     } catch (error) {
       throw error instanceof AppError ? error : handleApiError(error);
     }
@@ -219,6 +243,24 @@ export class OrderRepository {
       );
       if (!response.data?.data) {
         throw new AppError('Không lấy được trạng thái thanh toán.', 'PAYMENT_ERROR', 404);
+      }
+      return response.data.data;
+    } catch (error) {
+      throw error instanceof AppError ? error : handleApiError(error);
+    }
+  }
+
+  /**
+   * Synchronize PayOS after the customer returns from the payment provider
+   */
+  async syncPayosPayment(orderId: number): Promise<PaymentStatusData> {
+    try {
+      const response = await axiosClient.post<{
+        success: boolean;
+        data: PaymentStatusData;
+      }>(API_ENDPOINTS.PAYMENTS.SYNC(orderId));
+      if (!response.data?.data) {
+        throw new AppError('Không xác nhận được trạng thái thanh toán.', 'PAYMENT_ERROR', 404);
       }
       return response.data.data;
     } catch (error) {

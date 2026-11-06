@@ -60,13 +60,18 @@ export const API_ENDPOINTS = {
   ORDERS: {
     BASE: '/api/orders',
     DETAIL: (id: string | number) => `/api/orders/${id}`,
-    RENTALS: '/api/orders/rentals',
+    CULTIVATION: '/api/orders/cultivation',
     CANCEL: (orderId: string | number) => `/api/orders/${orderId}/cancel`,
+  },
+  CUSTOMER: {
+    CULTIVATION_STATUS: (orderId: string | number) =>
+      `/api/customer/orders/${orderId}/cultivation-status`,
   },
   // Payments (PayOS)
   PAYMENTS: {
     PAYOS: (orderId: string | number) => `/api/payments/orders/${orderId}/payos`,
     STATUS: (orderId: string | number) => `/api/payments/orders/${orderId}/status`,
+    SYNC: (orderId: string | number) => `/api/payments/orders/${orderId}/payos/sync`,
     /** @deprecated Use PAYOS instead */
     SEPAY_QR: (orderId: string | number) => `/api/payments/orders/${orderId}/payos`,
   },

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,6 +9,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { AppError } from '../../../../core/errors/appError';
 import { theme } from '../../../../core/theme';
 import { formatVND } from '../../../../core/utils/currency';
 import {
@@ -19,416 +20,474 @@ import {
   AppText,
   ScreenContainer,
 } from '../../../../shared/components';
-import {
-  cultivationRepository,
-  MushroomType,
-} from '../../../cultivation';
-import {
-  orderRepository,
-  PaymentQrModal,
-  RentalPackage,
-} from '../../../order';
+import { cultivationRepository, MushroomType } from '../../../cultivation';
+import { orderRepository, PaymentQrModal, RentalPackage } from '../../../order';
+
+type RentalStep = 1 | 2 | 3 | 4;
+
+const RENTAL_DURATIONS = [15, 20];
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof AppError) {
+    const availableQuantity = error.message.match(/Only\s+(\d+)/i)?.[1];
+    if (error.code === 'INSUFFICIENT_TRAYS') {
+      return availableQuantity
+        ? `Hiện chỉ còn ${availableQuantity} khay có thể đáp ứng. Vui lòng giảm số lượng khay.`
+        : 'Số khay trống hiện không đủ đáp ứng đơn hàng. Vui lòng giảm số lượng khay.';
+    }
+    if (error.code === 'INSUFFICIENT_SPAWN') {
+      return availableQuantity
+        ? `Hiện chỉ còn ${availableQuantity} đơn vị phôi nấm. Vui lòng giảm số lượng khay hoặc chọn giống nấm khác.`
+        : 'Số lượng phôi nấm hiện không đủ đáp ứng đơn hàng. Vui lòng chọn giống khác hoặc giảm số khay.';
+    }
+    return error.message;
+  }
+  return error instanceof Error ? error.message : 'Đã xảy ra lỗi. Vui lòng thử lại.';
+}
 
 export const RentalFlowScreen: React.FC = () => {
   const router = useRouter();
-
-  // Steps: 1 = Gói thuê, 2 = Giống nấm, 3 = Xác nhận
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-
-  // Real backend data
+  const [step, setStep] = useState<RentalStep>(1);
   const [packages, setPackages] = useState<RentalPackage[]>([]);
   const [mushrooms, setMushrooms] = useState<MushroomType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Selections
   const [selectedPackage, setSelectedPackage] = useState<RentalPackage | null>(null);
   const [selectedMushroom, setSelectedMushroom] = useState<MushroomType | null>(null);
+  const [trayQuantity, setTrayQuantity] = useState(1);
 
-  // Order submission & payment modal
   const [submitting, setSubmitting] = useState(false);
   const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
 
-  // Load real rental packages and mushroom types from backend
-  useEffect(() => {
-    async function loadData() {
-      try {
-        setLoading(true);
-        const [pkgData, mshData] = await Promise.all([
-          orderRepository.getRentalPackages('ACTIVE'),
-          cultivationRepository.getMushroomTypes('ACTIVE'),
-        ]);
-        setPackages(pkgData);
-        setMushrooms(mshData);
-      } catch (err: unknown) {
-        Alert.alert(
-          'Lỗi tải dữ liệu',
-          typeof err === 'string'
-            ? err
-            : err instanceof Error
-            ? err.message
-            : 'Không thể kết nối đến máy chủ.'
-        );
-      } finally {
-        setLoading(false);
-      }
+  const loadCatalog = useCallback(async () => {
+    try {
+      const [rentalPackages, mushroomTypes] = await Promise.all([
+        orderRepository.getRentalPackages('ACTIVE'),
+        cultivationRepository.getMushroomTypes('ACTIVE'),
+      ]);
+      setPackages(
+        rentalPackages.filter((rentalPackage) =>
+          RENTAL_DURATIONS.includes(rentalPackage.duration_days)
+        )
+      );
+      setMushrooms(mushroomTypes);
+    } catch (error: unknown) {
+      setLoadError(getErrorMessage(error));
+    } finally {
+      setLoading(false);
     }
-    loadData();
   }, []);
 
-  const handleSelectPackage = (pkg: RentalPackage) => {
-    setSelectedPackage(pkg);
-    // If selected mushroom growing days exceed the package duration, clear mushroom
-    if (selectedMushroom && selectedMushroom.growing_days > pkg.duration_days) {
-      setSelectedMushroom(null);
-    }
-    setStep(2);
+  useEffect(() => {
+    const request = setTimeout(() => {
+      void loadCatalog();
+    }, 0);
+    return () => clearTimeout(request);
+  }, [loadCatalog]);
+
+  const handleRetryCatalog = () => {
+    setLoadError(null);
+    setLoading(true);
+    void loadCatalog();
   };
 
-  const handleSelectMushroom = (mush: MushroomType) => {
-    if (selectedPackage && mush.growing_days > selectedPackage.duration_days) {
-      Alert.alert(
-        'Thời gian không phù hợp',
-        `Giống nấm "${mush.name}" cần ${mush.growing_days} ngày để sinh trưởng, vượt quá thời hạn gói thuê (${selectedPackage.duration_days} ngày). Vui lòng chọn gói thuê dài hơn hoặc giống nấm khác.`
-      );
+  const navigateBack = () => {
+    if (step > 1) {
+      setStep((currentStep) => (currentStep - 1) as RentalStep);
       return;
     }
-    setSelectedMushroom(mush);
-    setStep(3);
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)');
+  };
+
+  const handleSelectMushroom = (mushroom: MushroomType) => {
+    setSelectedMushroom(mushroom);
+    if (
+      selectedPackage &&
+      mushroom.growing_days > selectedPackage.duration_days
+    ) {
+      setSelectedPackage(null);
+    }
   };
 
   const handleCreateOrder = async () => {
     if (!selectedPackage || !selectedMushroom) return;
-
-    if (selectedMushroom.growing_days > selectedPackage.duration_days) {
-      Alert.alert(
-        'Thời gian không hợp lệ',
-        `Thời gian sinh trưởng của nấm (${selectedMushroom.growing_days} ngày) vượt quá gói thuê (${selectedPackage.duration_days} ngày).`
-      );
-      return;
-    }
 
     try {
       setSubmitting(true);
       const order = await orderRepository.createRentalOrder({
         packageId: selectedPackage.package_id,
         mushroomTypeId: selectedMushroom.mushroom_type_id,
+        quantity: trayQuantity,
       });
-
       setCreatedOrderId(order.order_id);
       setPaymentModalVisible(true);
-    } catch (err: unknown) {
-      Alert.alert(
-        'Tạo đơn không thành công',
-        typeof err === 'string'
-          ? err
-          : err instanceof Error
-          ? err.message
-          : 'Không thể tạo đơn hàng thuê khay. Vui lòng thử lại.'
-      );
+    } catch (error: unknown) {
+      Alert.alert('Không thể tạo đơn hàng', getErrorMessage(error));
     } finally {
       setSubmitting(false);
     }
   };
 
+  const totalAmount =
+    selectedPackage && selectedMushroom
+      ? (selectedPackage.price + selectedMushroom.price) * trayQuantity
+      : 0;
+
   if (loading) {
     return (
       <ScreenContainer edges={['top', 'left', 'right']}>
-        <AppHeader
-          title="Thuê khay nuôi trồng"
-          showBack
-          onBack={() => {
-            if (router.canGoBack()) router.back();
-            else router.replace('/(tabs)');
-          }}
-        />
-        <View style={styles.centerLoading}>
+        <AppHeader title="Thuê khay nuôi trồng" showBack onBack={navigateBack} />
+        <View style={styles.centerState}>
           <ActivityIndicator size="large" color={theme.colors.primary[500]} />
-          <AppText variant="bodySmall" color={theme.colors.text.secondary} style={styles.loadingText}>
-            Đang tải danh mục gói thuê & phôi nấm...
+          <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+            Đang tải danh sách nấm và gói dịch vụ...
           </AppText>
         </View>
       </ScreenContainer>
     );
   }
 
-  const totalAmount = (selectedPackage?.price || 0) + (selectedMushroom?.price || 0);
-
   return (
     <ScreenContainer scrollable edges={['left', 'right']}>
       <AppHeader
         title="Thuê khay nuôi trồng"
-        subtitle="Dịch vụ thông minh SmartMush"
+        subtitle="Dịch vụ trồng nấm tại SmartMush Farm"
         showBack
-        onBack={
-          step > 1
-            ? () => setStep((prev) => (prev - 1) as 1 | 2)
-            : () => {
-                if (router.canGoBack()) router.back();
-                else router.replace('/(tabs)');
-              }
-        }
+        onBack={navigateBack}
       />
 
       <View style={styles.content}>
-        {/* Step Indicator Header */}
-        <View style={styles.stepsBar}>
-          <Pressable onPress={() => setStep(1)} style={[styles.stepItem, step === 1 && styles.stepItemActive]}>
-            <View style={[styles.stepCircle, step >= 1 && styles.stepCircleActive]}>
-              <AppText variant="caption" color={step >= 1 ? '#FFFFFF' : theme.colors.text.muted}>
-                1
-              </AppText>
-            </View>
-            <AppText variant="caption" weight={step === 1 ? 'bold' : 'normal'} color={step === 1 ? theme.colors.primary[600] : theme.colors.text.secondary}>
-              Gói thuê
+        {loadError ? (
+          <AppCard elevation="sm" style={styles.stateCard}>
+            <Ionicons name="cloud-offline-outline" size={40} color={theme.colors.error.main} />
+            <AppText variant="title" weight="bold">
+              Không tải được danh mục
             </AppText>
-          </Pressable>
-
-          <View style={styles.stepConnector} />
-
-          <Pressable
-            onPress={() => selectedPackage && setStep(2)}
-            style={[styles.stepItem, step === 2 && styles.stepItemActive]}
-          >
-            <View style={[styles.stepCircle, step >= 2 && styles.stepCircleActive]}>
-              <AppText variant="caption" color={step >= 2 ? '#FFFFFF' : theme.colors.text.muted}>
-                2
-              </AppText>
-            </View>
-            <AppText variant="caption" weight={step === 2 ? 'bold' : 'normal'} color={step === 2 ? theme.colors.primary[600] : theme.colors.text.secondary}>
-              Loại nấm
-            </AppText>
-          </Pressable>
-
-          <View style={styles.stepConnector} />
-
-          <Pressable
-            onPress={() => selectedPackage && selectedMushroom && setStep(3)}
-            style={[styles.stepItem, step === 3 && styles.stepItemActive]}
-          >
-            <View style={[styles.stepCircle, step >= 3 && styles.stepCircleActive]}>
-              <AppText variant="caption" color={step >= 3 ? '#FFFFFF' : theme.colors.text.muted}>
-                3
-              </AppText>
-            </View>
-            <AppText variant="caption" weight={step === 3 ? 'bold' : 'normal'} color={step === 3 ? theme.colors.primary[600] : theme.colors.text.secondary}>
-              Xác nhận
-            </AppText>
-          </Pressable>
-        </View>
-
-        {/* ================= STEP 1: SELECT RENTAL PACKAGE ================= */}
-        {step === 1 && (
-          <View style={styles.section}>
-            <AppText variant="h3">Chọn gói thời gian thuê</AppText>
             <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-              Các gói thời hạn nuôi trồng tối ưu vi khí hậu trong buồng kín SmartMush.
+              {loadError}
             </AppText>
-
-            <View style={styles.grid}>
-              {packages.map((pkg) => {
-                const isSelected = selectedPackage?.package_id === pkg.package_id;
-                return (
-                  <Pressable key={pkg.package_id} onPress={() => handleSelectPackage(pkg)}>
-                    <AppCard
-                      elevation={isSelected ? 'md' : 'xs'}
-                      style={[styles.packageCard, isSelected && styles.cardSelected]}
-                    >
-                      <View style={styles.cardHeaderRow}>
-                        <View style={styles.iconCircle}>
-                          <Ionicons name="calendar-outline" size={24} color={theme.colors.primary[500]} />
-                        </View>
-                        <View style={styles.badgeDays}>
-                          <AppText variant="captionMedium" color={theme.colors.primary[700]} weight="bold">
-                            {pkg.duration_days} ngày
-                          </AppText>
-                        </View>
-                      </View>
-
-                      <AppText variant="title" weight="bold">
-                        {pkg.package_name}
-                      </AppText>
-
-                      {pkg.description ? (
-                        <AppText variant="bodySmall" color={theme.colors.text.secondary} numberOfLines={2}>
-                          {pkg.description}
-                        </AppText>
-                      ) : null}
-
-                      <AppDivider spacing="xs" />
-
-                      <View style={styles.priceRow}>
-                        <AppText variant="caption" color={theme.colors.text.muted}>
-                          Giá thuê:
-                        </AppText>
-                        <AppText variant="title" weight="bold" color={theme.colors.primary[600]}>
-                          {formatVND(pkg.price)}
-                        </AppText>
-                      </View>
-                    </AppCard>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-        )}
-
-        {/* ================= STEP 2: SELECT MUSHROOM TYPE ================= */}
-        {step === 2 && (
-          <View style={styles.section}>
-            <AppText variant="h3">Chọn loại phôi nấm</AppText>
-            <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-              Gói đã chọn: <AppText variant="label">{selectedPackage?.package_name} ({selectedPackage?.duration_days} ngày)</AppText>. Hãy chọn giống nấm có chu kỳ sinh trưởng phù hợp.
-            </AppText>
-
-            <View style={styles.grid}>
-              {mushrooms.map((mush) => {
-                const isSelected = selectedMushroom?.mushroom_type_id === mush.mushroom_type_id;
-                const exceeds = selectedPackage ? mush.growing_days > selectedPackage.duration_days : false;
-
-                return (
+            <AppButton title="Thử tải lại" onPress={handleRetryCatalog} />
+          </AppCard>
+        ) : (
+          <>
+            <View style={styles.stepsBar}>
+              {[
+                { number: 1 as const, label: 'Loại nấm' },
+                { number: 2 as const, label: 'Gói trồng' },
+                { number: 3 as const, label: 'Số khay' },
+                { number: 4 as const, label: 'Xác nhận' },
+              ].map((item, index) => (
+                <React.Fragment key={item.number}>
+                  {index > 0 ? <View style={styles.stepConnector} /> : null}
                   <Pressable
-                    key={mush.mushroom_type_id}
-                    onPress={() => !exceeds && handleSelectMushroom(mush)}
-                    disabled={exceeds}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: step === item.number }}
+                    disabled={item.number > step}
+                    onPress={() => setStep(item.number)}
+                    style={styles.stepItem}
                   >
-                    <AppCard
-                      elevation={isSelected ? 'md' : 'xs'}
+                    <View
                       style={[
-                        styles.mushroomCard,
-                        isSelected && styles.cardSelected,
-                        exceeds && styles.cardDisabled,
+                        styles.stepCircle,
+                        step >= item.number && styles.stepCircleActive,
                       ]}
                     >
-                      <View style={styles.mushHeaderRow}>
-                        {mush.image_url ? (
-                          <Image source={{ uri: mush.image_url }} style={styles.mushImage} />
-                        ) : (
-                          <View style={styles.iconCircle}>
-                            <Ionicons name="leaf" size={24} color={theme.colors.primary[500]} />
-                          </View>
-                        )}
-                        <View style={styles.mushInfo}>
-                          <AppText variant="title" weight="bold">
-                            {mush.name}
-                          </AppText>
-                          <AppText variant="caption" color={theme.colors.text.secondary}>
-                            Sinh trưởng: {mush.growing_days} ngày
-                          </AppText>
-                        </View>
-                      </View>
-
-                      {mush.description ? (
-                        <AppText variant="bodySmall" color={theme.colors.text.secondary} numberOfLines={2}>
-                          {mush.description}
-                        </AppText>
-                      ) : null}
-
-                      {exceeds ? (
-                        <View style={styles.exceedsWarning}>
-                          <Ionicons name="warning-outline" size={16} color={theme.colors.error.main} />
-                          <AppText variant="caption" color={theme.colors.error.main}>
-                            Cần {mush.growing_days} ngày &gt; gói {selectedPackage?.duration_days} ngày
-                          </AppText>
-                        </View>
-                      ) : null}
-
-                      <AppDivider spacing="xs" />
-
-                      <View style={styles.priceRow}>
-                        <AppText variant="caption" color={theme.colors.text.muted}>
-                          Giá phôi:
-                        </AppText>
-                        <AppText variant="title" weight="bold" color={theme.colors.primary[600]}>
-                          {formatVND(mush.price)}
-                        </AppText>
-                      </View>
-                    </AppCard>
+                      <AppText
+                        variant="caption"
+                        color={step >= item.number ? '#FFFFFF' : theme.colors.text.muted}
+                      >
+                        {item.number}
+                      </AppText>
+                    </View>
+                    <AppText
+                      variant="caption"
+                      weight={step === item.number ? 'bold' : 'normal'}
+                      color={
+                        step === item.number
+                          ? theme.colors.primary[600]
+                          : theme.colors.text.secondary
+                      }
+                    >
+                      {item.label}
+                    </AppText>
                   </Pressable>
-                );
-              })}
+                </React.Fragment>
+              ))}
             </View>
-          </View>
-        )}
 
-        {/* ================= STEP 3: CONFIRMATION & ORDER SUMMARY ================= */}
-        {step === 3 && selectedPackage && selectedMushroom && (
-          <View style={styles.section}>
-            <AppText variant="h3">Xác nhận thông tin thuê</AppText>
-            <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-              Kiểm tra chi tiết gói thuê & thanh toán trực tuyến qua PayOS VietQR.
-            </AppText>
-
-            <AppCard elevation="sm" style={styles.summaryCard}>
-              <AppText variant="label" color={theme.colors.text.muted}>
-                CHI TIẾT DỊCH VỤ
-              </AppText>
-
-              <View style={styles.summaryRow}>
-                <AppText variant="body">Gói thuê khay:</AppText>
-                <AppText variant="body" weight="bold">
-                  {selectedPackage.package_name} ({selectedPackage.duration_days} ngày)
-                </AppText>
+            {step === 1 ? (
+              <View style={styles.section}>
+                <View style={styles.sectionHeading}>
+                  <AppText variant="h3">Chọn loại nấm</AppText>
+                  <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+                    Chọn giống nấm bạn muốn trồng. Thời gian sinh trưởng cần phù hợp với gói.
+                  </AppText>
+                </View>
+                {mushrooms.length === 0 ? (
+                  <EmptyCatalog message="Hiện chưa có loại nấm nào đang mở dịch vụ." />
+                ) : (
+                  mushrooms.map((mushroom) => {
+                    const selected =
+                      selectedMushroom?.mushroom_type_id === mushroom.mushroom_type_id;
+                    return (
+                      <Pressable
+                        key={mushroom.mushroom_type_id}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}
+                        onPress={() => handleSelectMushroom(mushroom)}
+                      >
+                        <AppCard
+                          elevation={selected ? 'md' : 'xs'}
+                          style={[styles.selectionCard, selected && styles.cardSelected]}
+                        >
+                          <View style={styles.mushroomRow}>
+                            {mushroom.image_url ? (
+                              <Image source={{ uri: mushroom.image_url }} style={styles.mushroomImage} />
+                            ) : (
+                              <View style={styles.iconCircle}>
+                                <Ionicons name="leaf-outline" size={22} color={theme.colors.primary[600]} />
+                              </View>
+                            )}
+                            <View style={styles.flexContent}>
+                              <AppText variant="title" weight="bold">
+                                {mushroom.name}
+                              </AppText>
+                              <AppText variant="caption" color={theme.colors.text.secondary}>
+                                Sinh trưởng khoảng {mushroom.growing_days} ngày
+                              </AppText>
+                            </View>
+                            <Ionicons
+                              name={selected ? 'checkmark-circle' : 'ellipse-outline'}
+                              size={24}
+                              color={selected ? theme.colors.primary[600] : theme.colors.neutral[400]}
+                            />
+                          </View>
+                          {mushroom.description ? (
+                            <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+                              {mushroom.description}
+                            </AppText>
+                          ) : null}
+                          <AppDivider spacing="xs" />
+                          <View style={styles.priceRow}>
+                            <AppText variant="caption" color={theme.colors.text.muted}>
+                              Phôi nấm / khay
+                            </AppText>
+                            <AppText variant="title" weight="bold" color={theme.colors.primary[600]}>
+                              {formatVND(mushroom.price)}
+                            </AppText>
+                          </View>
+                        </AppCard>
+                      </Pressable>
+                    );
+                  })
+                )}
+                <AppButton
+                  title="Tiếp tục chọn gói"
+                  disabled={!selectedMushroom}
+                  onPress={() => selectedMushroom && setStep(2)}
+                />
               </View>
+            ) : null}
 
-              <View style={styles.summaryRow}>
-                <AppText variant="body">Đơn giá gói thuê:</AppText>
-                <AppText variant="body" weight="medium">
-                  {formatVND(selectedPackage.price)}
-                </AppText>
+            {step === 2 ? (
+              <View style={styles.section}>
+                <View style={styles.sectionHeading}>
+                  <AppText variant="h3">Chọn gói dịch vụ</AppText>
+                  <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+                    Chọn gói 15 hoặc 20 ngày phù hợp với giống {selectedMushroom?.name}.
+                  </AppText>
+                </View>
+                {packages.length === 0 ? (
+                  <EmptyCatalog message="Hiện chưa có gói dịch vụ 15 hoặc 20 ngày đang hoạt động." />
+                ) : (
+                  packages.map((rentalPackage) => {
+                    const incompatible =
+                      selectedMushroom !== null &&
+                      selectedMushroom.growing_days > rentalPackage.duration_days;
+                    const selected =
+                      selectedPackage?.package_id === rentalPackage.package_id;
+                    return (
+                      <Pressable
+                        key={rentalPackage.package_id}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected, disabled: incompatible }}
+                        disabled={incompatible}
+                        onPress={() => {
+                          setSelectedPackage(rentalPackage);
+                          setStep(3);
+                        }}
+                      >
+                        <AppCard
+                          elevation={selected ? 'md' : 'xs'}
+                          style={[
+                            styles.selectionCard,
+                            selected && styles.cardSelected,
+                            incompatible && styles.cardDisabled,
+                          ]}
+                        >
+                          <View style={styles.packageHeading}>
+                            <View style={styles.iconCircle}>
+                              <Ionicons
+                                name="calendar-outline"
+                                size={22}
+                                color={theme.colors.primary[600]}
+                              />
+                            </View>
+                            <View style={styles.flexContent}>
+                              <AppText variant="title" weight="bold">
+                                {rentalPackage.package_name}
+                              </AppText>
+                              <AppText variant="caption" color={theme.colors.text.secondary}>
+                                {rentalPackage.duration_days} ngày trồng
+                              </AppText>
+                            </View>
+                            <AppText variant="title" weight="bold" color={theme.colors.primary[600]}>
+                              {formatVND(rentalPackage.price)}
+                            </AppText>
+                          </View>
+                          {rentalPackage.description ? (
+                            <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+                              {rentalPackage.description}
+                            </AppText>
+                          ) : null}
+                          {incompatible ? (
+                            <AppText variant="caption" color={theme.colors.error.main}>
+                              Gói này ngắn hơn chu kỳ sinh trưởng của giống nấm đã chọn.
+                            </AppText>
+                          ) : null}
+                        </AppCard>
+                      </Pressable>
+                    );
+                  })
+                )}
               </View>
+            ) : null}
 
-              <AppDivider spacing="xs" />
-
-              <View style={styles.summaryRow}>
-                <AppText variant="body">Giống nấm:</AppText>
-                <AppText variant="body" weight="bold">
-                  {selectedMushroom.name} ({selectedMushroom.growing_days} ngày sinh trưởng)
-                </AppText>
+            {step === 3 && selectedPackage && selectedMushroom ? (
+              <View style={styles.section}>
+                <View style={styles.sectionHeading}>
+                  <AppText variant="h3">Chọn số lượng khay</AppText>
+                  <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+                    Mỗi khay cần 3 đơn vị phôi. Hệ thống sẽ kiểm tra khay và phôi còn đáp ứng trước khi giữ chỗ.
+                  </AppText>
+                </View>
+                <AppCard elevation="sm" style={styles.quantityCard}>
+                  <AppText variant="label" color={theme.colors.text.muted}>
+                    {selectedMushroom.name} · {selectedPackage.duration_days} ngày
+                  </AppText>
+                  <View style={styles.quantityRow}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Giảm số khay"
+                      accessibilityState={{ disabled: trayQuantity <= 1 }}
+                      disabled={trayQuantity <= 1}
+                      onPress={() => setTrayQuantity((quantity) => Math.max(1, quantity - 1))}
+                      style={[styles.quantityButton, trayQuantity <= 1 && styles.quantityButtonDisabled]}
+                    >
+                      <Ionicons name="remove" size={24} color={theme.colors.primary[700]} />
+                    </Pressable>
+                    <View style={styles.quantityValue}>
+                      <AppText variant="h2" weight="bold">
+                        {trayQuantity}
+                      </AppText>
+                      <AppText variant="caption" color={theme.colors.text.secondary}>
+                        khay
+                      </AppText>
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Tăng số khay"
+                      onPress={() => setTrayQuantity((quantity) => quantity + 1)}
+                      style={styles.quantityButton}
+                    >
+                      <Ionicons name="add" size={24} color={theme.colors.primary[700]} />
+                    </Pressable>
+                  </View>
+                  <AppDivider spacing="sm" />
+                  <View style={styles.priceRow}>
+                    <AppText variant="body">Tạm tính / khay</AppText>
+                    <AppText variant="body" weight="bold">
+                      {formatVND(selectedPackage.price + selectedMushroom.price)}
+                    </AppText>
+                  </View>
+                  <View style={styles.priceRow}>
+                    <AppText variant="body">Tổng cộng</AppText>
+                    <AppText variant="title" weight="bold" color={theme.colors.primary[600]}>
+                      {formatVND(totalAmount)}
+                    </AppText>
+                  </View>
+                </AppCard>
+                <AppButton title="Tiếp tục xác nhận" onPress={() => setStep(4)} />
               </View>
+            ) : null}
 
-              <View style={styles.summaryRow}>
-                <AppText variant="body">Đơn giá phôi nấm:</AppText>
-                <AppText variant="body" weight="medium">
-                  {formatVND(selectedMushroom.price)}
-                </AppText>
+            {step === 4 && selectedPackage && selectedMushroom ? (
+              <View style={styles.section}>
+                <View style={styles.sectionHeading}>
+                  <AppText variant="h3">Xác nhận đơn trồng nấm</AppText>
+                  <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+                    Kiểm tra đơn hàng trước khi hệ thống kiểm tra sức chứa và giữ khay tạm thời.
+                  </AppText>
+                </View>
+                <AppCard elevation="sm" style={styles.summaryCard}>
+                  <AppText variant="label" color={theme.colors.text.muted}>
+                    CHI TIẾT DỊCH VỤ
+                  </AppText>
+                  <SummaryRow label="Loại nấm" value={selectedMushroom.name} />
+                  <SummaryRow
+                    label="Gói dịch vụ"
+                    value={`${selectedPackage.package_name} (${selectedPackage.duration_days} ngày)`}
+                  />
+                  <SummaryRow label="Số lượng khay" value={`${trayQuantity} khay`} />
+                  <AppDivider spacing="xs" />
+                  <SummaryRow
+                    label={`Gói trồng (${trayQuantity} khay)`}
+                    value={formatVND(selectedPackage.price * trayQuantity)}
+                  />
+                  <SummaryRow
+                    label={`Phôi nấm (${trayQuantity} khay)`}
+                    value={formatVND(selectedMushroom.price * trayQuantity)}
+                  />
+                  <AppDivider spacing="xs" />
+                  <View style={styles.totalRow}>
+                    <AppText variant="title" weight="bold">
+                      Tổng thanh toán
+                    </AppText>
+                    <AppText variant="h2" weight="bold" color={theme.colors.primary[600]}>
+                      {formatVND(totalAmount)}
+                    </AppText>
+                  </View>
+                  <View style={styles.holdNotice}>
+                    <Ionicons
+                      name="time-outline"
+                      size={19}
+                      color={theme.colors.warning.dark}
+                    />
+                    <AppText variant="caption" color={theme.colors.text.secondary} style={styles.flexContent}>
+                      Khay và phôi sẽ được kiểm tra, giữ tạm 15 phút sau khi tạo đơn. Vui lòng hoàn tất thanh toán trong thời gian này.
+                    </AppText>
+                  </View>
+                  <AppButton
+                    title="Kiểm tra & tạo đơn"
+                    variant="primary"
+                    size="lg"
+                    loading={submitting}
+                    disabled={submitting}
+                    leftIcon={<Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" />}
+                    onPress={handleCreateOrder}
+                    style={styles.confirmButton}
+                  />
+                </AppCard>
               </View>
-
-              <AppDivider spacing="sm" />
-
-              <View style={styles.totalRow}>
-                <AppText variant="title" weight="bold">
-                  Tổng thanh toán:
-                </AppText>
-                <AppText variant="h2" weight="bold" color={theme.colors.primary[600]}>
-                  {formatVND(totalAmount)}
-                </AppText>
-              </View>
-
-              <View style={styles.securityNote}>
-                <Ionicons name="shield-checkmark-outline" size={18} color={theme.colors.success.main} />
-                <AppText variant="caption" color={theme.colors.text.secondary} style={styles.securityText}>
-                  Tự động điều phối vi khí hậu IoT và liên kết thanh toán PayOS VietQR ngay sau khi tạo đơn.
-                </AppText>
-              </View>
-
-              <AppButton
-                title="Tạo đơn & Thanh toán ngay"
-                variant="primary"
-                size="lg"
-                loading={submitting}
-                disabled={submitting}
-                leftIcon={<Ionicons name="qr-code-outline" size={20} color="#FFFFFF" />}
-                onPress={handleCreateOrder}
-                style={styles.confirmBtn}
-              />
-            </AppCard>
-          </View>
+            ) : null}
+          </>
         )}
       </View>
 
-      {/* PayOS Payment Modal */}
-      {createdOrderId && (
+      {createdOrderId ? (
         <PaymentQrModal
           visible={paymentModalVisible}
           orderId={createdOrderId}
@@ -438,7 +497,7 @@ export const RentalFlowScreen: React.FC = () => {
           }}
           onPaymentSuccess={() => {
             setPaymentModalVisible(false);
-            Alert.alert('Thành công', 'Thanh toán thành công! Đơn hàng của bạn đã được ghi nhận.', [
+            Alert.alert('Thành công', 'Thanh toán thành công! Đơn hàng đã được xác nhận.', [
               {
                 text: 'Xem đơn hàng',
                 onPress: () => router.replace('/(tabs)/orders' as any),
@@ -446,10 +505,30 @@ export const RentalFlowScreen: React.FC = () => {
             ]);
           }}
         />
-      )}
+      ) : null}
     </ScreenContainer>
   );
 };
+
+const EmptyCatalog: React.FC<{ message: string }> = ({ message }) => (
+  <AppCard elevation="xs" style={styles.emptyCard}>
+    <Ionicons name="information-circle-outline" size={24} color={theme.colors.text.muted} />
+    <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+      {message}
+    </AppText>
+  </AppCard>
+);
+
+const SummaryRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <View style={styles.summaryRow}>
+    <AppText variant="body" color={theme.colors.text.secondary}>
+      {label}
+    </AppText>
+    <AppText variant="body" weight="medium" style={styles.summaryValue}>
+      {value}
+    </AppText>
+  </View>
+);
 
 const styles = StyleSheet.create({
   content: {
@@ -458,14 +537,17 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing['2xl'],
     gap: theme.spacing.md,
   },
-  centerLoading: {
+  centerState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: theme.spacing['2xl'],
+    padding: theme.spacing['2xl'],
+    gap: theme.spacing.sm,
   },
-  loadingText: {
-    marginTop: theme.spacing.sm,
+  stateCard: {
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    padding: theme.spacing.lg,
   },
   stepsBar: {
     flexDirection: 'row',
@@ -479,7 +561,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  stepItemActive: {},
   stepCircle: {
     width: 28,
     height: 28,
@@ -500,14 +581,14 @@ const styles = StyleSheet.create({
   section: {
     gap: theme.spacing.md,
   },
-  grid: {
-    gap: theme.spacing.md,
+  sectionHeading: {
+    gap: theme.spacing.xs,
   },
-  packageCard: {
+  selectionCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.md,
-    gap: theme.spacing.xs,
+    gap: theme.spacing.sm,
     borderWidth: 2,
     borderColor: 'transparent',
   },
@@ -516,13 +597,20 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary[50],
   },
   cardDisabled: {
-    opacity: 0.5,
-    backgroundColor: theme.colors.neutral[100],
+    opacity: 0.55,
   },
-  cardHeaderRow: {
+  mushroomRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  mushroomImage: {
+    width: 48,
+    height: 48,
+    borderRadius: theme.borderRadius.md,
+  },
+  flexContent: {
+    flex: 1,
   },
   iconCircle: {
     width: 44,
@@ -532,73 +620,81 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  badgeDays: {
-    backgroundColor: theme.colors.primary[50],
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 4,
-    borderRadius: theme.borderRadius.full,
-  },
   priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: theme.spacing.sm,
   },
-  mushroomCard: {
+  packageHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  quantityCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.md,
-    gap: theme.spacing.xs,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  mushHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    padding: theme.spacing.lg,
     gap: theme.spacing.md,
   },
-  mushImage: {
-    width: 50,
-    height: 50,
-    borderRadius: theme.borderRadius.md,
-  },
-  mushInfo: {
-    flex: 1,
-  },
-  exceedsWarning: {
+  quantityRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
+    justifyContent: 'center',
+    gap: theme.spacing['2xl'],
+  },
+  quantityButton: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.primary[50],
+  },
+  quantityButtonDisabled: {
+    opacity: 0.4,
+  },
+  quantityValue: {
+    minWidth: 64,
+    alignItems: 'center',
   },
   summaryCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.lg,
-    gap: theme.spacing.sm,
+    gap: theme.spacing.md,
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: theme.spacing.md,
+  },
+  summaryValue: {
+    flex: 1,
+    textAlign: 'right',
   },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: theme.spacing.sm,
   },
-  securityNote: {
+  holdNotice: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    alignItems: 'flex-start',
+    backgroundColor: theme.colors.warning.light,
     padding: theme.spacing.sm,
     borderRadius: theme.borderRadius.md,
     gap: theme.spacing.xs,
-    marginVertical: theme.spacing.xs,
   },
-  securityText: {
-    flex: 1,
+  confirmButton: {
+    marginTop: theme.spacing.xs,
   },
-  confirmBtn: {
-    marginTop: theme.spacing.sm,
+  emptyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    padding: theme.spacing.md,
   },
 });

@@ -38,3 +38,19 @@ export interface TrayRackTier {
   title: string;
   trays: Tray[];
 }
+
+export type CustomerTrayUsage = 'MY_CULTIVATION' | 'OTHER_CULTIVATION' | 'AVAILABLE';
+
+export interface CustomerTrayCard {
+  id: number;
+  code: string;
+  usage: CustomerTrayUsage;
+  mushroomName?: string;
+}
+
+export interface CustomerFloorRack {
+  id: number;
+  floorNumber: number;
+  floorName: string;
+  trays: CustomerTrayCard[];
+}
