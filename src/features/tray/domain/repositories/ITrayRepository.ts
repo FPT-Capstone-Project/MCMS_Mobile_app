@@ -1,4 +1,4 @@
-import { Tray, TrayId } from '../entities/Tray';
+import { CustomerTrayDetails, Tray, TrayId } from '../entities/Tray';
 
 /**
  * Tray Repository Interface (Domain Boundary)
@@ -18,4 +18,9 @@ export interface ITrayRepository {
    * Retrieves the current user's rented tray(s)
    */
   getMyRentedTrays(): Promise<Tray[]>;
+
+  /**
+   * Retrieves cultivation progress and device command history for an owned session
+   */
+  getCustomerCultivationDetails(sessionId: number): Promise<CustomerTrayDetails>;
 }

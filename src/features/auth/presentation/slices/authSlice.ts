@@ -11,6 +11,7 @@ import {
   LoginCredentials,
   RegisterOtpData,
   ResetPasswordData,
+  UpdateUserProfileData,
   VerifyRegistrationOtpData,
 } from '../../domain/entities/AuthUser';
 import { authRepository } from '../../data/repositories/AuthRepository';
@@ -163,6 +164,19 @@ export const changePasswordOtpUser = createAsyncThunk<
   }
 });
 
+export const updateUserProfile = createAsyncThunk<
+  AuthUser,
+  UpdateUserProfileData,
+  { rejectValue: string }
+>('auth/updateUserProfile', async (data, { rejectWithValue }) => {
+  try {
+    return await authRepository.updateProfile(data);
+  } catch (error) {
+    const msg = error instanceof AppError ? error.message : 'Không thể cập nhật hồ sơ.';
+    return rejectWithValue(msg);
+  }
+});
+
 /**
  * Async Thunk: Log out user and purge cache
  */
@@ -295,6 +309,10 @@ export const authSlice = createSlice({
       state.status = 'unauthenticated';
       state.user = null;
       state.tokens = null;
+    });
+
+    builder.addCase(updateUserProfile.fulfilled, (state, action) => {
+      state.user = action.payload;
     });
   },
 });

@@ -166,15 +166,6 @@ const customerActions: QuickActionItem[] = [
     iconBg: 'rgba(139, 92, 246, 0.1)',
     route: '/(tabs)/notifications',
   },
-  {
-    id: 'camera',
-    title: 'Camera trực tiếp',
-    desc: 'Theo dõi hình ảnh buồng nuôi',
-    icon: 'videocam-outline',
-    iconColor: '#0EA5E9',
-    iconBg: 'rgba(14, 165, 233, 0.1)',
-    route: `/camera/${ENV.cameraId || '0'}`,
-  },
 ];
 
 /**
@@ -382,20 +373,18 @@ export default function HomeScreen() {
               <View style={styles.ctaBadge}>
                 <Ionicons name="sparkles" size={16} color="#FFFFFF" />
                 <AppText variant="overline" color="#FFFFFF">
-                  Dịch vụ thông minh
+                  Trang trại nấm thông minh
                 </AppText>
               </View>
-              <AppText variant="caption" color="rgba(255, 255, 255, 0.8)">
-                Buồng kín IoT chuẩn vi khí hậu
-              </AppText>
+              
             </View>
 
             <View style={styles.ctaContent}>
               <AppText variant="h2" weight="bold" color="#FFFFFF">
-                Thuê khay nuôi trồng nấm
+                Nuôi trồng chuẩn xác, theo dõi từng khay.
               </AppText>
               <AppText variant="bodySmall" color="rgba(255, 255, 255, 0.9)" style={styles.ctaSubtitle}>
-                Tự động điều phối vi khí hậu, phun sương giữ ẩm chính xác và thanh toán tức thì qua PayOS VietQR.
+                Nền tảng giám sát IoT chuyên sâu: tự động hoá vi khí hậu buồng nuôi, quản lý giống nấm và gói thuê khay trong một hệ thống duy nhất.
               </AppText>
             </View>
 
