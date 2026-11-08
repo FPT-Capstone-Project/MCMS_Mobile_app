@@ -4,7 +4,7 @@
     "slug": "MCMS_Mobile_App",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/mcms-mark.png",
     "scheme": "mcms",
     "userInterfaceStyle": "light",
     "ios": {
@@ -12,15 +12,13 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#147C3E",
+        "foregroundImage": "./assets/mcms-mark.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/mcms-mark.png"
     },
     "plugins": [
       "expo-secure-store",
@@ -32,7 +30,16 @@
       ],
       "expo-font",
       "expo-video",
-      "expo-asset"
+      "expo-asset",
+      "expo-image",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFFFFF",
+          "image": "./assets/mcms-mark.png",
+          "imageWidth": 120
+        }
+      ]
     ]
   }
 }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, View, ViewStyle } from 'react-native';
 import { theme } from '../../../core/theme';
+import { AppLogo } from '../primitives/AppLogo';
 import { AppText } from '../primitives/AppText';
 
 export interface AppLoadingProps {
@@ -20,6 +21,7 @@ export const AppLoading: React.FC<AppLoadingProps> = ({
 }) => {
   return (
     <View style={[styles.container, fullscreen && styles.fullscreen, style]}>
+      <AppLogo size={64} />
       <ActivityIndicator size={size} color={color} />
       {message ? (
         <AppText
@@ -39,13 +41,13 @@ const styles = StyleSheet.create({
     padding: theme.spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: theme.spacing.md,
   },
   fullscreen: {
     flex: 1,
     backgroundColor: theme.colors.background.default,
   },
   message: {
-    marginTop: theme.spacing.md,
     textAlign: 'center',
   },
 });

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -38,6 +38,7 @@ function getErrorMessage(error: unknown, fallback = 'Không thể tải sơ đ�
 }
 
 function formatDateTime(value: string): string {
+  if (!value) return 'Không rõ thời gian';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('vi-VN');
 }
@@ -52,6 +53,42 @@ function getGrowthStageLabel(stage: string): string {
   return labels[stage] ?? stage.replace(/_/g, ' ');
 }
 
+function getAverageSensorReadings(readings: CustomerTrayDetails['sensor_readings']) {
+  const latestBySensor = new Map<string, CustomerTrayDetails['sensor_readings'][number]>();
+  const newestFirst = [...readings].sort((left, right) => {
+    const leftTime = Date.parse(left.receivedAt ?? left.measuredAt ?? '');
+    const rightTime = Date.parse(right.receivedAt ?? right.measuredAt ?? '');
+    return (Number.isFinite(rightTime) ? rightTime : 0) -
+      (Number.isFinite(leftTime) ? leftTime : 0);
+  });
+
+  for (const reading of newestFirst) {
+    const sensorKey = `${reading.floorId ?? reading.floorName}:${reading.sensorId}`;
+    if (!latestBySensor.has(sensorKey) && latestBySensor.size < 3) {
+      latestBySensor.set(sensorKey, reading);
+    }
+  }
+
+  const latestReadings = [...latestBySensor.values()].filter((reading) => reading.ok);
+  const temperatures = latestReadings
+    .map((reading) => reading.temperature)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+  const humidities = latestReadings
+    .map((reading) => reading.humidity)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+
+  return {
+    temperature:
+      temperatures.length > 0
+        ? temperatures.reduce((total, value) => total + value, 0) / temperatures.length
+        : null,
+    humidity:
+      humidities.length > 0
+        ? humidities.reduce((total, value) => total + value, 0) / humidities.length
+        : null,
+  };
+}
+
 export default function TrayScreen() {
   const router = useRouter();
   const [racks, setRacks] = useState<CustomerFloorRack[]>([]);
@@ -62,6 +99,7 @@ export default function TrayScreen() {
   const [details, setDetails] = useState<CustomerTrayDetails | null>(null);
   const [detailLoadState, setDetailLoadState] = useState<DetailLoadState>('loading');
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [sensorRefreshError, setSensorRefreshError] = useState<string | null>(null);
   const detailRequestId = useRef(0);
 
   const loadRacks = useCallback(async () => {
@@ -104,9 +142,16 @@ export default function TrayScreen() {
       if (!tray.sessionId) {
         throw new AppError('Không tìm thấy vụ trồng của khay này.', 'NOT_FOUND', 404);
       }
-      const result = await trayRepository.getCustomerCultivationDetails(tray.sessionId);
+      if (!tray.orderId) {
+        throw new AppError('Không tìm thấy đơn hàng của vụ trồng này.', 'NOT_FOUND', 404);
+      }
+      const result = await trayRepository.getCustomerCultivationDetails(
+        tray.sessionId,
+        tray.orderId
+      );
       if (requestId !== detailRequestId.current) return;
       setDetails(result);
+      setSensorRefreshError(null);
       setDetailLoadState('ready');
     } catch (error: unknown) {
       if (requestId !== detailRequestId.current) return;
@@ -114,6 +159,39 @@ export default function TrayScreen() {
       setDetailLoadState('error');
     }
   };
+
+  const refreshSensorHistory = useCallback(async (sessionId: number, requestId: number) => {
+    try {
+      const readings = await trayRepository.getCustomerSensorHistory(sessionId);
+      if (requestId !== detailRequestId.current) return;
+      setDetails((current) =>
+        current?.session_id === sessionId ? { ...current, sensor_readings: readings } : current
+      );
+      setSensorRefreshError(null);
+    } catch (error: unknown) {
+      if (requestId !== detailRequestId.current) return;
+      setSensorRefreshError(getErrorMessage(error, 'Không thể làm mới dữ liệu cảm biến.'));
+    }
+  }, []);
+
+  useEffect(() => {
+    const sessionId = selectedTray?.sessionId;
+    if (
+      !sessionId ||
+      detailTab !== 'devices' ||
+      detailLoadState !== 'ready' ||
+      details?.session_id !== sessionId
+    ) {
+      return;
+    }
+
+    const requestId = detailRequestId.current;
+    void refreshSensorHistory(sessionId, requestId);
+    const intervalId = setInterval(() => {
+      void refreshSensorHistory(sessionId, requestId);
+    }, 15_000);
+    return () => clearInterval(intervalId);
+  }, [selectedTray, detailTab, detailLoadState, details?.session_id, refreshSensorHistory]);
 
   const handleCloseDetails = () => {
     detailRequestId.current += 1;
@@ -171,48 +249,48 @@ export default function TrayScreen() {
 
         {loadState === 'ready'
           ? racks.map((rack) => (
-              <View key={rack.id} style={styles.floorSection}>
-                <View style={styles.floorHeading}>
-                  <AppText variant="title" weight="bold" style={styles.floorTitle}>
-                    Tầng {rack.floorNumber}
-                  </AppText>
-                  {getCameraIdForFloor(rack.floorNumber) ? (
-                    <AppButton
-                      title="Xem camera"
-                      variant="outline"
-                      size="sm"
-                      leftIcon={
-                        <Ionicons
-                          name="videocam-outline"
-                          size={16}
-                          color={theme.colors.primary[500]}
-                        />
-                      }
-                      accessibilityLabel={`Xem camera tầng ${rack.floorNumber}`}
-                      onPress={() => {
-                        const cameraId = getCameraIdForFloor(rack.floorNumber);
-                        if (cameraId) handleViewCamera(cameraId);
-                      }}
-                    />
-                  ) : null}
-                </View>
-                {rack.trays.length > 0 ? (
-                  <View style={styles.trayGrid}>
-                    {rack.trays.map((tray) => (
-                      <TrayTile
-                        key={tray.id}
-                        tray={tray}
-                        onViewDetails={handleViewDetails}
+            <View key={rack.id} style={styles.floorSection}>
+              <View style={styles.floorHeading}>
+                <AppText variant="title" weight="bold" style={styles.floorTitle}>
+                  Tầng {rack.floorNumber}
+                </AppText>
+                {getCameraIdForFloor(rack.floorNumber) ? (
+                  <AppButton
+                    title="Xem camera"
+                    variant="outline"
+                    size="sm"
+                    leftIcon={
+                      <Ionicons
+                        name="videocam-outline"
+                        size={16}
+                        color={theme.colors.primary[500]}
                       />
-                    ))}
-                  </View>
-                ) : (
-                  <AppText variant="caption" color={theme.colors.text.secondary}>
-                    Tầng này chưa có khay.
-                  </AppText>
-                )}
+                    }
+                    accessibilityLabel={`Xem camera tầng ${rack.floorNumber}`}
+                    onPress={() => {
+                      const cameraId = getCameraIdForFloor(rack.floorNumber);
+                      if (cameraId) handleViewCamera(cameraId);
+                    }}
+                  />
+                ) : null}
               </View>
-            ))
+              {rack.trays.length > 0 ? (
+                <View style={styles.trayGrid}>
+                  {rack.trays.map((tray) => (
+                    <TrayTile
+                      key={tray.id}
+                      tray={tray}
+                      onViewDetails={handleViewDetails}
+                    />
+                  ))}
+                </View>
+              ) : (
+                <AppText variant="caption" color={theme.colors.text.secondary}>
+                  Tầng này chưa có khay.
+                </AppText>
+              )}
+            </View>
+          ))
           : null}
       </View>
 
@@ -278,11 +356,13 @@ export default function TrayScreen() {
                 showsVerticalScrollIndicator={false}
               >
                 {detailTab === 'growth' ? (
-                  <GrowthHistory
-                    history={details?.growth_history ?? []}
-                  />
+                  <GrowthHistory history={details?.growth_history ?? []} />
                 ) : (
-                  <DeviceHistory logs={details?.device_logs ?? []} />
+                  <DeviceHistory
+                    logs={details?.device_logs ?? []}
+                    readings={details?.sensor_readings ?? []}
+                    refreshError={sensorRefreshError}
+                  />
                 )}
               </ScrollView>
             )}
@@ -315,24 +395,24 @@ const TrayTile: React.FC<TrayTileProps> = ({ tray, onViewDetails }) => {
   const palette =
     tray.usage === 'MY_CULTIVATION'
       ? {
-          background: '#E8F5EC',
-          border: '#168A4A',
-          text: '#08743A',
-          accent: '#16A34A',
-        }
+        background: '#E8F5EC',
+        border: '#168A4A',
+        text: '#08743A',
+        accent: '#16A34A',
+      }
       : tray.usage === 'OTHER_CULTIVATION'
         ? {
-            background: '#EAF2FB',
-            border: '#2F70B7',
-            text: '#275E99',
-            accent: '#3478C5',
-          }
+          background: '#EAF2FB',
+          border: '#2F70B7',
+          text: '#275E99',
+          accent: '#3478C5',
+        }
         : {
-            background: '#F1F4F8',
-            border: '#94A3B8',
-            text: '#64748B',
-            accent: '#FFFFFF',
-          };
+          background: '#F1F4F8',
+          border: '#94A3B8',
+          text: '#64748B',
+          accent: '#FFFFFF',
+        };
 
   return (
     <View
@@ -341,13 +421,12 @@ const TrayTile: React.FC<TrayTileProps> = ({ tray, onViewDetails }) => {
         { backgroundColor: palette.background, borderColor: palette.border },
         !isInUse && styles.unusedTile,
       ]}
-      accessibilityLabel={`${tray.code}, ${
-        isMine
+      accessibilityLabel={`${tray.code}, ${isMine
           ? `khay của tôi, đang trồng ${tray.mushroomName ?? 'nấm'}`
           : tray.usage === 'OTHER_CULTIVATION'
             ? `đang trồng ${tray.mushroomName ?? 'nấm'}`
             : 'chưa sử dụng'
-      }`}
+        }`}
     >
       <View style={styles.tileHeading}>
         <AppText
@@ -466,45 +545,77 @@ const GrowthHistory: React.FC<{ history: CustomerGrowthHistoryItem[] }> = ({ his
   );
 };
 
-const DeviceHistory: React.FC<{ logs: CustomerDeviceLogItem[] }> = ({ logs }) => {
-  if (logs.length === 0) {
-    return <DetailEmptyState message="Chưa có nhật ký bật/tắt thiết bị trong vụ trồng này." />;
-  }
+const DeviceHistory: React.FC<{
+  logs: CustomerDeviceLogItem[];
+  readings: CustomerTrayDetails['sensor_readings'];
+  refreshError: string | null;
+}> = ({ logs, readings, refreshError }) => {
+  const averages = getAverageSensorReadings(readings);
 
   return (
     <View style={styles.historyList}>
-      {logs.map((log) => (
-        <View key={log.command_id} style={styles.historyCard}>
-          <View style={styles.historyHeading}>
-            <View style={styles.deviceAction}>
-              <Ionicons
-                name={log.action === 'ON' ? 'power' : 'power-outline'}
-                size={17}
-                color={log.action === 'ON' ? theme.colors.success.main : theme.colors.text.secondary}
-              />
-              <AppText variant="bodyMedium" weight="bold">
-                {log.action === 'ON' ? 'Lệnh bật' : 'Lệnh tắt'}
+      <View style={styles.sensorSection}>
+        {refreshError ? (
+          <AppText variant="caption" color={theme.colors.error.main}>
+            Không thể cập nhật cảm biến: {refreshError}
+          </AppText>
+        ) : null}
+        <View style={styles.sensorSummary}>
+          <View style={styles.sensorMetricRow}>
+            <Ionicons name="thermometer-outline" size={30} color="#F5A623" />
+            <View style={styles.sensorMetricText}>
+              <AppText variant="bodySmall" color="#286257">
+                Nhiệt độ
+              </AppText>
+              <AppText variant="bodyMedium" weight="bold" color="#286257">
+                {averages.temperature === null ? '--' : `${averages.temperature.toFixed(1)}°C`}
               </AppText>
             </View>
-            <AppText variant="captionMedium" weight="bold">
-              {log.control_mode === 'AUTOMATIC' ? 'Tự động' : 'Thủ công'}
+          </View>
+          <View style={styles.sensorMetricDivider} />
+          <View style={styles.sensorMetricRow}>
+            <Ionicons name="water-outline" size={30} color="#78C7BF" />
+            <View style={styles.sensorMetricText}>
+              <AppText variant="bodySmall" color="#286257">
+                Độ ẩm
+              </AppText>
+              <AppText variant="bodyMedium" weight="bold" color="#286257">
+                {averages.humidity === null ? '--' : `${averages.humidity.toFixed(0)}%`}
+              </AppText>
+            </View>
+          </View>
+        </View>
+      </View>
+      <AppText variant="bodyMedium" weight="bold">
+        Nhật ký bật/tắt thiết bị
+      </AppText>
+      {logs.length === 0 ? (
+        <AppText variant="caption" color={theme.colors.text.secondary}>
+          Chưa có lệnh bật/tắt thiết bị.
+        </AppText>
+      ) : null}
+      {logs.map((log) => (
+        <View key={log.commandId} style={styles.historyCard}>
+          <View style={styles.deviceAction}>
+            <Ionicons
+              name={log.action === 'ON' ? 'power' : 'power-outline'}
+              size={17}
+              color={log.action === 'ON' ? theme.colors.success.main : theme.colors.text.secondary}
+            />
+            <AppText variant="bodyMedium" weight="bold">
+              {log.action === 'ON' ? 'Bật' : 'Tắt'}{' '}
+              {log.floors.length > 0
+                ? log.floors
+                  .map(
+                    (floor) =>
+                      `${floor.deviceType === 'MISTING' ? 'phun sương' : 'đèn'} · ${floor.floorName}`
+                  )
+                  .join(', ')
+                : 'thiết bị'}
             </AppText>
           </View>
-          <AppText variant="caption" color={theme.colors.text.secondary}>
-            {log.floor_name} • {log.control_mode === 'MANUAL' ? 'Thủ công' : log.reason}
-          </AppText>
           <AppText variant="caption" color={theme.colors.text.muted}>
-            {formatDateTime(log.published_at ?? log.requested_at)}
-          </AppText>
-          <AppText variant="caption" color={theme.colors.text.muted}>
-            {log.command_status === 'PUBLISHED'
-              ? 'Đã gửi lệnh'
-              : log.command_status === 'PENDING'
-                ? 'Đang xử lý'
-                : log.command_status === 'TIMED_OUT'
-                  ? 'Quá thời gian chờ'
-                  : 'Gửi lệnh thất bại'}
-            {log.error_message ? ` • ${log.error_message}` : ''}
+            {formatDateTime(log.requestedAt)}
           </AppText>
         </View>
       ))}
@@ -704,6 +815,30 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: theme.spacing.sm,
+  },
+  sensorSection: {
+    gap: theme.spacing.sm,
+  },
+  sensorSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: theme.spacing.md,
+  },
+  sensorMetricRow: {
+    flex: 1,
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  sensorMetricText: {
+    gap: theme.spacing.xxs,
+  },
+  sensorMetricDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 48,
+    backgroundColor: '#E5ECEA',
   },
   historyTitle: {
     flex: 1,

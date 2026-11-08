@@ -22,5 +22,10 @@ export interface ITrayRepository {
   /**
    * Retrieves cultivation progress and device command history for an owned session
    */
-  getCustomerCultivationDetails(sessionId: number): Promise<CustomerTrayDetails>;
+  getCustomerCultivationDetails(sessionId: number, orderId: number): Promise<CustomerTrayDetails>;
+
+  /**
+   * Retrieves recent sensor readings for an owned cultivation session.
+   */
+  getCustomerSensorHistory(sessionId: number): Promise<CustomerTrayDetails['sensor_readings']>;
 }
