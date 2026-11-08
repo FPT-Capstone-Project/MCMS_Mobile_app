@@ -51,31 +51,51 @@ export interface CustomerTrayCard {
 }
 
 export interface CustomerGrowthHistoryItem {
-  progress_id: number;
-  session_id: number;
+  progress_id: number | string;
+  session_id: number | string;
   current_stage: string;
   progress_percent: number;
-  condition: string | null;
+  condition?: string | null;
   description: string | null;
   updated_at: string;
 }
 
 export interface CustomerDeviceLogItem {
-  command_id: string;
-  action: 'ON' | 'OFF';
-  command_status: 'PENDING' | 'PUBLISHED' | 'FAILED' | 'TIMED_OUT';
-  control_mode: 'AUTOMATIC' | 'MANUAL';
+  commandId: number | string;
+  channel: number;
+  action: string;
+  status: string;
+  controlMode: 'AUTOMATIC' | 'MANUAL';
   reason: string;
-  floor_name: string;
-  requested_at: string;
-  published_at: string | null;
-  error_message: string | null;
+  requestedAt: string;
+  publishedAt: string | null;
+  completedAt: string | null;
+  errorMessage: string | null;
+  floors: {
+    floorId: number;
+    floorName: string;
+    deviceType: string;
+  }[];
+}
+
+export interface CustomerSensorReading {
+  id: number | string;
+  temperature: number | string | null;
+  humidity: number | string | null;
+  ok: boolean;
+  receivedAt: string | null;
+  measuredAt: string | null;
+  retained: boolean;
+  floorName: string;
+  floorId?: number;
+  sensorId: number | string;
 }
 
 export interface CustomerTrayDetails {
   session_id: number;
   growth_history: CustomerGrowthHistoryItem[];
   device_logs: CustomerDeviceLogItem[];
+  sensor_readings: CustomerSensorReading[];
 }
 
 export interface CustomerFloorRack {

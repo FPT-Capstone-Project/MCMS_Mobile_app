@@ -5,6 +5,7 @@ import { StyleSheet, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../../core/theme';
 import { AppIconButton } from '../primitives/AppIconButton';
+import { AppLogo } from '../primitives/AppLogo';
 import { AppText } from '../primitives/AppText';
 
 export interface AppHeaderProps {
@@ -32,6 +33,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 }) => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const hasLeadingAction = showBack || Boolean(leftAction);
 
   const handleBack = () => {
     if (onBack) {
@@ -51,7 +53,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       ]}
     >
       <View style={styles.content}>
-        <View style={styles.leftContainer}>
+        <View
+          style={[
+            styles.leftContainer,
+            !hasLeadingAction && styles.leftContainerEmpty,
+          ]}
+        >
           {showBack ? (
             <AppIconButton
               icon={
@@ -74,31 +81,35 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           style={[
             styles.titleContainer,
             titleAlign === 'center' ? styles.titleCenter : styles.titleLeft,
+            titleAlign === 'left' && hasLeadingAction && styles.titleLeftWithLeading,
           ]}
         >
-          {title ? (
-            <AppText
-              variant="title"
-              weight="bold"
-              numberOfLines={1}
-              style={[
-                styles.titleText,
-                titleAlign === 'center' ? styles.alignCenter : undefined,
-              ]}
-            >
-              {title}
-            </AppText>
-          ) : null}
-          {subtitle ? (
-            <AppText
-              variant="caption"
-              color={theme.colors.text.secondary}
-              numberOfLines={1}
-              style={titleAlign === 'center' ? styles.alignCenter : undefined}
-            >
-              {subtitle}
-            </AppText>
-          ) : null}
+          {title ? <AppLogo size={32} /> : null}
+          <View style={[styles.titleCopy, titleAlign === 'center' && styles.titleCopyCenter]}>
+            {title ? (
+              <AppText
+                variant="title"
+                weight="bold"
+                numberOfLines={1}
+                style={[
+                  styles.titleText,
+                  titleAlign === 'center' ? styles.alignCenter : undefined,
+                ]}
+              >
+                {title}
+              </AppText>
+            ) : null}
+            {subtitle ? (
+              <AppText
+                variant="caption"
+                color={theme.colors.text.secondary}
+                numberOfLines={1}
+                style={titleAlign === 'center' ? styles.alignCenter : undefined}
+              >
+                {subtitle}
+              </AppText>
+            ) : null}
+          </View>
         </View>
 
         <View style={styles.rightContainer}>{rightAction}</View>
@@ -128,14 +139,31 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'center',
   },
+  leftContainerEmpty: {
+    width: 0,
+    minWidth: 0,
+  },
   titleContainer: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
     justifyContent: 'center',
   },
   titleLeft: {
-    paddingHorizontal: theme.spacing.xs,
+    justifyContent: 'flex-start',
+  },
+  titleLeftWithLeading: {
+    paddingLeft: theme.spacing.xs,
   },
   titleCenter: {
+    justifyContent: 'center',
+  },
+  titleCopy: {
+    flexShrink: 1,
+    justifyContent: 'center',
+  },
+  titleCopyCenter: {
     alignItems: 'center',
   },
   titleText: {

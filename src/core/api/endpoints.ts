@@ -66,8 +66,8 @@ export const API_ENDPOINTS = {
   CUSTOMER: {
     CULTIVATION_STATUS: (orderId: string | number) =>
       `/api/customer/orders/${orderId}/cultivation-status`,
-    SESSION_DETAILS: (sessionId: string | number) =>
-      `/api/customer/sessions/${sessionId}/details`,
+    CULTIVATION_PROGRESS: (orderId: string | number) =>
+      `/api/customer/orders/${orderId}/cultivation-progress`,
   },
   // Payments (PayOS)
   PAYMENTS: {
@@ -131,6 +131,10 @@ export const API_ENDPOINTS = {
       `/api/cultivation-sessions/admin/${sessionId}`,
     ADMIN_PROGRESS: (sessionId: number | string) =>
       `/api/cultivation-sessions/admin/${sessionId}/progress`,
+    ADMIN_IOT_HISTORY: (sessionId: number | string) =>
+      `/api/cultivation-sessions/admin/${sessionId}/iot-history`,
+    ADMIN_IOT_SENSOR_HISTORY: (sessionId: number | string) =>
+      `/api/cultivation-sessions/admin/${sessionId}/iot-history/sensors`,
     ADMIN_GROWTH: (sessionId: number | string) =>
       `/api/cultivation-sessions/admin/${sessionId}/growth`,
     ADMIN_HARVEST_READINESS: (sessionId: number | string) =>

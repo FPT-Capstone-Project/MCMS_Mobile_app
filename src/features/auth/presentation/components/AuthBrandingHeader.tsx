@@ -1,8 +1,8 @@
-import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { theme } from '../../../../core/theme';
 import { AppText } from '../../../../shared/components/primitives/AppText';
+import { AppLogo } from '../../../../shared/components/primitives/AppLogo';
 
 export interface AuthBrandingHeaderProps {
   title: string;
@@ -14,9 +14,7 @@ export const AuthBrandingHeader: React.FC<AuthBrandingHeaderProps> = ({ title, s
     <View style={styles.container}>
       {/* Brand Icon Badge */}
       <View style={styles.logoBadge}>
-        <View style={styles.iconCircle}>
-          <Ionicons name="leaf" size={28} color={theme.colors.primary[500]} />
-        </View>
+        <AppLogo size={72} />
         <AppText variant="overline" color={theme.colors.primary[600]} style={styles.brandTag}>
           SmartMush MCMS
         </AppText>
@@ -46,21 +44,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: theme.spacing.sm,
     gap: 6,
-  },
-  iconCircle: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: theme.colors.primary[50],
-    borderWidth: 1.5,
-    borderColor: theme.colors.primary[200],
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: theme.colors.primary[500],
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
   },
   brandTag: {
     letterSpacing: 1.2,

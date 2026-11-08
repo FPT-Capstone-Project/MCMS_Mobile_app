@@ -2,8 +2,11 @@ import { axiosClient } from '../../../../core/api/axiosClient';
 import { API_ENDPOINTS } from '../../../../core/api/endpoints';
 import {
   CustomerFloorRack,
+  CustomerGrowthHistoryItem,
+  CustomerSensorReading,
   CustomerTrayDetails,
   CustomerTrayCard,
+  CustomerDeviceLogItem,
   Tray,
   TrayId,
 } from '../../domain/entities/Tray';
@@ -35,15 +38,73 @@ export class TrayRepository implements ITrayRepository {
     return this.trays.filter((t) => t.status === 'MY_RENTED_TRAY');
   }
 
-  async getCustomerCultivationDetails(sessionId: number): Promise<CustomerTrayDetails> {
+  async getCustomerCultivationDetails(
+    sessionId: number,
+    orderId: number
+  ): Promise<CustomerTrayDetails> {
     try {
-      const response = await axiosClient.get<{ data: CustomerTrayDetails }>(
-        API_ENDPOINTS.CUSTOMER.SESSION_DETAILS(sessionId)
-      );
-      if (!response.data?.data) {
-        throw new AppError('Chi tiết vụ trồng từ máy chủ không hợp lệ.', 'API_ERROR', 500);
+      const [progressResponse, iotResponse, sensorResponse] = await Promise.all([
+        axiosClient.get<{ data: CustomerProgressHistoryItem[] }>(
+          API_ENDPOINTS.CUSTOMER.CULTIVATION_PROGRESS(orderId)
+        ),
+        axiosClient.get<{ data: CustomerSessionIotHistory }>(
+          API_ENDPOINTS.CULTIVATION_SESSIONS.ADMIN_IOT_HISTORY(sessionId),
+          { params: { page: 1, pageSize: 100 } }
+        ),
+        axiosClient.get<{ data: CustomerSensorHistory }>(
+          API_ENDPOINTS.CULTIVATION_SESSIONS.ADMIN_IOT_SENSOR_HISTORY(sessionId),
+          { params: { page: 1, pageSize: 100 } }
+        ),
+      ]);
+
+      const progress = progressResponse.data?.data;
+      const iotHistory = iotResponse.data?.data;
+      const sensorHistory = sensorResponse.data?.data;
+      if (
+        !Array.isArray(progress) ||
+        !iotHistory ||
+        !Array.isArray(iotHistory.deviceEvents) ||
+        !sensorHistory ||
+        !Array.isArray(sensorHistory.readings)
+      ) {
+        throw new AppError('Dữ liệu lịch sử vụ trồng từ máy chủ không hợp lệ.', 'API_ERROR', 500);
       }
-      return response.data.data;
+
+      return {
+        session_id: sessionId,
+        growth_history: progress
+          .filter((item) => Number(item.session_id) === sessionId)
+          .map((item) => ({
+            ...item,
+            progress_percent: Number(item.progress_percent),
+            condition: null,
+          })),
+        device_logs: iotHistory.deviceEvents,
+        sensor_readings: sensorHistory.readings.map((reading) => ({
+          ...reading,
+          temperature: toNullableNumber(reading.temperature),
+          humidity: toNullableNumber(reading.humidity),
+        })),
+      };
+    } catch (error) {
+      throw error instanceof AppError ? error : handleApiError(error);
+    }
+  }
+
+  async getCustomerSensorHistory(sessionId: number): Promise<CustomerSensorReading[]> {
+    try {
+      const response = await axiosClient.get<{ data: CustomerSensorHistory }>(
+        API_ENDPOINTS.CULTIVATION_SESSIONS.ADMIN_IOT_SENSOR_HISTORY(sessionId),
+        { params: { page: 1, pageSize: 100 } }
+      );
+      if (!Array.isArray(response.data?.data?.readings)) {
+        throw new AppError('Dữ liệu cảm biến từ máy chủ không hợp lệ.', 'API_ERROR', 500);
+      }
+      return response.data.data.readings.map((reading) => ({
+        ...reading,
+        temperature: toNullableNumber(reading.temperature),
+        humidity: toNullableNumber(reading.humidity),
+      }));
     } catch (error) {
       throw error instanceof AppError ? error : handleApiError(error);
     }
@@ -168,3 +229,19 @@ export class TrayRepository implements ITrayRepository {
 }
 
 export const trayRepository = new TrayRepository();
+
+function toNullableNumber(value: number | string | null): number | null {
+  if (value === null) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+type CustomerProgressHistoryItem = CustomerGrowthHistoryItem;
+
+interface CustomerSessionIotHistory {
+  deviceEvents: CustomerDeviceLogItem[];
+}
+
+interface CustomerSensorHistory {
+  readings: CustomerSensorReading[];
+}
