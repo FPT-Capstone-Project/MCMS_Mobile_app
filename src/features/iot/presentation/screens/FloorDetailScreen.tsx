@@ -282,9 +282,11 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
   const isRunning = statusData?.run?.status === 'RUNNING';
   const isDryRun = statusData?.run?.dry_run === true;
   const isFault =
-    (statusData?.mode === 'AUTO' && statusData?.run?.status === 'FAULT') ||
-    statusData?.runtime?.control_state === 'FAULT' ||
-    statusData?.runtime?.control_state === 'SENSOR_FAULT';
+    statusData?.run?.status === 'FAULT' ||
+    (statusData?.mode === 'AUTO' &&
+      (statusData?.runtime?.control_state === 'FAULT' ||
+        statusData?.runtime?.control_state === 'SENSOR_FAULT' ||
+        statusData?.runtime?.control_state === 'DEVICE_OFFLINE'));
   const isOffPending = statusData?.runtime?.control_state === 'OFF_PENDING';
 
   // Cooldown countdown

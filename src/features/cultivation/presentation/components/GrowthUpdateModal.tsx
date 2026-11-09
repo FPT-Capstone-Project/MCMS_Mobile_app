@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -31,7 +31,7 @@ interface GrowthUpdateModalProps {
   onClose: () => void;
   session: CultivationSessionAdmin;
   latestProgress?: ProgressHistoryItem | null;
-  onSuccess: () => Promise<void>;
+  onSuccess: () => Promise<void> | void;
 }
 
 const GROWTH_STAGE_OPTIONS: { stage: GrowthStage; label: string; desc: string }[] = [
@@ -71,20 +71,22 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
   latestProgress,
   onSuccess,
 }) => {
-  const currentStage = (latestProgress?.current_stage ||
-    session.current_stage ||
-    session.growth_status ||
-    'FRUITING_INITIATION') as GrowthStage;
-
-  const currentPercent =
+  const initialPercent =
     latestProgress?.progress_percent != null
       ? Number(latestProgress.progress_percent)
       : session.progress_percent != null
       ? Number(session.progress_percent)
       : 0;
 
-  const [selectedStage, setSelectedStage] = useState<GrowthStage>(currentStage);
-  const [progressPercent, setProgressPercent] = useState<string>(String(currentPercent));
+  const initialStage = (latestProgress?.current_stage ||
+    session.current_stage ||
+    session.growth_status ||
+    'FRUITING_INITIATION') as GrowthStage;
+
+  const [baselinePercent, setBaselinePercent] = useState<number>(initialPercent);
+  const [baselineStage, setBaselineStage] = useState<GrowthStage>(initialStage);
+  const [selectedStage, setSelectedStage] = useState<GrowthStage>(initialStage);
+  const [progressPercent, setProgressPercent] = useState<string>(String(initialPercent));
   const [condition, setCondition] = useState<string>(
     latestProgress?.condition || session.condition || 'NORMAL'
   );
@@ -94,8 +96,117 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
       (session.harvest_date ? session.harvest_date.slice(0, 10) : '')
   );
 
+  const [fetchingProgress, setFetchingProgress] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
+
+  // Fetch real current session progress from server when opened
+  useEffect(() => {
+    if (!visible || !session?.session_id) return;
+    let isMounted = true;
+
+    const loadLatestSessionProgress = async () => {
+      setFetchingProgress(true);
+      setErrorText(null);
+      try {
+        const prog = await iotRepository.getSessionProgress(session.session_id);
+        if (!isMounted) return;
+
+        const resolvedStage = (prog.current_stage ||
+          prog.growth_status ||
+          prog.latest_progress?.current_stage ||
+          latestProgress?.current_stage ||
+          session.current_stage ||
+          session.growth_status ||
+          'FRUITING_INITIATION') as GrowthStage;
+
+        const resolvedPercent =
+          prog.progress_percent != null
+            ? Number(prog.progress_percent)
+            : prog.latest_progress?.progress_percent != null
+            ? Number(prog.latest_progress.progress_percent)
+            : latestProgress?.progress_percent != null
+            ? Number(latestProgress.progress_percent)
+            : session.progress_percent != null
+            ? Number(session.progress_percent)
+            : 0;
+
+        const resolvedCondition =
+          prog.latest_progress?.condition ||
+          prog.condition ||
+          latestProgress?.condition ||
+          session.condition ||
+          'NORMAL';
+
+        const resolvedNotes =
+          prog.latest_progress?.description ||
+          latestProgress?.description ||
+          '';
+
+        const resolvedHarvestDate =
+          prog.expected_harvest_date ||
+          prog.latest_progress?.expected_harvest_date ||
+          latestProgress?.expected_harvest_date ||
+          (session.harvest_date ? session.harvest_date.slice(0, 10) : '');
+
+        setBaselinePercent(resolvedPercent);
+        setBaselineStage(resolvedStage);
+        setSelectedStage(resolvedStage);
+        setProgressPercent(String(resolvedPercent));
+        setCondition(resolvedCondition);
+        setNotes(resolvedNotes);
+        setExpectedHarvestDate(resolvedHarvestDate);
+      } catch {
+        if (!isMounted) return;
+        const fallbackPercent =
+          latestProgress?.progress_percent != null
+            ? Number(latestProgress.progress_percent)
+            : session.progress_percent != null
+            ? Number(session.progress_percent)
+            : 0;
+        const fallbackStage = (latestProgress?.current_stage ||
+          session.current_stage ||
+          session.growth_status ||
+          'FRUITING_INITIATION') as GrowthStage;
+
+        setBaselinePercent(fallbackPercent);
+        setBaselineStage(fallbackStage);
+        setSelectedStage(fallbackStage);
+        setProgressPercent(String(fallbackPercent));
+        setCondition(latestProgress?.condition || session.condition || 'NORMAL');
+        setNotes(latestProgress?.description || '');
+        setExpectedHarvestDate(
+          latestProgress?.expected_harvest_date ||
+            (session.harvest_date ? session.harvest_date.slice(0, 10) : '')
+        );
+      } finally {
+        if (isMounted) {
+          setFetchingProgress(false);
+        }
+      }
+    };
+
+    void loadLatestSessionProgress();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    visible,
+    session.session_id,
+    session.condition,
+    session.current_stage,
+    session.growth_status,
+    session.harvest_date,
+    session.progress_percent,
+    latestProgress,
+  ]);
+
+  const handleQuickAddPercent = (delta: number) => {
+    const cur = Number(progressPercent) || baselinePercent;
+    const next = Math.min(100, Math.max(baselinePercent, cur + delta));
+    setProgressPercent(String(next));
+  };
 
   const handleSubmit = async () => {
     setErrorText(null);
@@ -106,13 +217,13 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
       return;
     }
 
-    if (nPercent < currentPercent) {
-      setErrorText(`Tiến độ không được giảm so với ghi nhận trước (${currentPercent}%).`);
+    if (nPercent < baselinePercent) {
+      setErrorText(`Tiến độ không được giảm so với ghi nhận hiện tại (${baselinePercent}%).`);
       return;
     }
 
     // Backend rule: Cannot move backwards if already reached MATURATION
-    if (currentStage === 'MATURATION' && selectedStage !== 'MATURATION') {
+    if (baselineStage === 'MATURATION' && selectedStage !== 'MATURATION') {
       setErrorText('Phiên đã đạt giai đoạn Trưởng thành (MATURATION), không thể chuyển ngược về giai đoạn trước.');
       return;
     }
@@ -184,6 +295,16 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
           <AppDivider spacing="sm" />
 
           <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
+            {/* Loading Banner when fetching real progress */}
+            {fetchingProgress && (
+              <View style={styles.loadingBanner}>
+                <ActivityIndicator size="small" color={theme.colors.primary[600]} />
+                <AppText variant="caption" weight="medium" color={theme.colors.primary[700]} style={{ marginLeft: 8 }}>
+                  Đang tải tiến độ hiện tại của phiên từ máy chủ...
+                </AppText>
+              </View>
+            )}
+
             {/* Warning banner about harvest readiness reset */}
             <AppCard elevation="xs" style={styles.noticeCard}>
               <View style={styles.noticeRow}>
@@ -246,9 +367,51 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
             </View>
 
             {/* 2. Progress Percent */}
-            <AppText variant="label" weight="bold" style={styles.sectionTitle}>
-              2. Tiến độ sinh trưởng (%)
-            </AppText>
+            <View style={styles.sectionHeaderRow}>
+              <AppText variant="label" weight="bold" style={styles.sectionTitle}>
+                2. Tiến độ sinh trưởng (%)
+              </AppText>
+              <View style={styles.currentPercentBadge}>
+                <AppText variant="caption" weight="bold" color={theme.colors.primary[700]}>
+                  Hiện tại: {baselinePercent}%
+                </AppText>
+              </View>
+            </View>
+
+            {/* Quick Increment Buttons */}
+            <View style={styles.quickPercentRow}>
+              <Pressable
+                style={styles.quickPercentBtn}
+                onPress={() => setProgressPercent(String(baselinePercent))}
+                disabled={loading}
+              >
+                <AppText variant="caption" weight="medium" color={theme.colors.text.secondary}>
+                  Giữ {baselinePercent}%
+                </AppText>
+              </Pressable>
+              {[5, 10, 20].map((delta) => (
+                <Pressable
+                  key={delta}
+                  style={styles.quickPercentBtn}
+                  onPress={() => handleQuickAddPercent(delta)}
+                  disabled={loading}
+                >
+                  <AppText variant="caption" weight="bold" color={theme.colors.primary[700]}>
+                    +{delta}%
+                  </AppText>
+                </Pressable>
+              ))}
+              <Pressable
+                style={[styles.quickPercentBtn, styles.quickPercentBtnMax]}
+                onPress={() => setProgressPercent('100')}
+                disabled={loading}
+              >
+                <AppText variant="caption" weight="bold" color={theme.colors.success.dark}>
+                  100%
+                </AppText>
+              </Pressable>
+            </View>
+
             <View style={styles.inputWrapper}>
               <TextInput
                 style={styles.textInput}
@@ -264,7 +427,7 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
               </AppText>
             </View>
             <AppText variant="caption" color={theme.colors.text.muted} style={{ marginTop: 4 }}>
-              Tiến độ lần trước: {currentPercent}%. Tiến độ chỉ tăng dần hoặc giữ nguyên, không được giảm.
+              Tiến độ lần trước: {baselinePercent}%. Tiến độ chỉ tăng dần hoặc giữ nguyên, không được giảm.
             </AppText>
 
             {/* 3. Growth Condition */}
@@ -491,5 +654,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     marginTop: theme.spacing.sm,
+  },
+  loadingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.primary[50],
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  currentPercentBadge: {
+    backgroundColor: theme.colors.primary[50],
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  quickPercentRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: theme.spacing.xs,
+  },
+  quickPercentBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.neutral[100],
+    borderWidth: 1,
+    borderColor: theme.colors.neutral[200],
+  },
+  quickPercentBtnMax: {
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    borderColor: 'rgba(34, 197, 94, 0.3)',
   },
 });

@@ -624,7 +624,7 @@ export class IotRepository {
    */
   async getAdminCultivationSessions(status?: string): Promise<CultivationSessionAdmin[]> {
     try {
-      const [adminRes, farmRes] = await Promise.allSettled([
+      const [adminRes, farmRes, floorsRes] = await Promise.allSettled([
         axiosClient.get<{ data: any[] | { sessions: any[] } } | any[]>(
           API_ENDPOINTS.CULTIVATION_SESSIONS.ADMIN_BASE,
           { params: status ? { status } : undefined }
@@ -633,7 +633,19 @@ export class IotRepository {
           API_ENDPOINTS.FARM.SESSIONS,
           { params: status ? { status } : undefined }
         ),
+        this.getFloors(),
       ]);
+
+      // Floor map for fast floor_id -> floor_name resolution
+      const floorMap = new Map<number, string>();
+      if (floorsRes.status === 'fulfilled' && Array.isArray(floorsRes.value)) {
+        floorsRes.value.forEach((f) => {
+          const fid = f.floor_id ?? f.id;
+          if (fid != null && f.floor_name) {
+            floorMap.set(Number(fid), f.floor_name);
+          }
+        });
+      }
 
       const sessionsMap = new Map<number, CultivationSessionAdmin>();
 
@@ -656,31 +668,47 @@ export class IotRepository {
             ? item.assigned_trays
             : [];
 
-          const floorName =
-            item.floor_name ||
-            rawTrays.find((t: any) => t.floor_name)?.floor_name ||
-            null;
-
-          const floorId =
+          let floorId =
             item.floor_id != null
               ? Number(item.floor_id)
               : rawTrays.find((t: any) => t.floor_id != null)?.floor_id != null
               ? Number(rawTrays.find((t: any) => t.floor_id != null).floor_id)
               : null;
 
+          let floorName =
+            item.floor_name ||
+            rawTrays.find((t: any) => t.floor_name)?.floor_name ||
+            (floorId != null ? floorMap.get(floorId) : null) ||
+            null;
+
           const mappedTrays =
             rawTrays.length > 0
-              ? rawTrays.map((t: any) => ({
-                  session_tray_id: Number(t.session_tray_id ?? t.id ?? 0),
-                  tray_id: Number(t.tray_id),
-                  tray_code: String(t.tray_code || `Khay #${t.tray_id}`),
-                  floor_id: t.floor_id != null ? Number(t.floor_id) : floorId,
-                  floor_name: t.floor_name || floorName,
-                  status: String(t.status || t.assignment_status || 'ACTIVE'),
-                  row_number: t.row_number != null ? Number(t.row_number) : undefined,
-                  column_number: t.column_number != null ? Number(t.column_number) : undefined,
-                }))
+              ? rawTrays.map((t: any) => {
+                  const tFloorId = t.floor_id != null ? Number(t.floor_id) : floorId;
+                  const tFloorName =
+                    t.floor_name ||
+                    (tFloorId != null ? floorMap.get(tFloorId) : null) ||
+                    floorName;
+                  return {
+                    session_tray_id: Number(t.session_tray_id ?? t.id ?? 0),
+                    tray_id: Number(t.tray_id),
+                    tray_code: String(t.tray_code || `Khay #${t.tray_id}`),
+                    floor_id: tFloorId,
+                    floor_name: tFloorName,
+                    status: String(t.status || t.assignment_status || 'ACTIVE'),
+                    row_number: t.row_number != null ? Number(t.row_number) : undefined,
+                    column_number: t.column_number != null ? Number(t.column_number) : undefined,
+                  };
+                })
               : undefined;
+
+          if (!floorName && mappedTrays?.[0]?.floor_name) {
+            floorName = mappedTrays[0].floor_name;
+          }
+          if (floorId == null && mappedTrays?.[0]?.floor_id != null) {
+            floorId = mappedTrays[0].floor_id;
+            floorName = floorName || (floorId != null ? floorMap.get(floorId) : null) || `Tầng ${floorId}`;
+          }
 
           sessionsMap.set(sid, {
             session_id: sid,
@@ -767,17 +795,47 @@ export class IotRepository {
               ? item.assigned_trays
               : [];
 
-            const floorName =
-              item.floor_name ||
-              rawTrays.find((t: any) => t.floor_name)?.floor_name ||
-              null;
-
-            const floorId =
+            let floorId =
               item.floor_id != null
                 ? Number(item.floor_id)
                 : rawTrays.find((t: any) => t.floor_id != null)?.floor_id != null
                 ? Number(rawTrays.find((t: any) => t.floor_id != null).floor_id)
                 : null;
+
+            let floorName =
+              item.floor_name ||
+              rawTrays.find((t: any) => t.floor_name)?.floor_name ||
+              (floorId != null ? floorMap.get(floorId) : null) ||
+              null;
+
+            const mappedTrays =
+              rawTrays.length > 0
+                ? rawTrays.map((t: any) => {
+                    const tFloorId = t.floor_id != null ? Number(t.floor_id) : floorId;
+                    const tFloorName =
+                      t.floor_name ||
+                      (tFloorId != null ? floorMap.get(tFloorId) : null) ||
+                      floorName;
+                    return {
+                      session_tray_id: Number(t.session_tray_id ?? t.id ?? 0),
+                      tray_id: Number(t.tray_id),
+                      tray_code: String(t.tray_code || `Khay #${t.tray_id}`),
+                      floor_id: tFloorId,
+                      floor_name: tFloorName,
+                      status: String(t.status || t.assignment_status || 'ACTIVE'),
+                      row_number: t.row_number != null ? Number(t.row_number) : undefined,
+                      column_number: t.column_number != null ? Number(t.column_number) : undefined,
+                    };
+                  })
+                : undefined;
+
+            if (!floorName && mappedTrays?.[0]?.floor_name) {
+              floorName = mappedTrays[0].floor_name;
+            }
+            if (floorId == null && mappedTrays?.[0]?.floor_id != null) {
+              floorId = mappedTrays[0].floor_id;
+              floorName = floorName || (floorId != null ? floorMap.get(floorId) : null) || `Tầng ${floorId}`;
+            }
 
             sessionsMap.set(sid, {
               session_id: sid,
@@ -825,17 +883,7 @@ export class IotRepository {
                 item.progress_percent != null ? Number(item.progress_percent) : null,
               condition: item.condition ?? null,
               notes: item.notes ?? null,
-              trays:
-                rawTrays.length > 0
-                  ? rawTrays.map((t: any) => ({
-                      session_tray_id: Number(t.session_tray_id ?? t.id ?? 0),
-                      tray_id: Number(t.tray_id),
-                      tray_code: String(t.tray_code || `Khay #${t.tray_id}`),
-                      floor_id: t.floor_id != null ? Number(t.floor_id) : floorId,
-                      floor_name: t.floor_name || floorName,
-                      status: String(t.status || 'ACTIVE'),
-                    }))
-                  : undefined,
+              trays: mappedTrays,
             });
           }
         });
@@ -856,9 +904,25 @@ export class IotRepository {
             try {
               const detail = await this.getSessionAdminDetail(sess.session_id);
               if (detail.trays && detail.trays.length > 0) {
-                sess.trays = detail.trays;
-                sess.floor_name = detail.trays[0].floor_name || detail.floor_name || sess.floor_name;
-                sess.floor_id = detail.trays[0].floor_id ?? detail.floor_id ?? sess.floor_id;
+                sess.trays = detail.trays.map((t: any) => {
+                  const fid = t.floor_id != null ? Number(t.floor_id) : sess.floor_id;
+                  return {
+                    ...t,
+                    floor_id: fid,
+                    floor_name:
+                      t.floor_name ||
+                      (fid != null ? floorMap.get(fid) : null) ||
+                      sess.floor_name,
+                  };
+                });
+                const t0Fid = sess.trays[0].floor_id;
+                sess.floor_id = t0Fid ?? detail.floor_id ?? sess.floor_id;
+                sess.floor_name =
+                  sess.trays[0].floor_name ||
+                  (sess.floor_id != null ? floorMap.get(sess.floor_id) : null) ||
+                  detail.floor_name ||
+                  (sess.floor_id != null ? `Tầng ${sess.floor_id}` : null) ||
+                  sess.floor_name;
               }
               if (detail.growth_status && !sess.growth_status) {
                 sess.growth_status = detail.growth_status;

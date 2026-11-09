@@ -1,3 +1,5 @@
+import type { GrowthStage } from '../../../iot/domain/entities/Iot';
+
 /**
  * Cultivation Domain Entities
  * Reflects backend OpenAPI schema for Rooms, Trays, Mushroom Types, and Conditions.
@@ -100,4 +102,49 @@ export interface UpdateMushroomConditionRequest {
   temperatureMax?: number | null;
   humidityMin?: number | null;
   humidityMax?: number | null;
+}
+
+// Daily Tray Inspection Entities
+export interface DailyTrayInspectionImage {
+  imageId: number;
+  imageUrl: string;
+  caption?: string | null;
+  uploadedAt: string;
+}
+
+export interface DailyTrayInspection {
+  inspectionId: number;
+  sessionTrayId: number;
+  trayId?: number;
+  trayCode?: string;
+  trayName?: string;
+  inspectionDate: string;
+  growthStage: GrowthStage;
+  growthProgress: number;
+  trayCondition: string;
+  mushroomCondition: string;
+  notes?: string | null;
+  inspectedBy: number;
+  inspectedByName?: string;
+  images: DailyTrayInspectionImage[];
+}
+
+export interface CreateDailyTrayInspectionRequest {
+  growthStage: GrowthStage;
+  growthProgress: number;
+  trayCondition: string;
+  mushroomCondition: string;
+  notes?: string;
+}
+
+export interface DailyInspectionHistoryResponse {
+  session?: any;
+  tray?: any;
+  inspections: DailyTrayInspection[];
+  pagination?: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
 }

@@ -143,6 +143,14 @@ export const API_ENDPOINTS = {
       `/api/cultivation-sessions/admin/available-trays?floorId=${floorId}`,
     ADMIN_ASSIGN_TRAYS: (sessionId: number | string) =>
       `/api/cultivation-sessions/admin/${sessionId}/trays`,
+    ADMIN_SESSION_TRAY_INSPECTION: (sessionTrayId: number | string) =>
+      `/api/cultivation-sessions/admin/session-trays/${sessionTrayId}/inspections`,
+    ADMIN_INSPECTION_IMAGES: (inspectionId: number | string) =>
+      `/api/cultivation-sessions/admin/inspections/${inspectionId}/images`,
+    DAILY_INSPECTIONS: (sessionId: number | string) =>
+      `/api/cultivation-sessions/${sessionId}/daily-inspections`,
+    TRAY_DAILY_INSPECTIONS: (sessionId: number | string, sessionTrayId: number | string) =>
+      `/api/cultivation-sessions/${sessionId}/trays/${sessionTrayId}/daily-inspections`,
   },
   // Harvests Workflow (Admin & Operator)
   HARVESTS: {

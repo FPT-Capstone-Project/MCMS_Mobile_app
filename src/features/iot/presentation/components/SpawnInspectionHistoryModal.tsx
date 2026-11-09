@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -51,6 +52,21 @@ const SpawnInspectionHistoryModalContent: React.FC<{
   const [inspections, setInspections] = useState<SpawnInspection[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Fullscreen photo viewer state
+  const [fullscreenImage, setFullscreenImage] = useState<{
+    visible: boolean;
+    imageUrl: string;
+    caption?: string | null;
+    title?: string;
+    date?: string;
+  }>({
+    visible: false,
+    imageUrl: '',
+    caption: null,
+    title: '',
+    date: '',
+  });
 
   const loadHistory = useCallback(async () => {
     setLoading(true);
@@ -113,10 +129,10 @@ const SpawnInspectionHistoryModalContent: React.FC<{
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
               <AppText variant="title" weight="bold">
-                Lịch sử kiểm tra phôi
+                Lịch sử kiểm tra phôi theo phiên
               </AppText>
               <AppText variant="caption" color={theme.colors.text.secondary}>
-                Phiên #{session.session_id} • {session.mushroom_name}
+                Phiên #{session.session_id} • {session.mushroom_name || 'Nấm giống'}
               </AppText>
             </View>
             <AppIconButton
@@ -127,7 +143,15 @@ const SpawnInspectionHistoryModalContent: React.FC<{
             />
           </View>
 
-          <AppDivider spacing="sm" />
+          {/* Clarification banner */}
+          <View style={styles.scopeNotice}>
+            <Ionicons name="information-circle-outline" size={15} color={theme.colors.primary[600]} />
+            <AppText variant="caption" color={theme.colors.primary[700]} style={{ flex: 1, marginLeft: 6 }}>
+              Lịch sử kiểm tra chất lượng bịch giống chung cho cả phiên trước khi gán khay.
+            </AppText>
+          </View>
+
+          <AppDivider spacing="xs" />
 
           {loading ? (
             <View style={styles.centerLoading}>
@@ -160,13 +184,14 @@ const SpawnInspectionHistoryModalContent: React.FC<{
                 const formattedDate = dateStr
                   ? new Date(dateStr).toLocaleString('vi-VN')
                   : 'Chưa xác định';
+                const inspectionTitle = `Đợt kiểm tra #${inspections.length - index}`;
 
                 return (
                   <AppCard key={item.inspection_id || item.id || index} elevation="xs" style={styles.itemCard}>
                     <View style={styles.cardTopRow}>
                       <View style={{ flex: 1 }}>
                         <AppText variant="caption" weight="bold">
-                          Đợt kiểm tra #{inspections.length - index}
+                          {inspectionTitle}
                         </AppText>
                         <AppText variant="caption" color={theme.colors.text.muted}>
                           Thời gian: {formattedDate}
@@ -238,6 +263,44 @@ const SpawnInspectionHistoryModalContent: React.FC<{
                         Người kiểm tra: {item.inspector_name}
                       </AppText>
                     )}
+
+                    {/* Inspection Images Gallery */}
+                    {item.images && item.images.length > 0 && (
+                      <View style={styles.imagesGalleryWrap}>
+                        <AppText variant="caption" weight="bold" color={theme.colors.text.secondary} style={{ marginBottom: 4 }}>
+                          Hình ảnh kiểm tra phôi ({item.images.length} ảnh):
+                        </AppText>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryScroll}>
+                          {item.images.map((img, imgIdx) => (
+                            <Pressable
+                              key={img.image_id || imgIdx}
+                              onPress={() =>
+                                setFullscreenImage({
+                                  visible: true,
+                                  imageUrl: img.image_url,
+                                  caption: img.caption,
+                                  title: `${inspectionTitle} • ${session.mushroom_name || 'Nấm giống'}`,
+                                  date: formattedDate,
+                                })
+                              }
+                              style={styles.thumbnailWrap}
+                            >
+                              <Image source={{ uri: img.image_url }} style={styles.thumbnailImage} />
+                              <View style={styles.zoomPill}>
+                                <Ionicons name="expand" size={11} color="#FFFFFF" />
+                              </View>
+                              {img.caption ? (
+                                <View style={styles.thumbnailCaptionBg}>
+                                  <AppText variant="caption" numberOfLines={1} color="#FFFFFF" style={styles.captionText}>
+                                    {img.caption}
+                                  </AppText>
+                                </View>
+                              ) : null}
+                            </Pressable>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
                   </AppCard>
                 );
               })}
@@ -245,6 +308,52 @@ const SpawnInspectionHistoryModalContent: React.FC<{
           )}
         </View>
       </View>
+
+      {/* Fullscreen Photo Viewer */}
+      <Modal
+        visible={fullscreenImage.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFullscreenImage((prev) => ({ ...prev, visible: false }))}
+      >
+        <View style={styles.fullscreenBackdrop}>
+          <View style={styles.fullscreenTopBar}>
+            <View style={{ flex: 1 }}>
+              <AppText variant="bodyMedium" weight="bold" color="#FFFFFF">
+                {fullscreenImage.title}
+              </AppText>
+              <AppText variant="caption" color="rgba(255, 255, 255, 0.7)">
+                {fullscreenImage.date}
+              </AppText>
+            </View>
+            <AppIconButton
+              accessibilityLabel="Đóng ảnh"
+              icon={<Ionicons name="close" size={24} color="#FFFFFF" />}
+              onPress={() => setFullscreenImage((prev) => ({ ...prev, visible: false }))}
+              size="sm"
+            />
+          </View>
+
+          <View style={styles.fullscreenImageContainer}>
+            {fullscreenImage.imageUrl ? (
+              <Image
+                source={{ uri: fullscreenImage.imageUrl }}
+                style={styles.fullscreenImage}
+                resizeMode="contain"
+              />
+            ) : null}
+          </View>
+
+          {fullscreenImage.caption ? (
+            <View style={styles.fullscreenBottomBar}>
+              <Ionicons name="chatbubble-ellipses-outline" size={16} color="#FFFFFF" />
+              <AppText variant="bodySmall" color="#FFFFFF" style={{ marginLeft: 8, flex: 1 }}>
+                {fullscreenImage.caption}
+              </AppText>
+            </View>
+          ) : null}
+        </View>
+      </Modal>
     </Modal>
   );
 };
@@ -278,6 +387,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: theme.spacing.xs,
   },
+  scopeNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(2, 132, 199, 0.08)',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 6,
+    borderRadius: theme.borderRadius.md,
+    marginTop: 4,
+    marginBottom: 6,
+  },
   centerLoading: {
     paddingVertical: 40,
     alignItems: 'center',
@@ -291,25 +410,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listArea: {
-    maxHeight: 450,
+    maxHeight: 460,
+    marginTop: theme.spacing.xs,
   },
   itemCard: {
-    marginBottom: theme.spacing.sm,
     padding: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.neutral[200],
   },
   cardTopRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
   },
   badgeBox: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: theme.borderRadius.sm,
+    paddingVertical: 3,
+    borderRadius: theme.borderRadius.full,
   },
   countsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: theme.spacing.xs,
     paddingVertical: 4,
   },
   countItem: {
@@ -319,16 +442,88 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    marginTop: 6,
     backgroundColor: 'rgba(245, 158, 11, 0.1)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: theme.borderRadius.sm,
-    marginTop: 6,
   },
   notesRow: {
     marginTop: 6,
     backgroundColor: theme.colors.neutral[50],
     padding: 6,
     borderRadius: theme.borderRadius.sm,
+  },
+  imagesGalleryWrap: {
+    marginTop: 8,
+  },
+  galleryScroll: {
+    gap: 8,
+    paddingVertical: 4,
+  },
+  thumbnailWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: theme.borderRadius.md,
+    overflow: 'hidden',
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: theme.colors.neutral[300],
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+  },
+  zoomPill: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    padding: 3,
+    borderRadius: theme.borderRadius.full,
+  },
+  thumbnailCaptionBg: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  captionText: {
+    fontSize: 9,
+  },
+  // Fullscreen Viewer Styles
+  fullscreenBackdrop: {
+    flex: 1,
+    backgroundColor: '#000000',
+    justifyContent: 'space-between',
+  },
+  fullscreenTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: 48,
+    paddingBottom: theme.spacing.sm,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  fullscreenImageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenImage: {
+    width: '100%',
+    height: '100%',
+  },
+  fullscreenBottomBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    paddingBottom: 36,
+    backgroundColor: 'rgba(0,0,0,0.8)',
   },
 });

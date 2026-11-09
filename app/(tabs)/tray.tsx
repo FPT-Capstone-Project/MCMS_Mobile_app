@@ -27,6 +27,7 @@ import {
   CustomerTrayDetails,
 } from '../../src/features/tray';
 import { trayRepository } from '../../src/features/tray/data/repositories/TrayRepository';
+import { useAuth } from '../../src/features/auth';
 
 type TrayLoadState = 'loading' | 'ready' | 'error';
 type DetailLoadState = 'loading' | 'ready' | 'error';
@@ -91,6 +92,7 @@ function getAverageSensorReadings(readings: CustomerTrayDetails['sensor_readings
 
 export default function TrayScreen() {
   const router = useRouter();
+  const { canControlIot } = useAuth();
   const [racks, setRacks] = useState<CustomerFloorRack[]>([]);
   const [loadState, setLoadState] = useState<TrayLoadState>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -140,14 +142,13 @@ export default function TrayScreen() {
     setDetailLoadState('loading');
     try {
       if (!tray.sessionId) {
-        throw new AppError('Không tìm thấy vụ trồng của khay này.', 'NOT_FOUND', 404);
-      }
-      if (!tray.orderId) {
-        throw new AppError('Không tìm thấy đơn hàng của vụ trồng này.', 'NOT_FOUND', 404);
+        setDetailError('Khay này hiện đang trống, chưa có phiên nuôi trồng.');
+        setDetailLoadState('error');
+        return;
       }
       const result = await trayRepository.getCustomerCultivationDetails(
         tray.sessionId,
-        tray.orderId
+        tray.orderId || null
       );
       if (requestId !== detailRequestId.current) return;
       setDetails(result);
@@ -201,8 +202,8 @@ export default function TrayScreen() {
   return (
     <ScreenContainer scrollable edges={['left', 'right']}>
       <AppHeader
-        title="Khay của tôi"
-        subtitle="Sơ đồ khay tại SmartMush Farm"
+        title={canControlIot ? "Phòng tầng khay" : "Khay của tôi"}
+        subtitle={canControlIot ? "Sơ đồ phòng, tầng và khay tại SmartMush Farm" : "Sơ đồ khay tại SmartMush Farm"}
         rightAction={
           <AppIconButton
             icon={<Ionicons name="refresh-outline" size={20} color={theme.colors.text.primary} />}
@@ -214,7 +215,7 @@ export default function TrayScreen() {
       />
 
       <View style={styles.content}>
-        <TrayLegend />
+        <TrayLegend isStaff={canControlIot} />
 
         {loadState === 'loading' ? (
           <View style={styles.centerState}>
@@ -632,10 +633,10 @@ const DetailEmptyState: React.FC<{ message: string }> = ({ message }) => (
   </View>
 );
 
-const TrayLegend: React.FC = () => (
+const TrayLegend: React.FC<{ isStaff?: boolean }> = ({ isStaff }) => (
   <View style={styles.legend}>
-    <LegendItem color="#168A4A" label="Khay của tôi" />
-    <LegendItem color="#3478C5" label="Đang trồng" />
+    {!isStaff && <LegendItem color="#168A4A" label="Khay của tôi" />}
+    <LegendItem color={isStaff ? "#168A4A" : "#3478C5"} label="Đang trồng" />
     <LegendItem color="#94A3B8" label="Chưa sử dụng" />
   </View>
 );

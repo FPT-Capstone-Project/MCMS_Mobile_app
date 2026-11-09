@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -128,77 +128,88 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
     [floors, selectedRoomId]
   );
 
-  // Pre-hydrate all floors across all rooms in parallel so switching rooms is instant
-  useEffect(() => {
-    if (floors.length === 0) return;
+  const hydrateFloor = useCallback(async (f: FloorMapping) => {
+    const fid = f.floor_id ?? f.id;
+    if (!fid) return;
 
-    let isMounted = true;
+    try {
+      const [status, cfg, availableTrays] = await Promise.all([
+        iotRepository.getAutoControlStatus(fid).catch(() => null),
+        iotRepository.getAutoControlConfig(fid).catch(() => null),
+        iotRepository.getAvailableTraysForFloor(fid).catch(() => []),
+      ]);
 
-    const hydrateFloor = async (f: FloorMapping) => {
-      const fid = f.floor_id ?? f.id;
-      if (!fid) return;
-
-      try {
-        const [status, cfg, availableTrays] = await Promise.all([
-          iotRepository.getAutoControlStatus(fid).catch(() => null),
-          iotRepository.getAutoControlConfig(fid).catch(() => null),
-          iotRepository.getAvailableTraysForFloor(fid).catch(() => []),
-        ]);
-
-        if (!isMounted) return;
-
-        if (status) {
-          setFloorStatuses((prev) => ({ ...prev, [fid]: status }));
-          const env = status.environment;
-          if (env) {
-            setFloorEnvironments((prev) => ({ ...prev, [fid]: env }));
-          }
+      if (status) {
+        setFloorStatuses((prev) => ({ ...prev, [fid]: status }));
+        const env = status.environment;
+        if (env) {
+          setFloorEnvironments((prev) => ({ ...prev, [fid]: env }));
         }
-
-        const configObj =
-          cfg?.config ||
-          (status?.run?.config_snapshot as any) ||
-          (status?.environment?.thresholds as any) ||
-          null;
-        setFloorConfigs((prev) => ({ ...prev, [fid]: configObj }));
-
-        if (cfg?.cultivation?.trays) {
-          const trays = cfg.cultivation.trays;
-          const cultivating = trays.filter((t) => t.session_id && t.mushroom_name).length;
-          setFloorTrayCounts((prev) => ({
-            ...prev,
-            [fid]: {
-              total: trays.length,
-              cultivating,
-              availableForAssign: Array.isArray(availableTrays) ? availableTrays.length : 0,
-            },
-          }));
-        } else if (Array.isArray(availableTrays)) {
-          const total = (f.total_rows || 3) * (f.total_columns || 3);
-          setFloorTrayCounts((prev) => ({
-            ...prev,
-            [fid]: {
-              total,
-              cultivating: Math.max(0, total - availableTrays.length),
-              availableForAssign: availableTrays.length,
-            },
-          }));
-        }
-
-        setHydratedFloorIds((prev) => new Set(prev).add(fid));
-      } catch {
-        // Ignore
       }
-    };
 
-    floors.forEach((f) => {
-      void hydrateFloor(f);
-    });
+      const configObj =
+        (cfg as any)?.config ??
+        ((cfg as any)?.humidity_min != null ? cfg : null) ??
+        (status?.run?.config_snapshot as any) ??
+        (status?.environment?.thresholds as any) ??
+        ((status?.lastDecision as any)?.thresholds_snapshot_json as any) ??
+        null;
 
-    return () => {
-      isMounted = false;
-    };
-  }, [floors]);
+      setFloorConfigs((prev) => ({
+        ...prev,
+        [fid]: configObj || prev[fid] || null,
+      }));
+
+      if (cfg?.cultivation?.trays) {
+        const trays = cfg.cultivation.trays;
+        const cultivating = trays.filter((t) => t.session_id && t.mushroom_name).length;
+        setFloorTrayCounts((prev) => ({
+          ...prev,
+          [fid]: {
+            total: trays.length,
+            cultivating,
+            availableForAssign: Array.isArray(availableTrays) ? availableTrays.length : 0,
+          },
+        }));
+      } else if (Array.isArray(availableTrays)) {
+        const total = (f.total_rows || 3) * (f.total_columns || 3);
+        setFloorTrayCounts((prev) => ({
+          ...prev,
+          [fid]: {
+            total,
+            cultivating: Math.max(0, total - availableTrays.length),
+            availableForAssign: availableTrays.length,
+          },
+        }));
+      }
+
+      setHydratedFloorIds((prev) => new Set(prev).add(fid));
+    } catch {
+      setHydratedFloorIds((prev) => new Set(prev).add(fid));
+    }
+  }, []);
+
+  const hydrateAllFloors = useCallback((targetFloors: FloorMapping[], targetRoomId: number | null) => {
+    if (targetFloors.length === 0) return;
+    const active = targetFloors.filter((f) => f.room_id === targetRoomId);
+    const others = targetFloors.filter((f) => f.room_id !== targetRoomId);
+    active.forEach((f) => void hydrateFloor(f));
+    others.forEach((f) => void hydrateFloor(f));
+  }, [hydrateFloor]);
+
+  // Re-fetch data and re-hydrate whenever screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      void (async () => {
+        await loadInitialData();
+      })();
+    }, [loadInitialData])
+  );
+
+  // Pre-hydrate all floors across all rooms whenever floors list or room selection changes
+  useEffect(() => {
+    hydrateAllFloors(floors, selectedRoomId);
+  }, [floors, selectedRoomId, hydrateAllFloors]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -375,14 +386,20 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
               const isRunning = status?.run?.status === 'RUNNING';
               const isDryRun = status?.run?.dry_run === true;
               const isFault =
-                (status?.mode === 'AUTO' && status?.run?.status === 'FAULT') ||
-                status?.runtime?.control_state === 'FAULT' ||
-                status?.runtime?.control_state === 'SENSOR_FAULT';
+                status?.run?.status === 'FAULT' ||
+                (status?.mode === 'AUTO' &&
+                  (status?.runtime?.control_state === 'FAULT' ||
+                    status?.runtime?.control_state === 'SENSOR_FAULT' ||
+                    status?.runtime?.control_state === 'DEVICE_OFFLINE'));
               const isOffPending = status?.runtime?.control_state === 'OFF_PENDING';
 
-              // Has config check: Truly check if config exists in DB
+              // Has config check: Truly check if config exists in DB or has thresholds snapshot
               const hasConfig = Boolean(
-                config && (config.profile_name || config.humidity_min != null || config.id)
+                config &&
+                  (config.profile_name ||
+                    config.humidity_min != null ||
+                    config.id != null ||
+                    config.misting_pulse_ms != null)
               );
 
               return (

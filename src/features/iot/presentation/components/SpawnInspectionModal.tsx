@@ -1,7 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -15,6 +18,7 @@ import {
   RecordSpawnInspectionRequest,
 } from '../../domain/entities/Iot';
 import { iotRepository } from '../../data/repositories/IotRepository';
+import { cultivationRepository } from '../../../cultivation';
 import {
   AppButton,
   AppCard,
@@ -22,6 +26,12 @@ import {
   AppIconButton,
   AppText,
 } from '../../../../shared/components';
+
+interface SelectedImageItem {
+  uri: string;
+  caption?: string;
+  uploaded?: boolean;
+}
 
 interface SpawnInspectionModalProps {
   visible: boolean;
@@ -64,7 +74,17 @@ const SpawnInspectionModalContent: React.FC<{
   const [condition, setCondition] = useState<'NORMAL' | 'WARNING' | 'ABNORMAL'>('NORMAL');
   const [replacementQuantity, setReplacementQuantity] = useState('0');
   const [notes, setNotes] = useState('');
-  const [loading, setLoading] = useState(false);
+
+  // Selected Images
+  const [images, setImages] = useState<SelectedImageItem[]>([]);
+  const [editingCaptionIndex, setEditingCaptionIndex] = useState<number | null>(null);
+  const [captionInput, setCaptionInput] = useState('');
+
+  // Submission state
+  const [submitting, setSubmitting] = useState(false);
+  const [createdInspectionId, setCreatedInspectionId] = useState<number | null>(null);
+  const [uploadProgressText, setUploadProgressText] = useState<string | null>(null);
+  const [failedImageIndices, setFailedImageIndices] = useState<number[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Auto update condition when quantities change
@@ -101,6 +121,107 @@ const SpawnInspectionModalContent: React.FC<{
     }
   };
 
+  // Image Picking
+  const handleTakePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Cần cấp quyền', 'Ứng dụng cần quyền sử dụng máy ảnh để chụp ảnh kiểm tra phôi.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+        allowsEditing: false,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImages((prev) => [...prev, { uri: result.assets[0].uri }]);
+      }
+    } catch {
+      Alert.alert('Lỗi chụp ảnh', 'Không thể khởi động camera. Vui lòng thử lại.');
+    }
+  };
+
+  const handlePickFromGallery = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Cần cấp quyền', 'Ứng dụng cần quyền thư viện ảnh để chọn ảnh phôi.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+        allowsMultipleSelection: true,
+      });
+
+      if (!result.canceled && result.assets) {
+        const newImages = result.assets.map((asset) => ({ uri: asset.uri }));
+        setImages((prev) => [...prev, ...newImages]);
+      }
+    } catch {
+      Alert.alert('Lỗi chọn ảnh', 'Không thể mở thư viện ảnh.');
+    }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== index));
+    setFailedImageIndices((prev) =>
+      prev
+        .filter((i) => i !== index)
+        .map((i) => (i > index ? i - 1 : i))
+    );
+  };
+
+  const handleOpenCaption = (index: number) => {
+    setEditingCaptionIndex(index);
+    setCaptionInput(images[index]?.caption || '');
+  };
+
+  const handleSaveCaption = () => {
+    if (editingCaptionIndex !== null) {
+      setImages((prev) =>
+        prev.map((img, i) =>
+          i === editingCaptionIndex ? { ...img, caption: captionInput.trim() || undefined } : img
+        )
+      );
+      setEditingCaptionIndex(null);
+      setCaptionInput('');
+    }
+  };
+
+  // Sequential image uploader
+  const uploadPhotosSequentially = async (
+    inspectionId: number,
+    targetImages: { item: SelectedImageItem; index: number }[]
+  ): Promise<number[]> => {
+    const failed: number[] = [];
+
+    for (let i = 0; i < targetImages.length; i++) {
+      const { item, index } = targetImages[i];
+      setUploadProgressText(`Đang tải ảnh ${i + 1}/${targetImages.length}...`);
+
+      try {
+        await cultivationRepository.uploadSpawnInspectionImage(
+          inspectionId,
+          item.uri,
+          item.caption
+        );
+        setImages((prev) =>
+          prev.map((img, idx) => (idx === index ? { ...img, uploaded: true } : img))
+        );
+      } catch {
+        failed.push(index);
+      }
+    }
+
+    return failed;
+  };
+
+  // Main Submit Handler
   const handleSubmit = async () => {
     setErrorMessage(null);
     const total = parseInt(totalChecked, 10);
@@ -121,7 +242,9 @@ const SpawnInspectionModalContent: React.FC<{
       return;
     }
 
-    setLoading(true);
+    setSubmitting(true);
+    setUploadProgressText('Đang ghi nhận kết quả kiểm tra phôi...');
+
     try {
       const payload: RecordSpawnInspectionRequest = {
         totalChecked: total,
@@ -133,21 +256,88 @@ const SpawnInspectionModalContent: React.FC<{
         notes: notes.trim() || undefined,
       };
 
-      await iotRepository.recordSpawnInspection(session.session_id, payload);
+      const result = await iotRepository.recordSpawnInspection(session.session_id, payload);
+      const inspectionId = Number(result.inspection_id || result.id);
 
+      if (!inspectionId) {
+        throw new Error('Không nhận được ID lần kiểm tra phôi từ máy chủ.');
+      }
+
+      setCreatedInspectionId(inspectionId);
+
+      // Upload photos if any
+      const unuploaded = images
+        .map((img, idx) => ({ item: img, index: idx }))
+        .filter(({ item }) => !item.uploaded);
+
+      if (unuploaded.length > 0) {
+        const failed = await uploadPhotosSequentially(inspectionId, unuploaded);
+        setFailedImageIndices(failed);
+
+        if (failed.length > 0) {
+          Alert.alert(
+            'Lưu kiểm tra thành công (cần tải lại ảnh)',
+            `Đã lưu kết quả kiểm tra phôi, nhưng còn ${failed.length} ảnh chưa tải lên thành công do gián đoạn mạng. Bạn có thể bấm "Thử lại tải ảnh" ngay bên dưới mà không làm trùng lặp báo cáo.`,
+            [{ text: 'Đã hiểu' }]
+          );
+          setSubmitting(false);
+          setUploadProgressText(null);
+          return;
+        }
+      }
+
+      // Complete Success
+      setSubmitting(false);
+      setUploadProgressText(null);
       Alert.alert(
         'Đã lưu kết quả kiểm tra',
         condition === 'NORMAL' && total >= expectedSpawnBags
           ? 'Đợt kiểm tra đạt chuẩn (NORMAL) và đủ số lượng bịch phôi. Phiên đã đủ điều kiện để chuyển sang SẴN SÀNG TRỒNG (READY_FOR_CULTIVATION).'
-          : 'Kết quả kiểm tra phôi đã được lưu thành công vào lịch sử.',
+          : 'Kết quả kiểm tra phôi cùng hình ảnh minh chứng đã được lưu thành công vào lịch sử.',
         [{ text: 'Đóng', onPress: onSuccess }]
       );
     } catch (err: any) {
       setErrorMessage(
-        err?.message || 'Không thể lưu kết quả kiểm tra phôi. Vui lòng thử lại.'
+        err?.message || 'Không thể lưu kết quả kiểm tra phôi. Vui lòng kiểm tra lại.'
       );
+      setSubmitting(false);
+      setUploadProgressText(null);
+    }
+  };
+
+  // Retry upload failed images only
+  const handleRetryFailedImages = async () => {
+    if (!createdInspectionId || failedImageIndices.length === 0) return;
+
+    setSubmitting(true);
+    setErrorMessage(null);
+
+    const targetImages = failedImageIndices.map((idx) => ({
+      item: images[idx],
+      index: idx,
+    }));
+
+    try {
+      const stillFailed = await uploadPhotosSequentially(createdInspectionId, targetImages);
+      setFailedImageIndices(stillFailed);
+
+      if (stillFailed.length === 0) {
+        Alert.alert(
+          'Tải ảnh hoàn tất',
+          'Tất cả hình ảnh kiểm tra phôi đã được tải lên thành công!',
+          [{ text: 'Đóng', onPress: onSuccess }]
+        );
+      } else {
+        Alert.alert(
+          'Vẫn còn ảnh lỗi',
+          `Còn ${stillFailed.length} ảnh chưa thể tải lên. Vui lòng bấm thử lại lần nữa.`
+        );
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Không thể hoàn tất tải ảnh.');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
+      setUploadProgressText(null);
     }
   };
 
@@ -162,10 +352,10 @@ const SpawnInspectionModalContent: React.FC<{
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
               <AppText variant="title" weight="bold">
-                Kiểm tra phôi nấm
+                Kiểm tra phôi nấm theo phiên
               </AppText>
               <AppText variant="caption" color={theme.colors.text.secondary}>
-                Phiên #{session.session_id} • {session.mushroom_name}
+                Phiên #{session.session_id} • {session.mushroom_name || 'Nấm giống'}
               </AppText>
             </View>
             <AppIconButton
@@ -176,14 +366,22 @@ const SpawnInspectionModalContent: React.FC<{
             />
           </View>
 
-          <AppDivider spacing="sm" />
+          {/* Explicit Notice: Common for session */}
+          <View style={styles.scopeNotice}>
+            <Ionicons name="shield-checkmark" size={15} color={theme.colors.primary[600]} />
+            <AppText variant="caption" color={theme.colors.primary[700]} style={{ flex: 1, marginLeft: 6 }}>
+              Kiểm tra chung cho toàn bộ phiên nuôi trồng (không gắn ảnh riêng cho từng khay).
+            </AppText>
+          </View>
+
+          <AppDivider spacing="xs" />
 
           <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
             {/* Standards Info Banner */}
             <AppCard elevation="xs" style={styles.infoBanner}>
               <View style={styles.infoBannerRow}>
-                <Ionicons name="information-circle" size={20} color={theme.colors.primary[600]} />
-                <View style={{ flex: 1 }}>
+                <Ionicons name="information-circle" size={18} color={theme.colors.primary[600]} />
+                <View style={{ flex: 1, marginLeft: 6 }}>
                   <AppText variant="caption" weight="bold" color={theme.colors.primary[800]}>
                     Quy chuẩn phôi giống SmartMush:
                   </AppText>
@@ -198,9 +396,31 @@ const SpawnInspectionModalContent: React.FC<{
             {errorMessage && (
               <View style={styles.errorBanner}>
                 <Ionicons name="alert-circle" size={16} color={theme.colors.error.dark} />
-                <AppText variant="caption" color={theme.colors.error.dark} style={{ flex: 1 }}>
+                <AppText variant="caption" color={theme.colors.error.dark} style={{ flex: 1, marginLeft: 4 }}>
                   {errorMessage}
                 </AppText>
+              </View>
+            )}
+
+            {/* Partial Upload Warning Banner */}
+            {failedImageIndices.length > 0 && createdInspectionId && (
+              <View style={styles.retryBanner}>
+                <Ionicons name="warning" size={18} color={theme.colors.warning.dark} />
+                <View style={{ flex: 1, marginLeft: 6 }}>
+                  <AppText variant="caption" weight="bold" color={theme.colors.warning.dark}>
+                    Đã lưu kết quả đợt kiểm tra #{createdInspectionId}
+                  </AppText>
+                  <AppText variant="caption" color={theme.colors.warning.dark}>
+                    Còn {failedImageIndices.length} ảnh chưa tải lên thành công do kết nối. Bấm nút dưới để thử lại.
+                  </AppText>
+                </View>
+                <AppButton
+                  title="Thử lại tải ảnh"
+                  variant="primary"
+                  size="sm"
+                  onPress={handleRetryFailedImages}
+                  disabled={submitting}
+                />
               </View>
             )}
 
@@ -216,6 +436,7 @@ const SpawnInspectionModalContent: React.FC<{
                 onChangeText={setTotalChecked}
                 placeholder={`Mặc định: ${expectedSpawnBags}`}
                 placeholderTextColor={theme.colors.text.muted}
+                editable={!createdInspectionId}
               />
             </View>
 
@@ -235,6 +456,7 @@ const SpawnInspectionModalContent: React.FC<{
                   value={normalQuantity}
                   onChangeText={handleNormalChange}
                   placeholder="0"
+                  editable={!createdInspectionId}
                 />
               </View>
 
@@ -252,6 +474,7 @@ const SpawnInspectionModalContent: React.FC<{
                   value={warningQuantity}
                   onChangeText={handleWarningChange}
                   placeholder="0"
+                  editable={!createdInspectionId}
                 />
               </View>
 
@@ -269,6 +492,7 @@ const SpawnInspectionModalContent: React.FC<{
                   value={abnormalQuantity}
                   onChangeText={handleAbnormalChange}
                   placeholder="0"
+                  editable={!createdInspectionId}
                 />
               </View>
             </View>
@@ -284,7 +508,7 @@ const SpawnInspectionModalContent: React.FC<{
                     styles.conditionBtn,
                     condition === 'NORMAL' && styles.conditionBtnNormalActive,
                   ]}
-                  onPress={() => setCondition('NORMAL')}
+                  onPress={() => !createdInspectionId && setCondition('NORMAL')}
                 >
                   <Ionicons
                     name="checkmark-circle"
@@ -305,7 +529,7 @@ const SpawnInspectionModalContent: React.FC<{
                     styles.conditionBtn,
                     condition === 'WARNING' && styles.conditionBtnWarningActive,
                   ]}
-                  onPress={() => setCondition('WARNING')}
+                  onPress={() => !createdInspectionId && setCondition('WARNING')}
                 >
                   <Ionicons
                     name="alert-circle"
@@ -326,7 +550,7 @@ const SpawnInspectionModalContent: React.FC<{
                     styles.conditionBtn,
                     condition === 'ABNORMAL' && styles.conditionBtnAbnormalActive,
                   ]}
-                  onPress={() => setCondition('ABNORMAL')}
+                  onPress={() => !createdInspectionId && setCondition('ABNORMAL')}
                 >
                   <Ionicons
                     name="close-circle"
@@ -356,6 +580,7 @@ const SpawnInspectionModalContent: React.FC<{
                 onChangeText={setReplacementQuantity}
                 placeholder="0"
                 placeholderTextColor={theme.colors.text.muted}
+                editable={!createdInspectionId}
               />
             </View>
 
@@ -372,31 +597,164 @@ const SpawnInspectionModalContent: React.FC<{
                 onChangeText={setNotes}
                 placeholder="Ví dụ: Tơ nấm ăn kín 90%, trắng đều, không có dấu hiệu mốc xanh hay vi khuẩn."
                 placeholderTextColor={theme.colors.text.muted}
+                editable={!createdInspectionId}
               />
             </View>
+
+            {/* Images Section */}
+            <View style={styles.inputGroup}>
+              <View style={styles.imageHeaderRow}>
+                <AppText variant="caption" weight="bold">
+                  Ảnh chụp kiểm tra ({images.length} ảnh):
+                </AppText>
+                {!createdInspectionId && (
+                  <View style={styles.photoActions}>
+                    <Pressable onPress={handleTakePhoto} style={styles.photoActionBtn}>
+                      <Ionicons name="camera-outline" size={16} color={theme.colors.primary[600]} />
+                      <AppText variant="caption" weight="bold" color={theme.colors.primary[700]} style={{ marginLeft: 4 }}>
+                        Chụp ảnh
+                      </AppText>
+                    </Pressable>
+                    <Pressable onPress={handlePickFromGallery} style={styles.photoActionBtn}>
+                      <Ionicons name="image-outline" size={16} color={theme.colors.primary[600]} />
+                      <AppText variant="caption" weight="bold" color={theme.colors.primary[700]} style={{ marginLeft: 4 }}>
+                        Thư viện
+                      </AppText>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+
+              {images.length > 0 ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imagesScroll}>
+                  {images.map((img, idx) => {
+                    const isFailed = failedImageIndices.includes(idx);
+                    return (
+                      <View key={idx} style={styles.imageThumbnailBox}>
+                        <Image source={{ uri: img.uri }} style={styles.thumbnailImg} />
+
+                        {img.uploaded && (
+                          <View style={styles.uploadedBadge}>
+                            <Ionicons name="checkmark-circle" size={14} color="#FFFFFF" />
+                          </View>
+                        )}
+
+                        {isFailed && (
+                          <View style={styles.failedBadge}>
+                            <Ionicons name="alert-circle" size={14} color="#FFFFFF" />
+                          </View>
+                        )}
+
+                        {!createdInspectionId && (
+                          <Pressable onPress={() => handleRemoveImage(idx)} style={styles.removeImageBtn}>
+                            <Ionicons name="close" size={12} color="#FFFFFF" />
+                          </Pressable>
+                        )}
+
+                        <Pressable onPress={() => handleOpenCaption(idx)} style={styles.captionBar}>
+                          <AppText variant="caption" numberOfLines={1} color="#FFFFFF" style={styles.captionText}>
+                            {img.caption ? img.caption : '+ Chú thích'}
+                          </AppText>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              ) : (
+                <View style={styles.emptyImagesBox}>
+                  <Ionicons name="camera-outline" size={24} color={theme.colors.text.muted} />
+                  <AppText variant="caption" color={theme.colors.text.muted} style={{ marginTop: 4 }}>
+                    Chụp hoặc tải ảnh bịch phôi để lưu minh chứng
+                  </AppText>
+                </View>
+              )}
+            </View>
+
+            <View style={{ height: 20 }} />
           </ScrollView>
+
+          {/* Upload Progress Overlay Text */}
+          {uploadProgressText && (
+            <View style={styles.progressBanner}>
+              <ActivityIndicator size="small" color={theme.colors.primary[600]} />
+              <AppText variant="caption" weight="bold" color={theme.colors.primary[700]} style={{ marginLeft: 8 }}>
+                {uploadProgressText}
+              </AppText>
+            </View>
+          )}
 
           {/* Action buttons */}
           <View style={styles.footerRow}>
             <AppButton
-              title="Hủy"
+              title="Đóng"
               variant="outline"
               size="md"
               onPress={onClose}
-              disabled={loading}
+              disabled={submitting}
               style={{ flex: 1 }}
             />
-            <AppButton
-              title={loading ? 'Đang lưu...' : 'Lưu kết quả'}
-              variant="primary"
-              size="md"
-              onPress={handleSubmit}
-              disabled={loading}
-              style={{ flex: 1 }}
-            />
+            {!createdInspectionId ? (
+              <AppButton
+                title={submitting ? 'Đang lưu...' : 'Lưu kết quả'}
+                variant="primary"
+                size="md"
+                onPress={handleSubmit}
+                disabled={submitting}
+                style={{ flex: 1 }}
+              />
+            ) : failedImageIndices.length > 0 ? (
+              <AppButton
+                title="Tải lại ảnh lỗi"
+                variant="primary"
+                size="md"
+                onPress={handleRetryFailedImages}
+                disabled={submitting}
+                style={{ flex: 1 }}
+              />
+            ) : null}
           </View>
         </View>
       </View>
+
+      {/* Caption Editor Modal */}
+      <Modal
+        visible={editingCaptionIndex !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditingCaptionIndex(null)}
+      >
+        <View style={styles.captionModalBackdrop}>
+          <View style={styles.captionModalCard}>
+            <AppText variant="bodyMedium" weight="bold">
+              Chú thích cho ảnh
+            </AppText>
+            <TextInput
+              style={styles.captionTextInput}
+              value={captionInput}
+              onChangeText={setCaptionInput}
+              placeholder="Nhập ghi chú cho ảnh này (tối đa 500 ký tự)..."
+              placeholderTextColor={theme.colors.text.muted}
+              maxLength={500}
+              multiline
+              numberOfLines={3}
+            />
+            <View style={styles.captionModalActions}>
+              <AppButton
+                title="Hủy"
+                variant="outline"
+                size="sm"
+                onPress={() => setEditingCaptionIndex(null)}
+              />
+              <AppButton
+                title="Lưu chú thích"
+                variant="primary"
+                size="sm"
+                onPress={handleSaveCaption}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 };
@@ -430,27 +788,43 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: theme.spacing.xs,
   },
+  scopeNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(2, 132, 199, 0.08)',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 6,
+    borderRadius: theme.borderRadius.md,
+    marginTop: 4,
+    marginBottom: 6,
+  },
   scrollArea: {
-    maxHeight: 460,
+    marginTop: theme.spacing.xs,
   },
   infoBanner: {
-    backgroundColor: 'rgba(14, 165, 233, 0.08)',
-    borderColor: 'rgba(14, 165, 233, 0.3)',
+    backgroundColor: 'rgba(34, 197, 94, 0.08)',
+    borderColor: 'rgba(34, 197, 94, 0.25)',
     marginBottom: theme.spacing.sm,
     padding: theme.spacing.sm,
   },
   infoBannerRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-    padding: 10,
-    borderRadius: theme.borderRadius.sm,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
+  },
+  retryBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.sm,
     marginBottom: theme.spacing.sm,
   },
   inputGroup: {
@@ -459,13 +833,17 @@ const styles = StyleSheet.create({
   textInput: {
     borderWidth: 1,
     borderColor: theme.colors.neutral[300],
-    borderRadius: theme.borderRadius.sm,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
     fontSize: 14,
     color: theme.colors.text.primary,
     backgroundColor: '#FFFFFF',
     marginTop: 4,
+  },
+  notesInput: {
+    minHeight: 60,
+    textAlignVertical: 'top',
   },
   breakdownGrid: {
     flexDirection: 'row',
@@ -478,22 +856,31 @@ const styles = StyleSheet.create({
   badgeLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
     marginBottom: 4,
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 4,
   },
   inputNormal: {
     borderColor: theme.colors.success.main,
+    backgroundColor: 'rgba(34, 197, 94, 0.04)',
+    fontWeight: 'bold',
+    color: theme.colors.success.dark,
   },
   inputWarning: {
     borderColor: theme.colors.warning.main,
+    backgroundColor: 'rgba(245, 158, 11, 0.04)',
+    fontWeight: 'bold',
+    color: theme.colors.warning.dark,
   },
   inputAbnormal: {
     borderColor: theme.colors.error.main,
+    backgroundColor: 'rgba(239, 68, 68, 0.04)',
+    fontWeight: 'bold',
+    color: theme.colors.error.dark,
   },
   conditionRow: {
     flexDirection: 'row',
@@ -505,32 +892,148 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 10,
+    paddingVertical: 8,
+    borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     borderColor: theme.colors.neutral[300],
-    borderRadius: theme.borderRadius.sm,
-    backgroundColor: theme.colors.neutral[50],
+    backgroundColor: '#FFFFFF',
+    gap: 4,
   },
   conditionBtnNormalActive: {
     backgroundColor: theme.colors.success.main,
-    borderColor: theme.colors.success.dark,
+    borderColor: theme.colors.success.main,
   },
   conditionBtnWarningActive: {
     backgroundColor: theme.colors.warning.main,
-    borderColor: theme.colors.warning.dark,
+    borderColor: theme.colors.warning.main,
   },
   conditionBtnAbnormalActive: {
     backgroundColor: theme.colors.error.main,
-    borderColor: theme.colors.error.dark,
+    borderColor: theme.colors.error.main,
   },
-  notesInput: {
-    height: 70,
-    textAlignVertical: 'top',
+  imageHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  photoActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  photoActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: 'rgba(2, 132, 199, 0.08)',
+  },
+  imagesScroll: {
+    gap: 8,
+    paddingVertical: 4,
+  },
+  imageThumbnailBox: {
+    width: 80,
+    height: 80,
+    borderRadius: theme.borderRadius.md,
+    overflow: 'hidden',
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: theme.colors.neutral[300],
+  },
+  thumbnailImg: {
+    width: '100%',
+    height: '100%',
+  },
+  uploadedBadge: {
+    position: 'absolute',
+    top: 3,
+    left: 3,
+    backgroundColor: theme.colors.success.main,
+    borderRadius: 7,
+    padding: 1,
+  },
+  failedBadge: {
+    position: 'absolute',
+    top: 3,
+    left: 3,
+    backgroundColor: theme.colors.error.main,
+    borderRadius: 7,
+    padding: 1,
+  },
+  removeImageBtn: {
+    position: 'absolute',
+    top: 3,
+    right: 3,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderRadius: 9,
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  captionBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 3,
+    paddingVertical: 2,
+  },
+  captionText: {
+    fontSize: 9,
+  },
+  emptyImagesBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: theme.colors.neutral[300],
+    backgroundColor: theme.colors.neutral[50],
+  },
+  progressBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    backgroundColor: 'rgba(2, 132, 199, 0.1)',
+    borderRadius: theme.borderRadius.md,
+    marginBottom: 8,
   },
   footerRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: theme.spacing.md,
+    gap: 8,
+    paddingTop: theme.spacing.xs,
+  },
+  captionModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.lg,
+  },
+  captionModalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+  },
+  captionTextInput: {
+    borderWidth: 1,
+    borderColor: theme.colors.neutral[300],
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.sm,
+    marginTop: 8,
+    minHeight: 70,
+    textAlignVertical: 'top',
+    fontSize: 14,
+  },
+  captionModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 12,
   },
 });

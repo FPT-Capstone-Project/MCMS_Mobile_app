@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,6 +24,10 @@ import { GrowthUpdateModal } from '../../../cultivation/presentation/components/
 import { HarvestReadinessModal } from '../../../cultivation/presentation/components/HarvestReadinessModal';
 import { HarvestActionModal } from '../../../cultivation/presentation/components/HarvestActionModal';
 import { SessionDetailModal } from '../../../cultivation/presentation/components/SessionDetailModal';
+import {
+  DailyTrayInspectionModal,
+  DailyTrayInspectionHistoryModal,
+} from '../../../cultivation';
 import { CustomerOrder } from '../../domain/entities/Order';
 import { orderRepository } from '../../data/repositories/OrderRepository';
 import {
@@ -133,6 +137,15 @@ export const AdminOrdersScreen: React.FC = () => {
   const [harvestSession, setHarvestSession] = useState<CultivationSessionAdmin | null>(null);
   const [harvestModalVisible, setHarvestModalVisible] = useState(false);
 
+  // Daily Tray Inspection Modals State
+  const [dailyTraySession, setDailyTraySession] = useState<CultivationSessionAdmin | null>(null);
+  const [dailyTraySessionTrayId, setDailyTraySessionTrayId] = useState<number | null>(null);
+  const [dailyTrayModalVisible, setDailyTrayModalVisible] = useState(false);
+
+  const [dailyHistorySession, setDailyHistorySession] = useState<CultivationSessionAdmin | null>(null);
+  const [dailyHistorySessionTrayId, setDailyHistorySessionTrayId] = useState<number | null>(null);
+  const [dailyHistoryModalVisible, setDailyHistoryModalVisible] = useState(false);
+
   // Fetch data
   const fetchData = useCallback(async () => {
     setErrorMessage(null);
@@ -221,6 +234,13 @@ export const AdminOrdersScreen: React.FC = () => {
       isMounted = false;
     };
   }, [fetchData]);
+
+  // Automatically refresh data when screen comes back into focus (e.g. after assigning trays or updating session)
+  useFocusEffect(
+    useCallback(() => {
+      void fetchData();
+    }, [fetchData])
+  );
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -636,23 +656,30 @@ export const AdminOrdersScreen: React.FC = () => {
                       <AppText variant="caption" color={theme.colors.text.muted}>
                         Vị trí tầng
                       </AppText>
-                      <AppText
-                        variant="bodySmall"
-                        weight="medium"
-                        color={
-                          (session.floor_name || session.trays?.[0]?.floor_name)
-                            ? theme.colors.text.primary
-                            : theme.colors.warning.dark
-                        }
-                      >
-                        {session.floor_name || session.trays?.[0]?.floor_name
-                          ? `${session.floor_name || session.trays?.[0]?.floor_name}${
-                              session.trays && session.trays.length > 0
-                                ? ` (${session.trays.length} khay)`
-                                : ''
-                            }`
-                          : 'Chưa gán tầng'}
-                      </AppText>
+                      {(() => {
+                        const assignedFloorName =
+                          session.floor_name ||
+                          session.trays?.[0]?.floor_name ||
+                          (session.floor_id != null ? `Tầng ${session.floor_id}` : null) ||
+                          (session.trays?.[0]?.floor_id != null ? `Tầng ${session.trays[0].floor_id}` : null);
+                        const assignedCount = session.trays?.length || 0;
+
+                        return (
+                          <AppText
+                            variant="bodySmall"
+                            weight="medium"
+                            color={
+                              assignedFloorName
+                                ? theme.colors.text.primary
+                                : theme.colors.warning.dark
+                            }
+                          >
+                            {assignedFloorName
+                              ? `${assignedFloorName}${assignedCount > 0 ? ` (${assignedCount} khay)` : ''}`
+                              : 'Chưa gán tầng'}
+                          </AppText>
+                        );
+                      })()}
                     </View>
                   </View>
 
@@ -792,17 +819,63 @@ export const AdminOrdersScreen: React.FC = () => {
                       </View>
                     )}
 
-                    {/* 4. CULTIVATING: Growth, Harvest Readiness, Harvest Actions */}
+                    {/* 4. CULTIVATING: Daily Tray Report, Growth, Harvest Readiness, Harvest Actions */}
                     {session.status === 'CULTIVATING' && (
                       <View style={styles.actionCol}>
+                        {/* Daily Tray Report Buttons */}
                         <View style={styles.spawnActionsSubrow}>
                           <AppButton
-                            title="Cập nhật sinh trưởng"
+                            title="Báo cáo khay"
                             variant="primary"
                             size="sm"
-                            leftIcon={<Ionicons name="trending-up" size={16} color="#FFFFFF" />}
+                            leftIcon={<Ionicons name="camera" size={16} color="#FFFFFF" />}
+                            disabled={!session.trays || session.trays.length === 0}
+                            onPress={() => {
+                              setDailyTraySession(session);
+                              setDailyTraySessionTrayId(null);
+                              setDailyTrayModalVisible(true);
+                            }}
+                          />
+                          <AppButton
+                            title="Lịch sử khay"
+                            variant="outline"
+                            size="sm"
+                            leftIcon={<Ionicons name="images-outline" size={16} color={theme.colors.primary[600]} />}
+                            onPress={() => {
+                              setDailyHistorySession(session);
+                              setDailyHistorySessionTrayId(null);
+                              setDailyHistoryModalVisible(true);
+                            }}
+                          />
+                        </View>
+
+                        <View style={styles.spawnActionsSubrow}>
+                          <AppButton
+                            title="Cập nhật tiến độ"
+                            variant="outline"
+                            size="sm"
+                            leftIcon={<Ionicons name="trending-up" size={16} color={theme.colors.primary[600]} />}
                             onPress={() => {
                               setGrowthSession(session);
+                              const synthProg: ProgressHistoryItem | null =
+                                session.progress_percent != null || session.growth_status
+                                  ? {
+                                      progress_id: 0,
+                                      session_id: session.session_id,
+                                      current_stage: (session.current_stage ||
+                                        session.growth_status ||
+                                        'FRUITING_INITIATION') as string,
+                                      progress_percent:
+                                        session.progress_percent != null
+                                          ? Number(session.progress_percent)
+                                          : 0,
+                                      condition: session.condition || 'NORMAL',
+                                      description: '',
+                                      expected_harvest_date: session.harvest_date,
+                                      created_at: new Date().toISOString(),
+                                    }
+                                  : null;
+                              setLatestProgressForGrowth(synthProg);
                               setGrowthModalVisible(true);
                             }}
                           />
@@ -967,6 +1040,80 @@ export const AdminOrdersScreen: React.FC = () => {
                     )}
                   </View>
                 )}
+
+                {/* Cultivation Sessions belonging to this order */}
+                {(() => {
+                  const orderSessions = sessions.filter((s) => s.order_id === order.order_id);
+                  if (orderSessions.length === 0) return null;
+
+                  return (
+                    <View style={styles.orderSessionsWrap}>
+                      <AppDivider spacing="xs" />
+                      <View style={styles.orderSessionsHeader}>
+                        <Ionicons name="leaf-outline" size={14} color={theme.colors.primary[600]} />
+                        <AppText variant="caption" weight="bold" color={theme.colors.primary[700]}>
+                          Phiên nuôi trồng thuộc đơn ({orderSessions.length} phiên):
+                        </AppText>
+                      </View>
+
+                      <View style={{ gap: 6, marginTop: 4 }}>
+                        {orderSessions.map((s) => (
+                          <View key={s.session_id} style={styles.orderSessionItem}>
+                            <View style={{ flex: 1 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <AppText variant="caption" weight="bold">
+                                  Phiên #{s.session_id}
+                                </AppText>
+                                {renderSessionBadge(s.status)}
+                              </View>
+                              <AppText variant="caption" color={theme.colors.text.secondary} numberOfLines={1}>
+                                {s.mushroom_name || 'Nấm giống'} • {s.required_trays || 1} khay
+                              </AppText>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', gap: 4 }}>
+                              {(s.status === 'SPAWN_RESTING' || s.status === 'MYCELIAL_DEVELOPMENT') && (
+                                <AppButton
+                                  title="Phôi"
+                                  variant="primary"
+                                  size="sm"
+                                  leftIcon={<Ionicons name="clipboard-outline" size={13} color="#FFFFFF" />}
+                                  onPress={() => {
+                                    setInspectionSession(s);
+                                    setInspectionModalVisible(true);
+                                  }}
+                                />
+                              )}
+                              {s.status === 'CULTIVATING' && (
+                                <AppButton
+                                  title="Báo cáo"
+                                  variant="primary"
+                                  size="sm"
+                                  leftIcon={<Ionicons name="camera" size={13} color="#FFFFFF" />}
+                                  disabled={!s.trays || s.trays.length === 0}
+                                  onPress={() => {
+                                    setDailyTraySession(s);
+                                    setDailyTraySessionTrayId(null);
+                                    setDailyTrayModalVisible(true);
+                                  }}
+                                />
+                              )}
+                              <AppButton
+                                title="Chi tiết"
+                                variant="outline"
+                                size="sm"
+                                onPress={() => {
+                                  setDetailSession(s);
+                                  setDetailModalVisible(true);
+                                }}
+                              />
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  );
+                })()}
               </AppCard>
             );
           })
@@ -1030,6 +1177,16 @@ export const AdminOrdersScreen: React.FC = () => {
           setHistorySession(sess);
           setHistoryModalVisible(true);
         }}
+        onOpenDailyTrayInspection={(sess, trayId) => {
+          setDailyTraySession(sess);
+          setDailyTraySessionTrayId(trayId || null);
+          setDailyTrayModalVisible(true);
+        }}
+        onOpenDailyTrayInspectionHistory={(sess, trayId) => {
+          setDailyHistorySession(sess);
+          setDailyHistorySessionTrayId(trayId || null);
+          setDailyHistoryModalVisible(true);
+        }}
         onTransitionStage={(sess, stage) => {
           handleTransitionStage(sess, stage);
         }}
@@ -1078,6 +1235,42 @@ export const AdminOrdersScreen: React.FC = () => {
         }}
         onSuccess={async () => {
           await fetchData();
+        }}
+      />
+
+      {/* Daily Tray Inspection Modal */}
+      <DailyTrayInspectionModal
+        visible={dailyTrayModalVisible}
+        session={dailyTraySession}
+        initialSessionTrayId={dailyTraySessionTrayId}
+        onClose={() => {
+          setDailyTrayModalVisible(false);
+          setDailyTraySession(null);
+          setDailyTraySessionTrayId(null);
+        }}
+        onSuccess={() => {
+          setDailyTrayModalVisible(false);
+          setDailyTraySession(null);
+          setDailyTraySessionTrayId(null);
+          void fetchData();
+        }}
+      />
+
+      {/* Daily Tray Inspection History Modal */}
+      <DailyTrayInspectionHistoryModal
+        visible={dailyHistoryModalVisible}
+        session={dailyHistorySession}
+        initialSessionTrayId={dailyHistorySessionTrayId}
+        onClose={() => {
+          setDailyHistoryModalVisible(false);
+          setDailyHistorySession(null);
+          setDailyHistorySessionTrayId(null);
+        }}
+        onOpenCreateReport={(trayId) => {
+          setDailyHistoryModalVisible(false);
+          setDailyTraySession(dailyHistorySession);
+          setDailyTraySessionTrayId(trayId || null);
+          setDailyTrayModalVisible(true);
         }}
       />
     </ScreenContainer>
@@ -1310,5 +1503,24 @@ const styles = StyleSheet.create({
   expandBtn: {
     alignSelf: 'flex-start',
     marginTop: 4,
+  },
+  orderSessionsWrap: {
+    marginTop: 8,
+  },
+  orderSessionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  orderSessionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+    borderRadius: theme.borderRadius.sm,
+    padding: 8,
   },
 });
