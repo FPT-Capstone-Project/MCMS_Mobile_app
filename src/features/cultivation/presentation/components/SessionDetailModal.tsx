@@ -22,6 +22,7 @@ import {
   AppIconButton,
   AppText,
 } from '../../../../shared/components';
+import { formatVietnameseDisplayDate } from './GrowthUpdateModal';
 
 interface SessionDetailModalProps {
   visible: boolean;
@@ -316,7 +317,7 @@ const SessionDetailModalContent: React.FC<{
                     </View>
                     {expectedHarvest && (
                       <AppText variant="caption" color={theme.colors.text.secondary}>
-                        Dự kiến: {new Date(expectedHarvest).toLocaleDateString('vi-VN')}
+                        Dự kiến: {formatVietnameseDisplayDate(expectedHarvest)}
                       </AppText>
                     )}
                   </View>

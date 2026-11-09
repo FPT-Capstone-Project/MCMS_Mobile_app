@@ -34,6 +34,88 @@ interface GrowthUpdateModalProps {
   onSuccess: () => Promise<void> | void;
 }
 
+/**
+ * Robustly sanitizes any incoming date string (ISO timestamp, space-separated, DD/MM/YYYY)
+ * to standard YYYY-MM-DD format.
+ */
+export function sanitizeDateToYYYYMMDD(rawDate?: string | null): string {
+  if (!rawDate) return '';
+  const trimmed = String(rawDate).trim();
+  if (!trimmed) return '';
+
+  // Already standard YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Starts with YYYY-MM-DD (e.g. ISO 2026-11-20T... or 2026-11-20 00:00:00)
+  if (trimmed.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+    return trimmed.slice(0, 10);
+  }
+
+  // DD/MM/YYYY or DD-MM-YYYY
+  const dmyMatch = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(trimmed);
+  if (dmyMatch) {
+    const [, d, m, y] = dmyMatch;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+
+  // Try standard Date parsing
+  const parsed = new Date(trimmed);
+  if (!isNaN(parsed.getTime())) {
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  return trimmed;
+}
+
+/**
+ * Formats YYYY-MM-DD to DD/MM/YYYY for Vietnamese display
+ */
+export function formatVietnameseDisplayDate(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  const sanitized = sanitizeDateToYYYYMMDD(dateStr);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(sanitized)) return dateStr;
+  const [y, m, d] = sanitized.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+/**
+ * Formats full Vietnamese weekday and date: e.g. "Thứ Sáu, 20/11/2026"
+ */
+export function getVietnameseFullDate(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  const sanitized = sanitizeDateToYYYYMMDD(dateStr);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(sanitized)) return dateStr;
+  const [y, m, d] = sanitized.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  const dayNames = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+  const dayName = dayNames[dt.getDay()];
+  return `${dayName}, ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
+}
+
+/**
+ * Calculates remaining days from today until harvest date
+ */
+export function getDaysUntil(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  const sanitized = sanitizeDateToYYYYMMDD(dateStr);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(sanitized)) return '';
+  const [y, m, d] = sanitized.split('-').map(Number);
+  const target = new Date(y, m - 1, d);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffTime = target.getTime() - today.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Hôm nay';
+  if (diffDays === 1) return 'Ngày mai';
+  if (diffDays > 1) return `Còn ${diffDays} ngày`;
+  return `Đã qua ${Math.abs(diffDays)} ngày`;
+}
+
 const GROWTH_STAGE_OPTIONS: { stage: GrowthStage; label: string; desc: string }[] = [
   {
     stage: 'FRUITING_INITIATION',
@@ -91,10 +173,30 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
     latestProgress?.condition || session.condition || 'NORMAL'
   );
   const [notes, setNotes] = useState<string>(latestProgress?.description || '');
-  const [expectedHarvestDate, setExpectedHarvestDate] = useState<string>(
-    latestProgress?.expected_harvest_date ||
-      (session.harvest_date ? session.harvest_date.slice(0, 10) : '')
-  );
+  const [expectedHarvestDate, setExpectedHarvestDate] = useState<string>(() => {
+    const raw = latestProgress?.expected_harvest_date || session.harvest_date;
+    return sanitizeDateToYYYYMMDD(raw);
+  });
+
+  // Calendar picker state
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [pickerYear, setPickerYear] = useState<number>(() => {
+    const raw = latestProgress?.expected_harvest_date || session.harvest_date;
+    const sanitized = sanitizeDateToYYYYMMDD(raw);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(sanitized)) {
+      return Number(sanitized.slice(0, 4));
+    }
+    return new Date().getFullYear();
+  });
+  const [pickerMonth, setPickerMonth] = useState<number>(() => {
+    const raw = latestProgress?.expected_harvest_date || session.harvest_date;
+    const sanitized = sanitizeDateToYYYYMMDD(raw);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(sanitized)) {
+      return Number(sanitized.slice(5, 7)) - 1;
+    }
+    return new Date().getMonth();
+  });
+  const [showManualDateInput, setShowManualDateInput] = useState(false);
 
   const [fetchingProgress, setFetchingProgress] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -147,7 +249,9 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
           prog.expected_harvest_date ||
           prog.latest_progress?.expected_harvest_date ||
           latestProgress?.expected_harvest_date ||
-          (session.harvest_date ? session.harvest_date.slice(0, 10) : '');
+          session.harvest_date;
+
+        const sanitizedHarvestDate = sanitizeDateToYYYYMMDD(resolvedHarvestDate);
 
         setBaselinePercent(resolvedPercent);
         setBaselineStage(resolvedStage);
@@ -155,7 +259,12 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
         setProgressPercent(String(resolvedPercent));
         setCondition(resolvedCondition);
         setNotes(resolvedNotes);
-        setExpectedHarvestDate(resolvedHarvestDate);
+        setExpectedHarvestDate(sanitizedHarvestDate);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(sanitizedHarvestDate)) {
+          const [y, m] = sanitizedHarvestDate.split('-').map(Number);
+          setPickerYear(y);
+          setPickerMonth(m - 1);
+        }
       } catch {
         if (!isMounted) return;
         const fallbackPercent =
@@ -169,16 +278,22 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
           session.growth_status ||
           'FRUITING_INITIATION') as GrowthStage;
 
+        const fallbackHarvestDate = sanitizeDateToYYYYMMDD(
+          latestProgress?.expected_harvest_date || session.harvest_date
+        );
+
         setBaselinePercent(fallbackPercent);
         setBaselineStage(fallbackStage);
         setSelectedStage(fallbackStage);
         setProgressPercent(String(fallbackPercent));
         setCondition(latestProgress?.condition || session.condition || 'NORMAL');
         setNotes(latestProgress?.description || '');
-        setExpectedHarvestDate(
-          latestProgress?.expected_harvest_date ||
-            (session.harvest_date ? session.harvest_date.slice(0, 10) : '')
-        );
+        setExpectedHarvestDate(fallbackHarvestDate);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(fallbackHarvestDate)) {
+          const [y, m] = fallbackHarvestDate.split('-').map(Number);
+          setPickerYear(y);
+          setPickerMonth(m - 1);
+        }
       } finally {
         if (isMounted) {
           setFetchingProgress(false);
@@ -208,6 +323,78 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
     setProgressPercent(String(next));
   };
 
+  const handleOpenDatePicker = () => {
+    if (expectedHarvestDate) {
+      const sanitized = sanitizeDateToYYYYMMDD(expectedHarvestDate);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(sanitized)) {
+        const [y, m] = sanitized.split('-').map(Number);
+        setPickerYear(y);
+        setPickerMonth(m - 1);
+      }
+    } else {
+      const now = new Date();
+      setPickerYear(now.getFullYear());
+      setPickerMonth(now.getMonth());
+    }
+    setDatePickerVisible(true);
+  };
+
+  const handlePrevMonth = () => {
+    if (pickerMonth === 0) {
+      setPickerMonth(11);
+      setPickerYear((y) => y - 1);
+    } else {
+      setPickerMonth((m) => m - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (pickerMonth === 11) {
+      setPickerMonth(0);
+      setPickerYear((y) => y + 1);
+    } else {
+      setPickerMonth((m) => m + 1);
+    }
+  };
+
+  const handleSelectDay = (day: number) => {
+    const formattedDate = `${pickerYear}-${String(pickerMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    setExpectedHarvestDate(formattedDate);
+    setDatePickerVisible(false);
+  };
+
+  const handleQuickAddDays = (days: number) => {
+    const target = new Date();
+    target.setDate(target.getDate() + days);
+    const y = target.getFullYear();
+    const m = String(target.getMonth() + 1).padStart(2, '0');
+    const d = String(target.getDate()).padStart(2, '0');
+    const formattedDate = `${y}-${m}-${d}`;
+    setExpectedHarvestDate(formattedDate);
+    setPickerYear(y);
+    setPickerMonth(target.getMonth());
+  };
+
+  // Calendar month matrix calculation
+  const firstDay = new Date(pickerYear, pickerMonth, 1).getDay();
+  const mondayOffset = (firstDay + 6) % 7; // Monday = 0, Sunday = 6
+  const daysInMonth = new Date(pickerYear, pickerMonth + 1, 0).getDate();
+  const calendarCells: (number | null)[] = [];
+  for (let i = 0; i < mondayOffset; i++) {
+    calendarCells.push(null);
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    calendarCells.push(d);
+  }
+
+  const todayStr = (() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  })();
+
   const handleSubmit = async () => {
     setErrorText(null);
     const nPercent = Number(progressPercent);
@@ -233,12 +420,15 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
       return;
     }
 
+    let finalHarvestDate: string | undefined = undefined;
     if (expectedHarvestDate.trim()) {
+      const sanitized = sanitizeDateToYYYYMMDD(expectedHarvestDate);
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(expectedHarvestDate.trim())) {
-        setErrorText('Ngày dự kiến thu hoạch phải có định dạng YYYY-MM-DD (VD: 2026-11-20).');
+      if (!dateRegex.test(sanitized)) {
+        setErrorText('Ngày dự kiến thu hoạch không đúng định dạng YYYY-MM-DD. Vui lòng chọn ngày từ lịch.');
         return;
       }
+      finalHarvestDate = sanitized;
     }
 
     setLoading(true);
@@ -248,7 +438,7 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
         progressPercent: nPercent,
         condition: condition.trim(),
         notes: notes.trim() || undefined,
-        expectedHarvestDate: expectedHarvestDate.trim() || undefined,
+        expectedHarvestDate: finalHarvestDate,
       };
 
       await iotRepository.updateSessionGrowth(session.session_id, payload);
@@ -468,20 +658,129 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
             </View>
 
             {/* 4. Expected Harvest Date */}
-            <AppText variant="label" weight="bold" style={styles.sectionTitle}>
-              4. Ngày dự kiến thu hoạch (YYYY-MM-DD)
-            </AppText>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="calendar-outline" size={18} color={theme.colors.text.muted} style={{ marginRight: 8 }} />
-              <TextInput
-                style={[styles.textInput, { flex: 1 }]}
-                value={expectedHarvestDate}
-                onChangeText={setExpectedHarvestDate}
-                placeholder="VD: 2026-11-25 (tùy chọn)"
-                placeholderTextColor={theme.colors.text.muted}
-                editable={!loading}
-              />
+            <View style={styles.sectionHeaderRow}>
+              <AppText variant="label" weight="bold" style={styles.sectionTitle}>
+                4. Ngày dự kiến thu hoạch
+              </AppText>
+              {expectedHarvestDate.trim() ? (
+                <Pressable
+                  onPress={() => setExpectedHarvestDate('')}
+                  hitSlop={8}
+                  style={styles.clearDateBtn}
+                >
+                  <Ionicons name="close-circle-outline" size={14} color={theme.colors.error.main} />
+                  <AppText variant="caption" weight="medium" color={theme.colors.error.main}>
+                    Bỏ chọn ngày
+                  </AppText>
+                </Pressable>
+              ) : null}
             </View>
+
+            {/* Quick date chips */}
+            <View style={styles.quickDateRow}>
+              {[
+                { label: '+3 ngày', days: 3 },
+                { label: '+7 ngày (1 tuần)', days: 7 },
+                { label: '+14 ngày (2 tuần)', days: 14 },
+                { label: '+21 ngày (3 tuần)', days: 21 },
+                { label: '+30 ngày (1 tháng)', days: 30 },
+              ].map((chip) => (
+                <Pressable
+                  key={chip.days}
+                  style={styles.quickDateChip}
+                  onPress={() => handleQuickAddDays(chip.days)}
+                  disabled={loading}
+                >
+                  <AppText variant="caption" weight="bold" color={theme.colors.primary[700]}>
+                    {chip.label}
+                  </AppText>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Interactive Card opening Calendar Picker */}
+            <Pressable
+              style={[
+                styles.datePickerCard,
+                expectedHarvestDate ? styles.datePickerCardActive : null,
+              ]}
+              onPress={handleOpenDatePicker}
+              disabled={loading}
+            >
+              <View
+                style={[
+                  styles.datePickerIconWrapper,
+                  expectedHarvestDate ? styles.datePickerIconWrapperActive : null,
+                ]}
+              >
+                <Ionicons
+                  name="calendar"
+                  size={22}
+                  color={expectedHarvestDate ? theme.colors.primary[600] : theme.colors.neutral[500]}
+                />
+              </View>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                {expectedHarvestDate ? (
+                  <>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                      <AppText variant="body" weight="bold" color={theme.colors.primary[800]}>
+                        {formatVietnameseDisplayDate(expectedHarvestDate)}
+                      </AppText>
+                      {getDaysUntil(expectedHarvestDate) ? (
+                        <View style={styles.daysBadge}>
+                          <AppText variant="caption" weight="bold" color={theme.colors.primary[700]}>
+                            {getDaysUntil(expectedHarvestDate)}
+                          </AppText>
+                        </View>
+                      ) : null}
+                    </View>
+                    <AppText variant="caption" color={theme.colors.text.secondary} style={{ marginTop: 2 }}>
+                      {getVietnameseFullDate(expectedHarvestDate)} • Chuẩn: {sanitizeDateToYYYYMMDD(expectedHarvestDate)}
+                    </AppText>
+                  </>
+                ) : (
+                  <>
+                    <AppText variant="bodySmall" weight="medium" color={theme.colors.text.secondary}>
+                      Chưa chọn ngày dự kiến thu hoạch
+                    </AppText>
+                    <AppText variant="caption" color={theme.colors.text.muted}>
+                      Nhấn vào đây để mở lịch chọn ngày
+                    </AppText>
+                  </>
+                )}
+              </View>
+              <View style={styles.datePickerActionBtn}>
+                <AppText variant="caption" weight="bold" color={theme.colors.primary[700]}>
+                  {expectedHarvestDate ? 'Đổi ngày' : 'Chọn lịch'}
+                </AppText>
+                <Ionicons name="chevron-forward" size={16} color={theme.colors.primary[600]} />
+              </View>
+            </Pressable>
+
+            {/* Toggle manual text entry */}
+            <View style={{ marginTop: 6, flexDirection: 'row', justifyContent: 'flex-end' }}>
+              <Pressable
+                onPress={() => setShowManualDateInput(!showManualDateInput)}
+                hitSlop={6}
+              >
+                <AppText variant="caption" color={theme.colors.primary[600]} weight="medium">
+                  {showManualDateInput ? 'Ẩn ô nhập tay' : 'Nhập tay (YYYY-MM-DD)'}
+                </AppText>
+              </Pressable>
+            </View>
+
+            {showManualDateInput && (
+              <View style={[styles.inputWrapper, { marginTop: 6 }]}>
+                <TextInput
+                  style={styles.textInput}
+                  value={expectedHarvestDate}
+                  onChangeText={(val) => setExpectedHarvestDate(val)}
+                  placeholder="YYYY-MM-DD (VD: 2026-11-25)"
+                  placeholderTextColor={theme.colors.text.muted}
+                  editable={!loading}
+                />
+              </View>
+            )}
 
             {/* 5. Notes */}
             <AppText variant="label" weight="bold" style={styles.sectionTitle}>
@@ -520,6 +819,181 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
             </View>
           </View>
         </View>
+
+        {/* Calendar Picker Modal / Overlay */}
+        {datePickerVisible && (
+          <View style={styles.calendarOverlay}>
+            <Pressable
+              style={styles.calendarBackdropPressable}
+              onPress={() => setDatePickerVisible(false)}
+            />
+            <View style={styles.calendarCard}>
+              {/* Header */}
+              <View style={styles.calendarHeaderRow}>
+                <View style={{ flex: 1 }}>
+                  <AppText variant="subtitle" weight="bold">
+                    Chọn ngày thu hoạch
+                  </AppText>
+                  <AppText variant="caption" color={theme.colors.text.secondary}>
+                    {expectedHarvestDate
+                      ? getVietnameseFullDate(expectedHarvestDate)
+                      : 'Chọn một ngày dự kiến thu hoạch nấm'}
+                  </AppText>
+                </View>
+                <AppIconButton
+                  icon={<Ionicons name="close" size={20} color={theme.colors.text.secondary} />}
+                  size="sm"
+                  accessibilityLabel="Đóng lịch"
+                  onPress={() => setDatePickerVisible(false)}
+                />
+              </View>
+
+              <AppDivider spacing="xs" />
+
+              {/* Month & Year Navigation */}
+              <View style={styles.monthNavigationRow}>
+                <Pressable
+                  style={styles.monthNavBtn}
+                  onPress={handlePrevMonth}
+                  hitSlop={8}
+                >
+                  <Ionicons name="chevron-back" size={20} color={theme.colors.text.primary} />
+                </Pressable>
+                <AppText variant="body" weight="bold">
+                  {`Tháng ${pickerMonth + 1} / ${pickerYear}`}
+                </AppText>
+                <Pressable
+                  style={styles.monthNavBtn}
+                  onPress={handleNextMonth}
+                  hitSlop={8}
+                >
+                  <Ionicons name="chevron-forward" size={20} color={theme.colors.text.primary} />
+                </Pressable>
+              </View>
+
+              {/* Weekday Names */}
+              <View style={styles.weekdayRow}>
+                {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((dayName, idx) => (
+                  <View key={dayName} style={styles.weekdayCell}>
+                    <AppText
+                      variant="caption"
+                      weight="bold"
+                      color={idx >= 5 ? theme.colors.warning.dark : theme.colors.text.secondary}
+                    >
+                      {dayName}
+                    </AppText>
+                  </View>
+                ))}
+              </View>
+
+              {/* Days Grid */}
+              <View style={styles.daysGrid}>
+                {calendarCells.map((dayNum, cellIdx) => {
+                  if (dayNum == null) {
+                    return <View key={`empty-${cellIdx}`} style={styles.dayGridCell} />;
+                  }
+                  const cellDateStr = `${pickerYear}-${String(pickerMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                  const isSelected = expectedHarvestDate === cellDateStr;
+                  const isToday = todayStr === cellDateStr;
+                  const isPast = cellDateStr < todayStr;
+
+                  return (
+                    <View key={`day-${dayNum}`} style={styles.dayGridCell}>
+                      <Pressable
+                        style={[
+                          styles.dayCircle,
+                          isToday && styles.dayCircleToday,
+                          isSelected && styles.dayCircleSelected,
+                        ]}
+                        onPress={() => handleSelectDay(dayNum)}
+                      >
+                        <AppText
+                          variant="bodySmall"
+                          weight={isSelected || isToday ? 'bold' : 'normal'}
+                          color={
+                            isSelected
+                              ? '#FFFFFF'
+                              : isToday
+                              ? theme.colors.primary[700]
+                              : isPast
+                              ? theme.colors.neutral[400]
+                              : theme.colors.text.primary
+                          }
+                        >
+                          {dayNum}
+                        </AppText>
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+
+              {/* Calendar Quick Increment Chips */}
+              <View style={styles.calendarQuickRow}>
+                <Pressable
+                  style={styles.calendarQuickBtn}
+                  onPress={() => {
+                    setExpectedHarvestDate(todayStr);
+                    const now = new Date();
+                    setPickerYear(now.getFullYear());
+                    setPickerMonth(now.getMonth());
+                  }}
+                >
+                  <AppText variant="caption" weight="medium" color={theme.colors.primary[700]}>
+                    Hôm nay
+                  </AppText>
+                </Pressable>
+                <Pressable
+                  style={styles.calendarQuickBtn}
+                  onPress={() => handleQuickAddDays(7)}
+                >
+                  <AppText variant="caption" weight="medium" color={theme.colors.primary[700]}>
+                    +7 ngày
+                  </AppText>
+                </Pressable>
+                <Pressable
+                  style={styles.calendarQuickBtn}
+                  onPress={() => handleQuickAddDays(14)}
+                >
+                  <AppText variant="caption" weight="medium" color={theme.colors.primary[700]}>
+                    +14 ngày
+                  </AppText>
+                </Pressable>
+                <Pressable
+                  style={styles.calendarQuickBtn}
+                  onPress={() => handleQuickAddDays(21)}
+                >
+                  <AppText variant="caption" weight="medium" color={theme.colors.primary[700]}>
+                    +21 ngày
+                  </AppText>
+                </Pressable>
+              </View>
+
+              {/* Calendar Footer Actions */}
+              <View style={styles.calendarFooterRow}>
+                {expectedHarvestDate ? (
+                  <Pressable
+                    style={styles.calendarClearBtn}
+                    onPress={() => {
+                      setExpectedHarvestDate('');
+                      setDatePickerVisible(false);
+                    }}
+                  >
+                    <AppText variant="bodySmall" weight="medium" color={theme.colors.error.main}>
+                      Bỏ chọn ngày
+                    </AppText>
+                  </Pressable>
+                ) : <View style={{ flex: 1 }} />}
+                <AppButton
+                  title="Xong"
+                  variant="primary"
+                  size="sm"
+                  onPress={() => setDatePickerVisible(false)}
+                />
+              </View>
+            </View>
+          </View>
+        )}
       </View>
     </Modal>
   );
@@ -691,5 +1165,183 @@ const styles = StyleSheet.create({
   quickPercentBtnMax: {
     backgroundColor: 'rgba(34, 197, 94, 0.1)',
     borderColor: 'rgba(34, 197, 94, 0.3)',
+  },
+  clearDateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  quickDateRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  quickDateChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.primary[50],
+    borderWidth: 1,
+    borderColor: theme.colors.primary[200],
+  },
+  datePickerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.neutral[300],
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.sm,
+    backgroundColor: '#FFFFFF',
+    minHeight: 56,
+  },
+  datePickerCardActive: {
+    borderColor: theme.colors.primary[500],
+    backgroundColor: theme.colors.primary[50],
+  },
+  datePickerIconWrapper: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: theme.colors.neutral[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  datePickerIconWrapperActive: {
+    backgroundColor: theme.colors.primary[100],
+  },
+  daysBadge: {
+    backgroundColor: theme.colors.primary[100],
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  datePickerActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: theme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.primary[200],
+  },
+  calendarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.md,
+    zIndex: 9999,
+  },
+  calendarBackdropPressable: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  calendarCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#FFFFFF',
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    ...theme.shadows.lg,
+    zIndex: 10000,
+  },
+  calendarHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.xs,
+  },
+  monthNavigationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+  },
+  monthNavBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.neutral[100],
+  },
+  weekdayRow: {
+    flexDirection: 'row',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.neutral[200],
+  },
+  weekdayCell: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  daysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingVertical: 8,
+  },
+  dayGridCell: {
+    width: '14.28%',
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 2,
+  },
+  dayCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayCircleToday: {
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[600],
+    backgroundColor: theme.colors.primary[50],
+  },
+  dayCircleSelected: {
+    backgroundColor: theme.colors.primary[600],
+    borderColor: theme.colors.primary[600],
+  },
+  calendarQuickRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.neutral[200],
+  },
+  calendarQuickBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.primary[50],
+    borderWidth: 1,
+    borderColor: theme.colors.primary[200],
+  },
+  calendarFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  calendarClearBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
 });
