@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   View,
@@ -32,6 +33,8 @@ interface SessionDetailModalProps {
   onOpenHarvestAction?: (session: CultivationSessionAdmin) => void;
   onOpenSpawnInspection?: (session: CultivationSessionAdmin) => void;
   onOpenSpawnHistory?: (session: CultivationSessionAdmin) => void;
+  onOpenDailyTrayInspection?: (session: CultivationSessionAdmin, sessionTrayId?: number | null) => void;
+  onOpenDailyTrayInspectionHistory?: (session: CultivationSessionAdmin, sessionTrayId?: number | null) => void;
   onTransitionStage?: (session: CultivationSessionAdmin, stage: 'SPAWN_RESTING' | 'MYCELIAL_DEVELOPMENT' | 'READY_FOR_CULTIVATION') => void;
   onNavigateToAssignTrays?: () => void;
 }
@@ -46,6 +49,8 @@ export const SessionDetailModal: React.FC<SessionDetailModalProps> = ({
   onOpenHarvestAction,
   onOpenSpawnInspection,
   onOpenSpawnHistory,
+  onOpenDailyTrayInspection,
+  onOpenDailyTrayInspectionHistory,
   onTransitionStage,
   onNavigateToAssignTrays,
 }) => {
@@ -62,6 +67,8 @@ export const SessionDetailModal: React.FC<SessionDetailModalProps> = ({
       onOpenHarvestAction={onOpenHarvestAction}
       onOpenSpawnInspection={onOpenSpawnInspection}
       onOpenSpawnHistory={onOpenSpawnHistory}
+      onOpenDailyTrayInspection={onOpenDailyTrayInspection}
+      onOpenDailyTrayInspectionHistory={onOpenDailyTrayInspectionHistory}
       onTransitionStage={onTransitionStage}
       onNavigateToAssignTrays={onNavigateToAssignTrays}
     />
@@ -78,6 +85,8 @@ const SessionDetailModalContent: React.FC<{
   onOpenHarvestAction?: (session: CultivationSessionAdmin) => void;
   onOpenSpawnInspection?: (session: CultivationSessionAdmin) => void;
   onOpenSpawnHistory?: (session: CultivationSessionAdmin) => void;
+  onOpenDailyTrayInspection?: (session: CultivationSessionAdmin, sessionTrayId?: number | null) => void;
+  onOpenDailyTrayInspectionHistory?: (session: CultivationSessionAdmin, sessionTrayId?: number | null) => void;
   onTransitionStage?: (session: CultivationSessionAdmin, stage: 'SPAWN_RESTING' | 'MYCELIAL_DEVELOPMENT' | 'READY_FOR_CULTIVATION') => void;
   onNavigateToAssignTrays?: () => void;
 }> = ({
@@ -89,6 +98,8 @@ const SessionDetailModalContent: React.FC<{
   onOpenHarvestAction,
   onOpenSpawnInspection,
   onOpenSpawnHistory,
+  onOpenDailyTrayInspection,
+  onOpenDailyTrayInspectionHistory,
   onTransitionStage,
   onNavigateToAssignTrays,
 }) => {
@@ -96,6 +107,9 @@ const SessionDetailModalContent: React.FC<{
   const [sessionDetail, setSessionDetail] = useState<CultivationSessionAdmin | null>(null);
   const [progressData, setProgressData] = useState<SessionProgressResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Selected tray for targeted daily report
+  const [selectedSessionTrayId, setSelectedSessionTrayId] = useState<number | null>(null);
 
   const fetchFullDetail = useCallback(async () => {
     setLoading(true);
@@ -105,9 +119,15 @@ const SessionDetailModalContent: React.FC<{
       try {
         const detail = await iotRepository.getSessionAdminDetail(session.session_id);
         setSessionDetail(detail);
+        if (detail.trays && detail.trays.length > 0) {
+          setSelectedSessionTrayId(detail.trays[0].session_tray_id);
+        }
       } catch {
         // Fallback to current session object
         setSessionDetail(session);
+        if (session.trays && session.trays.length > 0) {
+          setSelectedSessionTrayId(session.trays[0].session_tray_id);
+        }
       }
 
       // 2. Fetch progress history
@@ -139,6 +159,8 @@ const SessionDetailModalContent: React.FC<{
   const current = sessionDetail || session;
   const reqTrays = current.required_trays || current.tray_quantity || 1;
   const spawnQuantity = current.spawn_quantity || reqTrays * 3;
+  const assignedTrays = current.trays || [];
+  const hasAssignedTrays = assignedTrays.length > 0;
 
   // Stages & Progress
   const growthStage = (
@@ -300,12 +322,12 @@ const SessionDetailModalContent: React.FC<{
                   </View>
                 </View>
 
-                {/* Mushroom & Trays summary */}
+                {/* Mushroom & Floor Summary */}
                 <AppCard elevation="none" style={styles.sectionCard}>
                   <View style={styles.sectionTitleRow}>
                     <Ionicons name="leaf-outline" size={18} color={theme.colors.primary[600]} />
                     <AppText variant="label" weight="bold">
-                      THÔNG TIN GIỐNG NẤM & KHAY
+                      THÔNG TIN GIỐNG NẤM & QUY MÔ
                     </AppText>
                   </View>
 
@@ -328,11 +350,28 @@ const SessionDetailModalContent: React.FC<{
                     </View>
                     <View style={styles.gridCol}>
                       <AppText variant="caption" color={theme.colors.text.muted}>
-                        Tầng canh tác
+                        Vị trí tầng nuôi trồng
                       </AppText>
-                      <AppText variant="bodySmall" weight="bold">
-                        {current.floor_name || (current.trays?.[0]?.floor_name) || 'Chưa gán tầng'}
-                      </AppText>
+                      {(() => {
+                        const assignedFloorName =
+                          current.floor_name ||
+                          current.trays?.[0]?.floor_name ||
+                          (current.floor_id != null ? `Tầng ${current.floor_id}` : null) ||
+                          (current.trays?.[0]?.floor_id != null ? `Tầng ${current.trays[0].floor_id}` : null);
+                        return (
+                          <AppText
+                            variant="bodySmall"
+                            weight="bold"
+                            color={
+                              assignedFloorName
+                                ? theme.colors.text.primary
+                                : theme.colors.warning.dark
+                            }
+                          >
+                            {assignedFloorName || 'Chưa gán tầng'}
+                          </AppText>
+                        );
+                      })()}
                     </View>
                     <View style={styles.gridCol}>
                       <AppText variant="caption" color={theme.colors.text.muted}>
@@ -343,33 +382,193 @@ const SessionDetailModalContent: React.FC<{
                       </AppText>
                     </View>
                   </View>
+                </AppCard>
 
-                  {/* Assigned Trays List */}
+                {/* ========================================================================= */}
+                {/* SECTION 1: KIỂM TRA PHÔI THEO PHIÊN (Chung cả phiên) */}
+                {/* ========================================================================= */}
+                <AppCard elevation="none" style={styles.sectionCard}>
+                  <View style={styles.sectionTitleRow}>
+                    <Ionicons name="flask-outline" size={18} color="#0284C7" />
+                    <View style={{ flex: 1 }}>
+                      <AppText variant="label" weight="bold" color="#0369A1">
+                        1. KIỂM TRA PHÔI THEO PHIÊN
+                      </AppText>
+                      <AppText variant="caption" color={theme.colors.text.muted}>
+                        Kiểm tra chất lượng và số lượng bịch phôi chung cho cả phiên (không gắn riêng từng khay).
+                      </AppText>
+                    </View>
+                  </View>
+
+                  <View style={styles.workflowDetailBox}>
+                    <View style={styles.workflowDetailRow}>
+                      <AppText variant="caption" color={theme.colors.text.secondary}>
+                        Tiêu chuẩn phôi phiên:
+                      </AppText>
+                      <AppText variant="caption" weight="bold">
+                        {spawnQuantity} bịch ({reqTrays} khay × 3 bịch/khay)
+                      </AppText>
+                    </View>
+                    <View style={[styles.workflowDetailRow, { marginTop: 4 }]}>
+                      <AppText variant="caption" color={theme.colors.text.secondary}>
+                        Trạng thái phôi:
+                      </AppText>
+                      <AppText
+                        variant="caption"
+                        weight="bold"
+                        color={current.spawn_issued ? theme.colors.success.dark : theme.colors.warning.dark}
+                      >
+                        {current.spawn_status || (current.spawn_issued ? 'Đã xuất kho phôi' : 'Chờ xuất phôi')}
+                      </AppText>
+                    </View>
+                  </View>
+
+                  <View style={styles.sectionButtonsRow}>
+                    {onOpenSpawnInspection && (
+                      <AppButton
+                        title="Kiểm tra phôi"
+                        variant="primary"
+                        size="sm"
+                        leftIcon={<Ionicons name="clipboard-outline" size={16} color="#FFFFFF" />}
+                        onPress={() => {
+                          onClose();
+                          onOpenSpawnInspection(current);
+                        }}
+                        style={{ flex: 1 }}
+                      />
+                    )}
+                    {onOpenSpawnHistory && (
+                      <AppButton
+                        title="Lịch sử kiểm tra phôi"
+                        variant="outline"
+                        size="sm"
+                        leftIcon={<Ionicons name="time-outline" size={16} color={theme.colors.primary[600]} />}
+                        onPress={() => {
+                          onClose();
+                          onOpenSpawnHistory(current);
+                        }}
+                        style={{ flex: 1 }}
+                      />
+                    )}
+                  </View>
+                </AppCard>
+
+                {/* ========================================================================= */}
+                {/* SECTION 2: BÁO CÁO KHAY HẰNG NGÀY (Theo từng khay) */}
+                {/* ========================================================================= */}
+                <AppCard elevation="none" style={styles.sectionCard}>
+                  <View style={styles.sectionTitleRow}>
+                    <Ionicons name="grid-outline" size={18} color="#059669" />
+                    <View style={{ flex: 1 }}>
+                      <AppText variant="label" weight="bold" color="#047857">
+                        2. BÁO CÁO KHAY HẰNG NGÀY
+                      </AppText>
+                      <AppText variant="caption" color={theme.colors.text.muted}>
+                        Báo cáo sinh trưởng, hình ảnh quả thể và tình trạng theo từng khay vật lý riêng biệt.
+                      </AppText>
+                    </View>
+                  </View>
+
+                  {/* Tray List / Assignment Status */}
                   <View style={styles.traysListBox}>
-                    <AppText variant="caption" weight="bold" color={theme.colors.text.secondary}>
-                      Khay vật lý đã gán ({current.trays?.length || 0}/{reqTrays}):
-                    </AppText>
-                    {current.trays && current.trays.length > 0 ? (
+                    <View style={styles.trayHeaderRow}>
+                      <AppText variant="caption" weight="bold" color={theme.colors.text.secondary}>
+                        Danh sách khay ({assignedTrays.length}/{reqTrays} khay):
+                      </AppText>
+                      {hasAssignedTrays && (
+                        <AppText variant="caption" color={theme.colors.text.muted}>
+                          Chạm để chọn khay báo cáo
+                        </AppText>
+                      )}
+                    </View>
+
+                    {hasAssignedTrays ? (
                       <View style={styles.traysChipContainer}>
-                        {current.trays.map((tray) => (
-                          <View key={tray.tray_id} style={styles.trayChip}>
-                            <Ionicons name="cube" size={12} color={theme.colors.primary[600]} />
-                            <AppText variant="caption" weight="bold">
-                              {tray.tray_code}
-                            </AppText>
-                            {tray.row_number != null && tray.column_number != null && (
-                              <AppText variant="caption" color={theme.colors.text.muted}>
-                                (H{tray.row_number}-C{tray.column_number})
+                        {assignedTrays.map((tray) => {
+                          const isSelected = selectedSessionTrayId === tray.session_tray_id;
+                          return (
+                            <Pressable
+                              key={tray.session_tray_id || tray.tray_id}
+                              onPress={() => setSelectedSessionTrayId(tray.session_tray_id)}
+                              style={[styles.traySelectChip, isSelected && styles.traySelectChipActive]}
+                            >
+                              <Ionicons
+                                name="cube"
+                                size={13}
+                                color={isSelected ? '#FFFFFF' : theme.colors.primary[600]}
+                              />
+                              <AppText
+                                variant="caption"
+                                weight="bold"
+                                color={isSelected ? '#FFFFFF' : theme.colors.text.primary}
+                              >
+                                {tray.tray_code}
                               </AppText>
-                            )}
-                          </View>
-                        ))}
+                              {tray.row_number != null && tray.column_number != null && (
+                                <AppText
+                                  variant="caption"
+                                  color={isSelected ? 'rgba(255,255,255,0.85)' : theme.colors.text.muted}
+                                >
+                                  (H{tray.row_number}-C{tray.column_number})
+                                </AppText>
+                              )}
+                            </Pressable>
+                          );
+                        })}
                       </View>
                     ) : (
-                      <AppText variant="caption" color={theme.colors.warning.dark}>
-                        Chưa gán khay vật lý nào cho phiên này.
-                      </AppText>
+                      <View style={styles.unassignedWarningBox}>
+                        <Ionicons name="warning-outline" size={18} color={theme.colors.warning.dark} />
+                        <View style={{ flex: 1, marginLeft: 6 }}>
+                          <AppText variant="caption" weight="bold" color={theme.colors.warning.dark}>
+                            Chưa gán khay vật lý
+                          </AppText>
+                          <AppText variant="caption" color={theme.colors.warning.dark}>
+                            Phiên nuôi trồng chưa được xếp vào khay tầng. Bạn cần xếp khay vào tầng trước khi có thể tạo báo cáo theo khay.
+                          </AppText>
+                        </View>
+                        {onNavigateToAssignTrays && (
+                          <AppButton
+                            title="Xếp khay ngay"
+                            variant="primary"
+                            size="sm"
+                            onPress={() => {
+                              onClose();
+                              onNavigateToAssignTrays();
+                            }}
+                          />
+                        )}
+                      </View>
                     )}
+                  </View>
+
+                  {/* Actions for Daily Tray Report */}
+                  <View style={styles.sectionButtonsRow}>
+                    <AppButton
+                      title={hasAssignedTrays ? 'Tạo báo cáo khay' : 'Chưa gán khay'}
+                      variant="primary"
+                      size="sm"
+                      leftIcon={<Ionicons name="camera" size={16} color="#FFFFFF" />}
+                      disabled={!hasAssignedTrays || !onOpenDailyTrayInspection}
+                      onPress={() => {
+                        if (!hasAssignedTrays) return;
+                        onClose();
+                        onOpenDailyTrayInspection?.(current, selectedSessionTrayId);
+                      }}
+                      style={{ flex: 1 }}
+                    />
+                    <AppButton
+                      title="Lịch sử báo cáo khay"
+                      variant="outline"
+                      size="sm"
+                      leftIcon={<Ionicons name="images-outline" size={16} color={theme.colors.primary[600]} />}
+                      disabled={!onOpenDailyTrayInspectionHistory}
+                      onPress={() => {
+                        onClose();
+                        onOpenDailyTrayInspectionHistory?.(current, selectedSessionTrayId);
+                      }}
+                      style={{ flex: 1 }}
+                    />
                   </View>
                 </AppCard>
 
@@ -509,16 +708,70 @@ const SessionDetailModalContent: React.FC<{
             {/* If CULTIVATING */}
             {current.status === 'CULTIVATING' && (
               <View style={styles.footerActionCol}>
+                {/* Primary Daily Report row */}
+                <View style={styles.footerActionRow}>
+                  <AppButton
+                    title="Báo cáo khay"
+                    variant="primary"
+                    size="sm"
+                    leftIcon={<Ionicons name="camera" size={16} color="#FFFFFF" />}
+                    disabled={!hasAssignedTrays || !onOpenDailyTrayInspection}
+                    onPress={() => {
+                      if (!hasAssignedTrays) return;
+                      onClose();
+                      onOpenDailyTrayInspection?.(current, selectedSessionTrayId);
+                    }}
+                    style={{ flex: 1 }}
+                  />
+                  <AppButton
+                    title="Lịch sử khay"
+                    variant="outline"
+                    size="sm"
+                    leftIcon={<Ionicons name="images-outline" size={16} color={theme.colors.primary[600]} />}
+                    disabled={!onOpenDailyTrayInspectionHistory}
+                    onPress={() => {
+                      onClose();
+                      onOpenDailyTrayInspectionHistory?.(current, selectedSessionTrayId);
+                    }}
+                    style={{ flex: 1 }}
+                  />
+                </View>
+
+                {/* Secondary management row */}
                 <View style={styles.footerActionRow}>
                   {onOpenGrowthUpdate && (
                     <AppButton
-                      title="Cập nhật sinh trưởng"
-                      variant="primary"
+                      title="Cập nhật tiến độ"
+                      variant="outline"
                       size="sm"
-                      leftIcon={<Ionicons name="trending-up" size={16} color="#FFFFFF" />}
+                      leftIcon={<Ionicons name="trending-up" size={16} color={theme.colors.primary[600]} />}
                       onPress={() => {
                         onClose();
-                        onOpenGrowthUpdate(current, progressData?.latest_progress);
+                        const latestProg: ProgressHistoryItem | null =
+                          progressData?.latest_progress ||
+                          (progressData
+                            ? {
+                                progress_id: 0,
+                                session_id: current.session_id,
+                                current_stage: (progressData.current_stage ||
+                                  progressData.growth_status ||
+                                  current.current_stage ||
+                                  current.growth_status ||
+                                  'FRUITING_INITIATION') as string,
+                                progress_percent:
+                                  progressData.progress_percent != null
+                                    ? Number(progressData.progress_percent)
+                                    : current.progress_percent != null
+                                    ? Number(current.progress_percent)
+                                    : 0,
+                                condition: progressData.condition || current.condition || 'NORMAL',
+                                description: '',
+                                expected_harvest_date:
+                                  progressData.expected_harvest_date || current.harvest_date,
+                                created_at: new Date().toISOString(),
+                              }
+                            : null);
+                        onOpenGrowthUpdate(current, latestProg);
                       }}
                       style={{ flex: 1 }}
                     />
@@ -537,6 +790,7 @@ const SessionDetailModalContent: React.FC<{
                     />
                   )}
                 </View>
+
                 {harvestStatus === 'HARVEST_READY' && onOpenHarvestAction && (
                   <AppButton
                     title="Quản lý thu hoạch (HARVEST)"
@@ -551,21 +805,6 @@ const SessionDetailModalContent: React.FC<{
                 )}
               </View>
             )}
-
-            {/* If HARVESTING */}
-            {current.status === 'HARVESTING' && onOpenHarvestAction && (
-              <AppButton
-                title="Quản lý thu hoạch & Sản lượng"
-                variant="primary"
-                size="md"
-                leftIcon={<Ionicons name="leaf" size={18} color="#FFFFFF" />}
-                onPress={() => {
-                  onClose();
-                  onOpenHarvestAction(current);
-                }}
-                style={{ flex: 1 }}
-              />
-            )}
           </View>
         </View>
       </View>
@@ -576,20 +815,23 @@ const SessionDetailModalContent: React.FC<{
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
     justifyContent: 'flex-end',
   },
   sheetContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background.paper,
     borderTopLeftRadius: theme.borderRadius.xl,
     borderTopRightRadius: theme.borderRadius.xl,
     maxHeight: '92%',
+    minHeight: '65%',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.sm,
   },
   titleRow: {
     flexDirection: 'row',
@@ -602,25 +844,25 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.full,
   },
   content: {
-    maxHeight: 560,
+    flex: 1,
   },
   scrollContent: {
     paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    gap: 14,
+    paddingTop: theme.spacing.sm,
+    gap: 12,
   },
   centerBox: {
-    paddingVertical: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 40,
   },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    padding: 10,
+    padding: theme.spacing.sm,
     borderRadius: theme.borderRadius.md,
+    gap: 8,
   },
   metricsRow: {
     flexDirection: 'row',
@@ -628,7 +870,7 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     flex: 1,
-    backgroundColor: theme.colors.neutral[50],
+    backgroundColor: '#FFFFFF',
     padding: 10,
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
@@ -662,7 +904,7 @@ const styles = StyleSheet.create({
   },
   sectionTitleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
   },
   infoGrid: {
@@ -675,26 +917,56 @@ const styles = StyleSheet.create({
     minWidth: '45%',
     gap: 2,
   },
+  workflowDetailBox: {
+    backgroundColor: theme.colors.neutral[50],
+    padding: 8,
+    borderRadius: theme.borderRadius.sm,
+  },
+  workflowDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sectionButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
   traysListBox: {
-    marginTop: 6,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border.light,
     gap: 6,
+  },
+  trayHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   traysChipContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
   },
-  trayChip: {
+  traySelectChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     backgroundColor: 'rgba(34, 197, 94, 0.1)',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: theme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  traySelectChipActive: {
+    backgroundColor: theme.colors.primary[600],
+    borderColor: theme.colors.primary[700],
+  },
+  unassignedWarningBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    padding: 8,
+    borderRadius: theme.borderRadius.md,
+    gap: 4,
   },
   timelineContainer: {
     gap: 12,

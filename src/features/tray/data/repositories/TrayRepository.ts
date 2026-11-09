@@ -40,13 +40,38 @@ export class TrayRepository implements ITrayRepository {
 
   async getCustomerCultivationDetails(
     sessionId: number,
-    orderId: number
+    orderId?: number | null
   ): Promise<CustomerTrayDetails> {
     try {
-      const [progressResponse, iotResponse, sensorResponse] = await Promise.all([
-        axiosClient.get<{ data: CustomerProgressHistoryItem[] }>(
-          API_ENDPOINTS.CUSTOMER.CULTIVATION_PROGRESS(orderId)
-        ),
+      let progress: any[] = [];
+      if (orderId && orderId > 0) {
+        try {
+          const pRes = await axiosClient.get<{ data: any[] }>(
+            API_ENDPOINTS.CUSTOMER.CULTIVATION_PROGRESS(orderId)
+          );
+          if (Array.isArray(pRes.data?.data)) {
+            progress = pRes.data.data;
+          }
+        } catch {
+          // Fall through to admin progress
+        }
+      }
+
+      if (progress.length === 0) {
+        try {
+          const adminProgRes = await axiosClient.get<{ data: any } | any>(
+            API_ENDPOINTS.CULTIVATION_SESSIONS.ADMIN_PROGRESS(sessionId)
+          );
+          const progData = adminProgRes.data?.data ?? adminProgRes.data;
+          if (Array.isArray(progData?.progress_history)) {
+            progress = progData.progress_history;
+          }
+        } catch {
+          // Ignore
+        }
+      }
+
+      const [iotResponse, sensorResponse] = await Promise.allSettled([
         axiosClient.get<{ data: CustomerSessionIotHistory }>(
           API_ENDPOINTS.CULTIVATION_SESSIONS.ADMIN_IOT_HISTORY(sessionId),
           { params: { page: 1, pageSize: 100 } }
@@ -57,34 +82,30 @@ export class TrayRepository implements ITrayRepository {
         ),
       ]);
 
-      const progress = progressResponse.data?.data;
-      const iotHistory = iotResponse.data?.data;
-      const sensorHistory = sensorResponse.data?.data;
-      if (
-        !Array.isArray(progress) ||
-        !iotHistory ||
-        !Array.isArray(iotHistory.deviceEvents) ||
-        !sensorHistory ||
-        !Array.isArray(sensorHistory.readings)
-      ) {
-        throw new AppError('Dữ liệu lịch sử vụ trồng từ máy chủ không hợp lệ.', 'API_ERROR', 500);
-      }
+      const iotHistory = iotResponse.status === 'fulfilled' ? iotResponse.value.data?.data : null;
+      const sensorHistory = sensorResponse.status === 'fulfilled' ? sensorResponse.value.data?.data : null;
 
       return {
         session_id: sessionId,
         growth_history: progress
-          .filter((item) => Number(item.session_id) === sessionId)
-          .map((item) => ({
-            ...item,
-            progress_percent: Number(item.progress_percent),
-            condition: null,
+          .filter((item) => Number(item.session_id) === sessionId || !item.session_id)
+          .map((item): CustomerGrowthHistoryItem => ({
+            progress_id: item.progress_id ?? item.id ?? 0,
+            session_id: sessionId,
+            current_stage: item.current_stage || item.growth_status || 'FRUITING_INITIATION',
+            progress_percent: Number(item.progress_percent ?? 0),
+            condition: item.condition ?? null,
+            description: item.description ?? item.notes ?? null,
+            updated_at: item.updated_at || item.created_at || item.recorded_at || new Date().toISOString(),
           })),
-        device_logs: iotHistory.deviceEvents,
-        sensor_readings: sensorHistory.readings.map((reading) => ({
-          ...reading,
-          temperature: toNullableNumber(reading.temperature),
-          humidity: toNullableNumber(reading.humidity),
-        })),
+        device_logs: Array.isArray(iotHistory?.deviceEvents) ? iotHistory.deviceEvents : [],
+        sensor_readings: Array.isArray(sensorHistory?.readings)
+          ? sensorHistory.readings.map((reading) => ({
+              ...reading,
+              temperature: toNullableNumber(reading.temperature),
+              humidity: toNullableNumber(reading.humidity),
+            }))
+          : [],
       };
     } catch (error) {
       throw error instanceof AppError ? error : handleApiError(error);
@@ -197,8 +218,8 @@ export class TrayRepository implements ITrayRepository {
                 ? 'OTHER_CULTIVATION'
                 : 'AVAILABLE',
             mushroomName: activeTray?.mushroom_name ?? undefined,
-            sessionId: hasOwnActiveCultivation ? ownedSession?.sessionId : undefined,
-            orderId: hasOwnActiveCultivation ? ownedSession?.orderId : undefined,
+            sessionId: ownedSession?.sessionId ?? activeTray?.session_id ?? undefined,
+            orderId: ownedSession?.orderId ?? undefined,
           };
         });
 
@@ -236,7 +257,6 @@ function toNullableNumber(value: number | string | null): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-type CustomerProgressHistoryItem = CustomerGrowthHistoryItem;
 
 interface CustomerSessionIotHistory {
   deviceEvents: CustomerDeviceLogItem[];

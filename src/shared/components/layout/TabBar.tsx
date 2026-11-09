@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../../core/theme';
+import { useAuth } from '../../../features/auth';
 import { AppText } from '../primitives/AppText';
 
 interface TabConfig {
@@ -54,6 +55,7 @@ export type TabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tab
 
 export const TabBar: React.FC<TabBarProps> = ({ state, descriptors, emitter, navigateToTab }) => {
   const insets = useSafeAreaInsets();
+  const { canControlIot } = useAuth();
 
   return (
     <View
@@ -69,12 +71,21 @@ export const TabBar: React.FC<TabBarProps> = ({ state, descriptors, emitter, nav
           const isFocused = state.index === index;
           const descriptor = descriptors[route.key];
           const options = descriptor?.options || {};
-          const config = TAB_CONFIGS[route.name] || {
+          let config = TAB_CONFIGS[route.name] || {
             label: options.title || route.name,
             activeIcon: 'ellipse',
             inactiveIcon: 'ellipse-outline',
             accessibilityLabel: `Tab ${route.name}`,
           };
+
+          if (route.name === 'tray' && canControlIot) {
+            config = {
+              label: 'Phòng tầng khay',
+              activeIcon: 'layers',
+              inactiveIcon: 'layers-outline',
+              accessibilityLabel: 'Tab Sơ đồ phòng tầng khay',
+            };
+          }
 
           const onPress = () => {
             const event = emitter.emit({

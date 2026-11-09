@@ -1,12 +1,15 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { TabBar } from '../../src/shared/components/layout/TabBar';
+import { useAuth } from '../../src/features/auth';
 
 /**
- * Customer App Shell Bottom Tabs Layout
- * Provides five core tabs: Trang chủ, Khay của tôi, Đơn hàng, Thông báo, and Hồ sơ.
+ * App Shell Bottom Tabs Layout
+ * Provides five core tabs: Trang chủ, Khay của tôi / Phòng tầng khay, Đơn hàng, Thông báo, and Hồ sơ.
  */
 export default function TabsLayout() {
+  const { canControlIot } = useAuth();
+
   return (
     <Tabs
       tabBar={(props) => <TabBar {...props} />}
@@ -23,7 +26,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="tray"
         options={{
-          title: 'Khay của tôi',
+          title: canControlIot ? 'Phòng tầng khay' : 'Khay của tôi',
         }}
       />
       <Tabs.Screen

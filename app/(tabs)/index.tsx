@@ -93,12 +93,12 @@ const staffActions: QuickActionItem[] = [
   },
   {
     id: 'cultivation',
-    title: 'Phòng, Tầng & Khay',
-    desc: 'Hạ tầng nuôi trồng',
+    title: 'Phòng tầng khay',
+    desc: 'Sơ đồ phòng, tầng & khay',
     icon: 'layers-outline',
     iconColor: '#8B5CF6',
     iconBg: 'rgba(139, 92, 246, 0.1)',
-    route: '/cultivation',
+    route: '/(tabs)/tray',
   },
   {
     id: 'mushrooms',
