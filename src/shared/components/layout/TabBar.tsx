@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../../core/theme';
-import { useAuth } from '../../../features/auth';
+import { useAuth } from '../../../features/auth/presentation/hooks/useAuth';
 import { AppText } from '../primitives/AppText';
 
 interface TabConfig {
