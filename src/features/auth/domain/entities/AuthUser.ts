@@ -87,8 +87,24 @@ export interface ChangePasswordOtpData {
 
 export interface AuthResponseDto {
   message?: string;
-  token: string;
-  user: BackendUser;
+  token?: string;
+  accessToken?: string;
+  access_token?: string;
+  jwt?: string;
+  refreshToken?: string;
+  refresh_token?: string;
+  data?: {
+    token?: string;
+    accessToken?: string;
+    access_token?: string;
+    jwt?: string;
+    refreshToken?: string;
+    refresh_token?: string;
+    user?: BackendUser;
+    [key: string]: any;
+  };
+  user?: BackendUser;
+  [key: string]: any;
 }
 
 export interface GenericAuthResponse {
