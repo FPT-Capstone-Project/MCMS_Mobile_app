@@ -9,7 +9,7 @@ export default function ControlRoute() {
   if (!canControlIot) {
     return (
       <AccessDeniedScreen
-        featureName="Điều khiển Van & Đèn phòng"
+        featureName="Điều khiển Van, Quạt & Đèn phòng"
         currentRole={user?.role || 'CUSTOMER'}
         requiredRoles={['ADMIN', 'FARM_OPERATOR']}
       />

@@ -204,6 +204,7 @@ export class IotRepository {
         ...f,
         id: f.floor_id ?? f.id,
         floor_id: f.floor_id ?? f.id,
+        fan_ssr_channel: f.fan_ssr_channel ?? null,
       }));
       if (roomId != null) {
         return normalized.filter((f) => f.room_id === roomId);
@@ -273,6 +274,29 @@ export class IotRepository {
         ...res,
         id: res.floor_id ?? res.id,
         floor_id: res.floor_id ?? res.id,
+      };
+    } catch (error) {
+      throw error instanceof AppError ? error : handleApiError(error);
+    }
+  }
+
+  /**
+   * Update fan SSR channel mapping for a floor
+   * Accepts channel 1-8 or null to unassign
+   * Endpoint: PUT /api/iot/floors/:floorId/fan
+   */
+  async updateFloorFan(floorId: number, channel: number | null): Promise<FloorMapping> {
+    try {
+      const response = await axiosClient.put<{ data: FloorMapping } | FloorMapping>(
+        API_ENDPOINTS.AUTOMATIC.FLOOR_FAN(floorId),
+        { channel }
+      );
+      const res = 'data' in response.data ? response.data.data : (response.data as FloorMapping);
+      return {
+        ...res,
+        id: res.floor_id ?? res.id,
+        floor_id: res.floor_id ?? res.id,
+        fan_ssr_channel: res.fan_ssr_channel ?? null,
       };
     } catch (error) {
       throw error instanceof AppError ? error : handleApiError(error);

@@ -231,7 +231,12 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
       setEditingFloor(null);
       await loadInitialData();
     } catch (err: any) {
-      Alert.alert('Lỗi lưu tầng', err?.message || 'Không thể lưu tầng.');
+      let msg = err?.message || 'Không thể lưu tầng.';
+      const status = err?.statusCode || err?.response?.status || err?.status;
+      if (status === 409) {
+        msg = 'Kênh đã được dùng cho van, đèn hoặc quạt khác.';
+      }
+      Alert.alert('Lỗi lưu tầng', msg);
     } finally {
       setActionLoading(false);
     }

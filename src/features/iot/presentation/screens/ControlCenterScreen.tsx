@@ -58,6 +58,12 @@ export const ControlCenterScreen: React.FC = () => {
   const [selectedConfigChannel, setSelectedConfigChannel] = useState<number | null>(null);
   const [configSaving, setConfigSaving] = useState(false);
 
+  // Fan Configuration Modal State
+  const [isFanConfigModalVisible, setIsFanConfigModalVisible] = useState(false);
+  const [selectedConfigFloor, setSelectedConfigFloor] = useState<FloorMapping | null>(null);
+  const [selectedFanChannel, setSelectedFanChannel] = useState<number | null>(null);
+  const [fanConfigSaving, setFanConfigSaving] = useState(false);
+
   const clearAllPollers = () => {
     Object.values(activePollers.current).forEach(clearInterval);
     activePollers.current = {};
@@ -291,6 +297,80 @@ export const ControlCenterScreen: React.FC = () => {
     );
   };
 
+  // Fan configuration handlers
+  const handleOpenFanConfigModal = (floor: FloorMapping) => {
+    setSelectedConfigFloor(floor);
+    setSelectedFanChannel(floor.fan_ssr_channel ?? null);
+    setIsFanConfigModalVisible(true);
+  };
+
+  const handleSaveFanConfig = async (floorId: number, channel: number | null) => {
+    try {
+      setFanConfigSaving(true);
+      await iotRepository.updateFloorFan(floorId, channel);
+
+      const actionDesc =
+        channel != null
+          ? `Đã cấu hình Quạt cho tầng ở Kênh SSR ${channel}.`
+          : 'Đã bỏ gán kênh quạt của tầng.';
+      Alert.alert('Thành công', actionDesc);
+
+      // Reload fresh floors data
+      const freshFloors = await iotRepository.getFloors();
+      setFloors(freshFloors);
+
+      // Refresh SSR data for the floor's master
+      const targetFloor = floors.find((f) => (f.floor_id ?? f.id) === floorId);
+      if (targetFloor) {
+        const masterStr = getMasterIdString(targetFloor.master_id);
+        if (masterStr) {
+          const ssr = await iotRepository.getMasterSsr(masterStr);
+          setSsrData((prev) => ({ ...prev, [masterStr]: ssr }));
+        }
+      }
+
+      setIsFanConfigModalVisible(false);
+    } catch (err: unknown) {
+      let msg = 'Không thể cập nhật cấu hình quạt.';
+      if (err && typeof err === 'object') {
+        const errorObj = err as any;
+        const status = errorObj.statusCode || errorObj.response?.status || errorObj.status;
+        if (status === 403) {
+          msg = 'Bạn không có quyền cấu hình quạt (yêu cầu quyền iot.automation.manage).';
+        } else if (status === 409) {
+          msg = 'Kênh đã được dùng cho van, đèn hoặc quạt khác.';
+        } else if (status === 404) {
+          msg = 'Không tìm thấy tầng nuôi trồng trên hệ thống.';
+        } else if (status === 400) {
+          msg = 'Dữ liệu không hợp lệ. Kênh SSR phải từ 1 đến 8 hoặc bỏ gán.';
+        } else if (errorObj.message) {
+          msg = errorObj.message;
+        }
+      }
+      Alert.alert('Cấu hình thất bại', msg);
+    } finally {
+      setFanConfigSaving(false);
+    }
+  };
+
+  const handleUnassignFan = () => {
+    if (!selectedConfigFloor) return;
+    const fid = selectedConfigFloor.floor_id ?? selectedConfigFloor.id;
+    if (!fid) return;
+    Alert.alert(
+      'Xác nhận bỏ gán quạt',
+      `Bạn có chắc chắn muốn bỏ gán kênh quạt của ${selectedConfigFloor.floor_name || `Tầng ${selectedConfigFloor.floor_number}`}? Hãy đảm bảo quạt đã được tắt trước khi bỏ gán.`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Đồng ý bỏ gán',
+          style: 'destructive',
+          onPress: () => handleSaveFanConfig(fid, null),
+        },
+      ]
+    );
+  };
+
   const selectedRoom = rooms.find((r) => r.room_id === selectedRoomId);
 
   // Mappings for Floor 1 and Floor 2
@@ -305,12 +385,17 @@ export const ControlCenterScreen: React.FC = () => {
   // Masters belonging strictly to this cultivation room
   const roomMasters = masters.filter((m) => m.cultivationRoomId === selectedRoomId);
 
+  // Floors belonging strictly to this cultivation room, ordered by floor_number
+  const selectedRoomFloors = floors
+    .filter((f) => f.room_id === selectedRoomId)
+    .sort((a, b) => a.floor_number - b.floor_number);
+
   if (loading) {
     return (
       <ScreenContainer edges={['top', 'left', 'right']}>
         <AppHeader
           title="Điều khiển thiết bị"
-          subtitle="Van phun sương & Đèn phòng • Admin & Farm Operator"
+          subtitle="Van phun sương, Quạt & Đèn phòng • Admin & Farm Operator"
           showBack
           onBack={() => {
             if (router.canGoBack()) {
@@ -334,7 +419,7 @@ export const ControlCenterScreen: React.FC = () => {
     <ScreenContainer scrollable edges={['left', 'right']}>
       <AppHeader
         title="Điều khiển thiết bị"
-        subtitle="Van phun sương & Đèn phòng • Admin & Farm Operator"
+        subtitle="Van phun sương, Quạt & Đèn phòng • Admin & Farm Operator"
         showBack
         onBack={() => {
           if (router.canGoBack()) {
@@ -606,6 +691,198 @@ export const ControlCenterScreen: React.FC = () => {
             />
           </View>
         </AppCard>
+
+        {/* ================= SECTION: QUẠT THEO TẦNG ================= */}
+        <AppText variant="label" color={theme.colors.text.muted}>
+          QUẠT THEO TẦNG
+        </AppText>
+
+        {selectedRoomFloors.length === 0 ? (
+          <AppCard elevation="sm" style={styles.controlCard}>
+            <View style={styles.cardHeader}>
+              <View style={styles.titleWithIcon}>
+                <View style={[styles.deviceIconBox, { backgroundColor: theme.colors.neutral[100] }]}>
+                  <Ionicons name="sync-outline" size={24} color={theme.colors.text.muted} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText variant="title" weight="bold">
+                    Quạt theo tầng
+                  </AppText>
+                  <AppText variant="caption" color={theme.colors.text.secondary}>
+                    {selectedRoom?.room_name || 'Chưa chọn phòng'} • Chưa có tầng
+                  </AppText>
+                </View>
+              </View>
+
+              <View style={[styles.stateBadge, { backgroundColor: theme.colors.neutral[100] }]}>
+                <AppText variant="captionMedium" color={theme.colors.neutral[600]} weight="bold">
+                  Chưa có tầng
+                </AppText>
+              </View>
+            </View>
+
+            <AppDivider spacing="xs" />
+
+            <View style={styles.warningNoticeBox}>
+              <Ionicons name="information-circle-outline" size={18} color={theme.colors.warning.dark} />
+              <AppText variant="caption" color={theme.colors.warning.dark} style={styles.warningNoticeText}>
+                Phòng nuôi trồng này hiện chưa có tầng nào. Vui lòng tạo tầng trước khi cấu hình quạt.
+              </AppText>
+            </View>
+          </AppCard>
+        ) : (
+          selectedRoomFloors.map((floor) => {
+            const fid = floor.floor_id ?? floor.id;
+            const fanChannel = floor.fan_ssr_channel ?? null;
+            const isConfigured = fanChannel != null;
+            const masterIdStr = getMasterIdString(floor.master_id);
+            const channelKey = isConfigured && masterIdStr ? `${masterIdStr}_${fanChannel}` : '';
+            const channelInfo = getChannelInfo(masterIdStr, fanChannel ?? undefined);
+            const isChLoading = channelKey ? Boolean(channelLoading[channelKey]) : false;
+            const isReportedOn = channelInfo?.reportedState === 'ON';
+            const isReportedOff = channelInfo?.reportedState === 'OFF';
+            const fanName = floor.floor_name ? `Quạt ${floor.floor_name}` : `Quạt tầng ${floor.floor_number}`;
+
+            return (
+              <AppCard key={`fan-${fid || floor.floor_number}`} elevation="sm" style={styles.controlCard}>
+                <View style={styles.cardHeader}>
+                  <View style={styles.titleWithIcon}>
+                    <View
+                      style={[
+                        styles.deviceIconBox,
+                        {
+                          backgroundColor: isReportedOn
+                            ? 'rgba(14, 165, 233, 0.15)'
+                            : theme.colors.neutral[100],
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name="sync-outline"
+                        size={24}
+                        color={isReportedOn ? '#0284C7' : theme.colors.text.secondary}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <AppText variant="title" weight="bold">
+                        {fanName}
+                      </AppText>
+                      <AppText variant="caption" color={theme.colors.text.secondary}>
+                        {selectedRoom?.room_name || 'Chưa chọn phòng'} • {masterIdStr ? `Master: ${masterIdStr}` : 'Chưa gán Master'}
+                      </AppText>
+                    </View>
+                  </View>
+
+                  {/* State badge: Chưa cấu hình kênh, Chờ phản hồi, BẬT, TẮT, Chưa có trạng thái */}
+                  <View
+                    style={[
+                      styles.stateBadge,
+                      {
+                        backgroundColor: !isConfigured
+                          ? theme.colors.neutral[100]
+                          : isChLoading
+                          ? 'rgba(234, 179, 8, 0.12)'
+                          : isReportedOn
+                          ? 'rgba(34, 197, 94, 0.12)'
+                          : isReportedOff
+                          ? theme.colors.neutral[100]
+                          : 'rgba(234, 179, 8, 0.12)',
+                      },
+                    ]}
+                  >
+                    <AppText
+                      variant="captionMedium"
+                      weight="bold"
+                      color={
+                        !isConfigured
+                          ? theme.colors.neutral[600]
+                          : isChLoading
+                          ? theme.colors.warning.dark
+                          : isReportedOn
+                          ? theme.colors.success.dark
+                          : isReportedOff
+                          ? theme.colors.neutral[600]
+                          : theme.colors.warning.dark
+                      }
+                    >
+                      {!isConfigured
+                        ? 'Chưa cấu hình kênh'
+                        : isChLoading
+                        ? 'Chờ phản hồi'
+                        : isReportedOn
+                        ? 'BẬT'
+                        : isReportedOff
+                        ? 'TẮT'
+                        : 'Chưa có trạng thái'}
+                    </AppText>
+                  </View>
+                </View>
+
+                <AppDivider spacing="xs" />
+
+                {/* Details & Mapping info */}
+                <View style={styles.mappingInfoBox}>
+                  <View>
+                    <AppText variant="caption" color={theme.colors.text.muted}>
+                      Kênh SSR điều khiển:
+                    </AppText>
+                    <AppText variant="captionMedium" weight="medium">
+                      {isConfigured ? `Kênh SSR ${fanChannel}` : 'Chưa cấu hình kênh'}
+                    </AppText>
+                  </View>
+                  {canControlIot && (
+                    <AppButton
+                      title={isConfigured ? 'Đổi kênh' : 'Cấu hình quạt'}
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => handleOpenFanConfigModal(floor)}
+                    />
+                  )}
+                </View>
+
+                {/* Command Status Message */}
+                {channelKey && channelStatusMsg[channelKey] ? (
+                  <View style={styles.statusMsgRow}>
+                    <Ionicons name="information-circle-outline" size={16} color={theme.colors.primary[600]} />
+                    <AppText variant="caption" color={theme.colors.primary[700]} style={styles.statusMsgText}>
+                      {channelStatusMsg[channelKey]}
+                    </AppText>
+                  </View>
+                ) : null}
+
+                {/* Action Buttons */}
+                <View style={styles.actionRow}>
+                  <AppButton
+                    title="Bật quạt"
+                    variant="primary"
+                    size="md"
+                    style={styles.actionBtn}
+                    loading={isChLoading}
+                    disabled={!isConfigured || !masterIdStr || isChLoading || !canControlIot}
+                    onPress={() =>
+                      isConfigured &&
+                      masterIdStr &&
+                      handleSendCommand(fanName, masterIdStr, fanChannel, 'ON')
+                    }
+                  />
+                  <AppButton
+                    title="Tắt quạt"
+                    variant="outline"
+                    size="md"
+                    style={styles.actionBtn}
+                    loading={isChLoading}
+                    disabled={!isConfigured || !masterIdStr || isChLoading || !canControlIot}
+                    onPress={() =>
+                      isConfigured &&
+                      masterIdStr &&
+                      handleSendCommand(fanName, masterIdStr, fanChannel, 'OFF')
+                    }
+                  />
+                </View>
+              </AppCard>
+            );
+          })
+        )}
 
         {/* ================= SECTION: ĐÈN PHÒNG ================= */}
         <View style={styles.sectionHeaderRow}>
@@ -888,9 +1165,12 @@ export const ControlCenterScreen: React.FC = () => {
                   const valveOnCh = floors.find(
                     (f) => f.master_id === selectedConfigMaster?.id && f.misting_ssr_channel === ch
                   );
+                  const fanOnCh = floors.find(
+                    (f) => f.master_id === selectedConfigMaster?.id && f.fan_ssr_channel === ch
+                  );
                   const isCurrentAssigned = selectedConfigMaster?.light_ssr_channel === ch;
                   const isSelected = selectedConfigChannel === ch;
-                  const isBlocked = Boolean(valveOnCh);
+                  const isBlocked = Boolean(valveOnCh || fanOnCh);
 
                   return (
                     <Pressable
@@ -928,7 +1208,9 @@ export const ControlCenterScreen: React.FC = () => {
                       {isBlocked ? (
                         <View style={styles.channelBlockedBadge}>
                           <AppText variant="caption" color={theme.colors.error.main} weight="bold">
-                            Đã dùng: Van {valveOnCh?.floor_name || `Tầng ${valveOnCh?.floor_number}`}
+                            {valveOnCh
+                              ? `Đã dùng: Van ${valveOnCh.floor_name || `Tầng ${valveOnCh.floor_number}`}`
+                              : `Đã dùng: Quạt ${fanOnCh?.floor_name || `Tầng ${fanOnCh?.floor_number}`}`}
                           </AppText>
                         </View>
                       ) : isCurrentAssigned ? (
@@ -973,6 +1255,182 @@ export const ControlCenterScreen: React.FC = () => {
                   selectedConfigMaster &&
                   handleSaveLightConfig(selectedConfigMaster.masterId, selectedConfigChannel)
                 }
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL: CẤU HÌNH QUẠT THEO TẦNG ================= */}
+      <Modal
+        visible={isFanConfigModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          if (!fanConfigSaving) setIsFanConfigModalVisible(false);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1 }}>
+                <AppText variant="h3" weight="bold">
+                  Cấu hình Quạt theo tầng
+                </AppText>
+                <AppText variant="caption" color={theme.colors.text.secondary}>
+                  Phòng {selectedRoom?.room_name || ''} • {selectedConfigFloor?.floor_name || `Tầng ${selectedConfigFloor?.floor_number}`}
+                </AppText>
+              </View>
+              <Pressable
+                disabled={fanConfigSaving}
+                onPress={() => setIsFanConfigModalVisible(false)}
+                style={styles.modalCloseBtn}
+              >
+                <Ionicons name="close" size={24} color={theme.colors.text.muted} />
+              </Pressable>
+            </View>
+
+            {/* Master Gateway Info */}
+            <View style={styles.singleMasterInfo}>
+              <Ionicons name="hardware-chip-outline" size={16} color={theme.colors.primary[600]} />
+              <AppText variant="captionMedium" color={theme.colors.text.secondary}>
+                Thiết bị điều khiển:{' '}
+                <AppText variant="captionMedium" weight="bold">
+                  {selectedConfigFloor ? (getMasterIdString(selectedConfigFloor.master_id) || `Master ID #${selectedConfigFloor.master_id}`) : '—'}
+                </AppText>
+              </AppText>
+            </View>
+
+            {/* Change Channel Caution Note */}
+            <View style={styles.modalNoticeBox}>
+              <Ionicons name="information-circle-outline" size={18} color="#0284C7" />
+              <AppText variant="caption" color="#0369A1" style={{ flex: 1 }}>
+                Lưu ý: Thay đổi hoặc bỏ gán kênh sẽ không tự động tắt quạt ở kênh cũ. Vui lòng tắt quạt và kiểm tra phản hồi trước khi thay đổi.
+              </AppText>
+            </View>
+
+            {/* Channel Selection List (Channels 1 to 8) */}
+            <View style={{ gap: theme.spacing.xs }}>
+              <AppText variant="label" weight="medium" color={theme.colors.text.primary}>
+                Chọn kênh SSR điều khiển quạt (1 - 8):
+              </AppText>
+              <ScrollView style={styles.channelList} showsVerticalScrollIndicator={false}>
+                {Array.from({ length: 8 }, (_, i) => i + 1).map((ch) => {
+                  const targetMaster = masters.find((m) => m.id === selectedConfigFloor?.master_id);
+
+                  // Check if channel is used by misting valve on same master
+                  const valveOnCh = floors.find(
+                    (f) => f.master_id === selectedConfigFloor?.master_id && f.misting_ssr_channel === ch
+                  );
+
+                  // Check if channel is used by light on same master
+                  const lightOnCh = targetMaster?.light_ssr_channel === ch;
+
+                  // Check if channel is used by fan of another floor on same master
+                  const otherFanOnCh = floors.find(
+                    (f) =>
+                      f.master_id === selectedConfigFloor?.master_id &&
+                      (f.floor_id ?? f.id) !== (selectedConfigFloor?.floor_id ?? selectedConfigFloor?.id) &&
+                      f.fan_ssr_channel === ch
+                  );
+
+                  const isCurrentAssigned = selectedConfigFloor?.fan_ssr_channel === ch;
+                  const isSelected = selectedFanChannel === ch;
+                  const isBlocked = Boolean(valveOnCh || lightOnCh || otherFanOnCh);
+
+                  let blockedLabel = '';
+                  if (valveOnCh) {
+                    blockedLabel = `Đã dùng: Van ${valveOnCh.floor_name || `Tầng ${valveOnCh.floor_number}`}`;
+                  } else if (lightOnCh) {
+                    blockedLabel = 'Đã dùng: Đèn phòng';
+                  } else if (otherFanOnCh) {
+                    blockedLabel = `Đã dùng: Quạt ${otherFanOnCh.floor_name || `Tầng ${otherFanOnCh.floor_number}`}`;
+                  }
+
+                  return (
+                    <Pressable
+                      key={`fan-ch-${ch}`}
+                      disabled={isBlocked || fanConfigSaving}
+                      onPress={() => setSelectedFanChannel(ch)}
+                      style={[
+                        styles.channelItem,
+                        isSelected && styles.channelItemSelected,
+                        isBlocked && styles.channelItemDisabled,
+                      ]}
+                    >
+                      <View style={styles.channelItemLeft}>
+                        <View
+                          style={[
+                            styles.channelRadio,
+                            isSelected && styles.channelRadioSelected,
+                            isBlocked && { borderColor: theme.colors.neutral[300] },
+                          ]}
+                        >
+                          {isSelected ? <View style={styles.channelRadioInner} /> : null}
+                        </View>
+                        <View>
+                          <AppText
+                            variant="bodySmall"
+                            weight={isSelected ? 'bold' : 'medium'}
+                            color={isBlocked ? theme.colors.text.muted : theme.colors.text.primary}
+                          >
+                            Kênh SSR #${ch}
+                          </AppText>
+                        </View>
+                      </View>
+
+                      {/* Status badges */}
+                      {isBlocked ? (
+                        <View style={styles.channelBlockedBadge}>
+                          <AppText variant="caption" color={theme.colors.error.main} weight="bold">
+                            {blockedLabel}
+                          </AppText>
+                        </View>
+                      ) : isCurrentAssigned ? (
+                        <View style={styles.channelCurrentBadge}>
+                          <AppText variant="caption" color={theme.colors.primary[700]} weight="bold">
+                            Đang gán hiện tại
+                          </AppText>
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* Action Buttons in Modal */}
+            <View style={styles.modalActionButtons}>
+              {selectedConfigFloor?.fan_ssr_channel != null && (
+                <AppButton
+                  title="Bỏ gán quạt"
+                  variant="outline"
+                  size="md"
+                  textStyle={{ color: theme.colors.error.main }}
+                  style={{ borderColor: theme.colors.error.light }}
+                  loading={fanConfigSaving}
+                  disabled={fanConfigSaving}
+                  onPress={handleUnassignFan}
+                />
+              )}
+              <AppButton
+                title="Lưu cấu hình"
+                variant="primary"
+                size="md"
+                style={styles.modalSaveBtn}
+                loading={fanConfigSaving}
+                disabled={
+                  fanConfigSaving ||
+                  selectedFanChannel === null ||
+                  selectedFanChannel === selectedConfigFloor?.fan_ssr_channel
+                }
+                onPress={() => {
+                  const fid = selectedConfigFloor?.floor_id ?? selectedConfigFloor?.id;
+                  if (fid) {
+                    handleSaveFanConfig(fid, selectedFanChannel);
+                  }
+                }}
               />
             </View>
           </View>
@@ -1227,6 +1685,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.xs,
     paddingVertical: 2,
     borderRadius: theme.borderRadius.sm,
+  },
+  modalNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F0F9FF',
+    borderColor: '#BAE6FD',
+    borderWidth: 1,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.sm,
   },
   modalActionButtons: {
     flexDirection: 'row',

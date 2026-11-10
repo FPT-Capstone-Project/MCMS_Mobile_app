@@ -66,7 +66,7 @@ const staffActions: QuickActionItem[] = [
   },
   {
     id: 'control',
-    title: 'Van & Đèn phòng',
+    title: 'Van, Quạt & Đèn phòng',
     desc: 'Điều khiển theo sơ đồ tầng',
     icon: 'options-outline',
     iconColor: '#10B981',
@@ -222,9 +222,21 @@ export default function HomeScreen() {
       const data = await analyticsRepository.getEnvironmentHistory();
       setEnvHistory(data);
     } catch {
-      // Retain existing chart if available
+      // Retain existing data
     }
   }, [isStaff]);
+
+  // Auto-refresh interval from API or fallback 5 minutes (300,000 ms)
+  const refreshIntervalMs = useMemo(() => {
+    if (
+      envHistory?.refreshAfterMs &&
+      typeof envHistory.refreshAfterMs === 'number' &&
+      envHistory.refreshAfterMs > 0
+    ) {
+      return envHistory.refreshAfterMs;
+    }
+    return 300000;
+  }, [envHistory?.refreshAfterMs]);
 
   // AppState change listener: Pause when backgrounded, refresh when returning to active
   useEffect(() => {
@@ -239,7 +251,7 @@ export default function HomeScreen() {
     };
   }, [isStaff, loadEnvironmentHistory]);
 
-  // Screen Focus Lifecycle: triggers initial load and sets 5-minute auto-refresh interval
+  // Screen Focus Lifecycle: triggers initial load and sets interval while screen is in focus
   useFocusEffect(
     useCallback(() => {
       loadDashboardData();
@@ -247,18 +259,17 @@ export default function HomeScreen() {
       if (isStaff) {
         loadEnvironmentHistory();
 
-        // 5-minute interval timer (300,000 ms) while screen is in focus
         const intervalId = setInterval(() => {
           if (appStateRef.current === 'active') {
             loadEnvironmentHistory();
           }
-        }, 300000);
+        }, refreshIntervalMs);
 
         return () => {
           clearInterval(intervalId);
         };
       }
-    }, [loadDashboardData, loadEnvironmentHistory, isStaff])
+    }, [loadDashboardData, loadEnvironmentHistory, isStaff, refreshIntervalMs])
   );
 
   // Manual pull-to-refresh
@@ -526,7 +537,7 @@ export default function HomeScreen() {
                 <AppText variant="caption" color={theme.colors.text.muted}>
                   Nhiệt độ gần nhất
                 </AppText>
-                <AppText variant="title" weight="bold" color="#8B5CF6">
+                <AppText variant="title" weight="bold" color="#c2413b">
                   {latestDashboardTemp != null ? `${latestDashboardTemp.toFixed(1)} °C` : '—'}
                 </AppText>
               </View>
@@ -537,7 +548,7 @@ export default function HomeScreen() {
                 <AppText variant="caption" color={theme.colors.text.muted}>
                   Độ ẩm gần nhất
                 </AppText>
-                <AppText variant="title" weight="bold" color="#14B8A6">
+                <AppText variant="title" weight="bold" color="#2563eb">
                   {latestDashboardHum != null ? `${latestDashboardHum.toFixed(1)} %RH` : '—'}
                 </AppText>
               </View>
