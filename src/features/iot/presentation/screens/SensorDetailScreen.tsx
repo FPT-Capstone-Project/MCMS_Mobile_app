@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -53,6 +53,20 @@ export const SensorDetailScreen: React.FC = () => {
   const [pullRefreshing, setPullRefreshing] = useState(false);
 
   const appStateRef = useRef<AppStateStatus>((AppState.currentState as AppStateStatus) || 'active');
+
+  // Filter out floors with empty points from the card list
+  const validFloors = useMemo(() => {
+    return (envHistory?.floors || []).filter(
+      (f) => f.points && f.points.length > 0
+    );
+  }, [envHistory]);
+
+  const refreshIntervalMs =
+    envHistory?.refreshAfterMs &&
+    typeof envHistory.refreshAfterMs === 'number' &&
+    envHistory.refreshAfterMs > 0
+      ? envHistory.refreshAfterMs
+      : 300000;
 
   // Map Node address to floor information:
   // Node 1 -> Tầng 1, Node 2 -> Tầng 2, omit Tầng 3
@@ -166,12 +180,12 @@ export const SensorDetailScreen: React.FC = () => {
         if (appStateRef.current === 'active') {
           loadEnvironmentHistory(true);
         }
-      }, 300000);
+      }, refreshIntervalMs);
 
       return () => {
         clearInterval(intervalId);
       };
-    }, [loadMasters, loadEnvironmentHistory])
+    }, [loadMasters, loadEnvironmentHistory, refreshIntervalMs])
   );
 
   // Manual pull-to-refresh
@@ -300,14 +314,15 @@ export const SensorDetailScreen: React.FC = () => {
                 style={styles.retryButton}
               />
             </AppCard>
-          ) : envHistory?.floors && envHistory.floors.length > 0 ? (
+          ) : validFloors.length > 0 ? (
             <View style={styles.floorsListContainer}>
-              {envHistory.floors.map((floor) => (
+              {validFloors.map((floor) => (
                 <FloorEnvironmentChartCard
                   key={floor.floorId}
                   floor={floor}
-                  from={envHistory.from}
-                  to={envHistory.to}
+                  from={envHistory?.from}
+                  to={envHistory?.to}
+                  bucketMs={envHistory?.bucketMs}
                 />
               ))}
             </View>
@@ -315,7 +330,7 @@ export const SensorDetailScreen: React.FC = () => {
             <AppCard elevation="xs" style={styles.emptyCard}>
               <Ionicons name="information-circle-outline" size={24} color={theme.colors.text.muted} />
               <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-                Hiện chưa có tầng nuôi trồng nào được kích hoạt hoặc cấu hình cảm biến.
+                Chưa có dữ liệu tầng
               </AppText>
             </AppCard>
           )}

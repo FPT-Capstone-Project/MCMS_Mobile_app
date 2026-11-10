@@ -23,6 +23,8 @@ export const API_ENDPOINTS = {
     BASE: '/api/notifications',
     READ_ALL: '/api/notifications/read-all',
     READ: (notificationId: number) => `/api/notifications/${notificationId}/read`,
+    CONFIRM_REPAIR: (notificationId: number | string) =>
+      `/api/notifications/${notificationId}/confirm-repair`,
   },
   // Cultivation Rooms
   ROOMS: {
@@ -100,6 +102,7 @@ export const API_ENDPOINTS = {
   AUTOMATIC: {
     FLOORS: '/api/iot/floors',
     FLOOR_DETAIL: (floorId: number) => `/api/iot/floors/${floorId}`,
+    FLOOR_FAN: (floorId: number) => `/api/iot/floors/${floorId}/fan`,
     GENERATE_TRAYS: (floorId: number) => `/api/iot/floors/${floorId}/trays/generate`,
     ASSIGN_TRAY: (floorId: number, trayId: number) =>
       `/api/iot/floors/${floorId}/trays/${trayId}`,

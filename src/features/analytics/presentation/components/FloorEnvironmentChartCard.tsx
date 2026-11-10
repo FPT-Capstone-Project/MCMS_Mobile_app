@@ -7,101 +7,89 @@ import {
   View,
 } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
-import { theme } from '../../../../core/theme';
-import { AppCard, AppDivider, AppText } from '../../../../shared/components';
+import { AppText } from '../../../../shared/components';
 import {
   EnvironmentHistoryPoint,
   FloorEnvironmentHistory,
 } from '../../domain/entities/EnvironmentHistory';
 
-interface FloorEnvironmentChartCardProps {
+export interface FloorEnvironmentChartCardProps {
   floor: FloorEnvironmentHistory;
   from?: number;
   to?: number;
+  bucketMs?: number;
 }
 
 const PLOT_HEIGHT = 220;
-const LEFT_AXIS_WIDTH = 42;
-const RIGHT_AXIS_WIDTH = 46;
-const PADDING_TOP = 22;
-const PADDING_BOTTOM = 14;
+const LEFT_AXIS_WIDTH = 50;
+const RIGHT_AXIS_WIDTH = 50;
+const PADDING_TOP = 20;
+const PADDING_BOTTOM = 20;
 const PADDING_LEFT = 8;
 const PADDING_RIGHT = 8;
 
-interface DynamicAxis {
+export interface DynamicAxis {
   min: number;
   max: number;
   ticks: number[];
 }
 
 /**
- * Calculates a dynamic, human-readable range with padding and integer/clean tick marks.
- * Handles edge cases: single value, constant values, empty array.
+ * Dynamic Y Domain & Ticks algorithm as strictly specified in climateAxis.
+ * Operates purely on valid finite values of a series; ignores null/undefined/NaN.
  */
-function calculateDynamicAxis(
-  values: number[],
-  type: 'temperature' | 'humidity'
-): DynamicAxis {
-  const intervals = 3; // 4 ticks: index 0 (top/max), 1, 2, 3 (bottom/min)
-
-  if (!values || values.length === 0) {
-    if (type === 'temperature') {
-      return { min: 20, max: 32, ticks: [32, 28, 24, 20] };
-    }
-    return { min: 60, max: 90, ticks: [90, 80, 70, 60] };
+export function climateAxis(values: number[]): DynamicAxis {
+  const valid = values.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  if (valid.length === 0) {
+    return { min: 0, max: 10, ticks: [0, 5, 10] };
   }
 
-  const rawMin = Math.min(...values);
-  const rawMax = Math.max(...values);
+  let dataMin = Math.min(...valid);
+  let dataMax = Math.max(...valid);
+  if (dataMin === dataMax) {
+    dataMin -= 1;
+    dataMax += 1;
+  }
 
-  let rangeMin: number;
-  let rangeMax: number;
-  let step: number;
+  const span = dataMax - dataMin;
+  const pad = span * 0.08;
+  const targetMin = dataMin - pad;
+  const targetMax = dataMax + pad;
+  const roughStep = (targetMax - targetMin) / 4;
+  const stepPower = Math.pow(10, Math.floor(Math.log10(roughStep)));
+  const stepNorm = roughStep / stepPower;
 
-  if (type === 'temperature') {
-    if (rawMin === rawMax) {
-      step = 1;
-      rangeMin = Math.floor(rawMin - 1);
-      rangeMax = rangeMin + step * intervals;
-    } else {
-      const span = rawMax - rawMin;
-      step = Math.max(1, Math.ceil(span / intervals));
-      rangeMin = Math.floor(rawMin);
-      while (rangeMin + step * intervals < rawMax) {
-        step++;
-      }
-      rangeMax = rangeMin + step * intervals;
-    }
+  let cleanStep: number;
+  if (stepNorm < 1.5) {
+    cleanStep = 1 * stepPower;
+  } else if (stepNorm < 3.5) {
+    cleanStep = 2 * stepPower;
+  } else if (stepNorm < 7.5) {
+    cleanStep = 5 * stepPower;
   } else {
-    // Humidity (%RH): step in clean intervals (5, 10, 15)
-    if (rawMin === rawMax) {
-      step = 5;
-      rangeMin = Math.max(0, Math.floor((rawMin - 5) / 5) * 5);
-      rangeMax = Math.min(100, rangeMin + step * intervals);
-    } else {
-      const span = rawMax - rawMin;
-      step = Math.max(5, Math.ceil(span / (intervals * 5)) * 5);
-      rangeMin = Math.max(0, Math.floor(rawMin / 5) * 5);
-      while (rangeMin + step * intervals < rawMax && rangeMin + step * intervals <= 100) {
-        step += 5;
-      }
-      if (rangeMin + step * intervals > 100) {
-        rangeMin = Math.max(0, 100 - step * intervals);
-      }
-      rangeMax = rangeMin + step * intervals;
-    }
+    cleanStep = 10 * stepPower;
   }
 
+  const min = Math.floor(targetMin / cleanStep) * cleanStep;
+  const max = Math.ceil(targetMax / cleanStep) * cleanStep;
   const ticks: number[] = [];
-  for (let i = intervals; i >= 0; i--) {
-    ticks.push(rangeMin + i * step);
+  for (let t = min; t <= max + cleanStep * 0.001; t += cleanStep) {
+    ticks.push(Number(t.toFixed(4)));
   }
-
-  return { min: rangeMin, max: rangeMax, ticks };
+  return { min, max, ticks };
 }
 
 /**
- * Formats epoch ms timestamp to HH:mm string in Asia/Ho_Chi_Minh timezone.
+ * Format tick with at most 1 decimal place (or integer without decimal) and unit.
+ */
+function formatTick(val: number, unit: string): string {
+  const rounded = Math.round(val * 10) / 10;
+  const numStr = Number.isInteger(rounded) ? `${rounded}` : `${rounded.toFixed(1)}`;
+  return `${numStr}${unit}`;
+}
+
+/**
+ * Formats epoch ms timestamp to HH:mm string in 24h format (Asia/Ho_Chi_Minh).
  */
 function formatTimeHHmm(timestamp: number): string {
   try {
@@ -117,36 +105,178 @@ function formatTimeHHmm(timestamp: number): string {
   }
 }
 
+interface SplinePoint {
+  x: number;
+  y: number;
+}
+
 /**
- * Formats epoch ms timestamp to full date and time string with seconds in Asia/Ho_Chi_Minh timezone.
+ * Fritsch-Carlson Monotone Cubic Spline generator.
+ * Produces smooth monotonic curves without overshoot artifacts or fake oscillations.
  */
-function formatFullDateTimeWithSeconds(timestamp: number): string {
-  try {
-    return new Intl.DateTimeFormat('vi-VN', {
-      timeZone: 'Asia/Ho_Chi_Minh',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    }).format(new Date(timestamp));
-  } catch {
-    return new Date(timestamp).toLocaleString('vi-VN');
+function buildMonotoneSegments(points: SplinePoint[]): string {
+  if (points.length === 0) return '';
+  if (points.length === 1) {
+    return `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
   }
+  if (points.length === 2) {
+    return `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)} L ${points[1].x.toFixed(1)} ${points[1].y.toFixed(1)}`;
+  }
+
+  const n = points.length;
+  const dx: number[] = [];
+  const dy: number[] = [];
+  const slopes: number[] = [];
+
+  for (let i = 0; i < n - 1; i++) {
+    const deltaX = points[i + 1].x - points[i].x;
+    const deltaY = points[i + 1].y - points[i].y;
+    dx.push(deltaX);
+    dy.push(deltaY);
+    slopes.push(deltaX === 0 ? 0 : deltaY / deltaX);
+  }
+
+  const tangents: number[] = new Array(n);
+  tangents[0] = slopes[0];
+  tangents[n - 1] = slopes[n - 2];
+  for (let i = 1; i < n - 1; i++) {
+    tangents[i] = (slopes[i - 1] + slopes[i]) / 2;
+  }
+
+  for (let i = 0; i < n - 1; i++) {
+    if (slopes[i] === 0) {
+      tangents[i] = 0;
+      tangents[i + 1] = 0;
+    } else {
+      const alpha = tangents[i] / slopes[i];
+      const beta = tangents[i + 1] / slopes[i];
+      const dist = alpha * alpha + beta * beta;
+      if (dist > 9) {
+        const tau = 3 / Math.sqrt(dist);
+        tangents[i] = tau * alpha * slopes[i];
+        tangents[i + 1] = tau * beta * slopes[i];
+      }
+    }
+  }
+
+  let path = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = points[i];
+    const p1 = points[i + 1];
+    const curDx = dx[i];
+    const cp1x = p0.x + curDx / 3;
+    const cp1y = p0.y + (tangents[i] * curDx) / 3;
+    const cp2x = p1.x - curDx / 3;
+    const cp2y = p1.y - (tangents[i + 1] * curDx) / 3;
+    path += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
+  }
+  return path;
+}
+
+interface ThresholdEval {
+  referenceText: string;
+  warningText: string | null;
+  isWarning: boolean;
+}
+
+function evaluateThreshold(
+  val: number | null,
+  min: number | null | undefined,
+  max: number | null | undefined,
+  unit: string
+): ThresholdEval {
+  const hasMin = min !== null && min !== undefined;
+  const hasMax = max !== null && max !== undefined;
+
+  if (!hasMin && !hasMax) {
+    return {
+      referenceText: 'Chưa có ngưỡng',
+      warningText: null,
+      isWarning: false,
+    };
+  }
+
+  let referenceText = '';
+  if (hasMin && hasMax) {
+    referenceText = `≥ ${min}${unit} – ≤ ${max}${unit}`;
+  } else if (hasMin) {
+    referenceText = `≥ ${min}${unit}`;
+  } else if (hasMax) {
+    referenceText = `≤ ${max}${unit}`;
+  }
+
+  if (val === null) {
+    return {
+      referenceText,
+      warningText: null,
+      isWarning: false,
+    };
+  }
+
+  if (hasMax && val > (max as number)) {
+    const diff = val - (max as number);
+    const diffStr = diff % 1 === 0 ? diff.toString() : diff.toFixed(1);
+    return {
+      referenceText,
+      warningText: `▲ vượt ngưỡng (+${diffStr}${unit})`,
+      isWarning: true,
+    };
+  }
+
+  if (hasMin && val < (min as number)) {
+    const diff = val - (min as number);
+    const diffStr = diff % 1 === 0 ? diff.toString() : diff.toFixed(1);
+    return {
+      referenceText,
+      warningText: `▼ dưới ngưỡng (${diffStr}${unit})`,
+      isWarning: true,
+    };
+  }
+
+  return {
+    referenceText,
+    warningText: null,
+    isWarning: false,
+  };
 }
 
 export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps> = ({
   floor,
   from,
   to,
+  bucketMs,
 }) => {
-  const points = useMemo(() => floor.points || [], [floor.points]);
+  // Sort points ascending by timestamp and normalize non-finite values to null
+  const points = useMemo(() => {
+    const raw = floor.points || [];
+    return [...raw]
+      .map((p) => ({
+        timestamp: Number(p.timestamp),
+        temperature:
+          p.temperature !== null &&
+          p.temperature !== undefined &&
+          typeof p.temperature === 'number' &&
+          Number.isFinite(p.temperature)
+            ? p.temperature
+            : null,
+        humidity:
+          p.humidity !== null &&
+          p.humidity !== undefined &&
+          typeof p.humidity === 'number' &&
+          Number.isFinite(p.humidity)
+            ? p.humidity
+            : null,
+      }))
+      .sort((a, b) => a.timestamp - b.timestamp);
+  }, [floor.points]);
 
-  // Width of chart container measured dynamically on mobile
+  // Check if both metrics are null for ALL points
+  const isAllNull = useMemo(() => {
+    return points.every((p) => p.temperature === null && p.humidity === null);
+  }, [points]);
+
+  // Measure container width for responsive scaling on mobile
   const [containerWidth, setContainerWidth] = useState<number>(330);
-
   const handleContainerLayout = (e: LayoutChangeEvent) => {
     const width = e.nativeEvent.layout.width;
     if (width > 0 && Math.abs(width - containerWidth) > 2) {
@@ -158,60 +288,41 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
   const innerWidth = Math.max(10, svgWidth - PADDING_LEFT - PADDING_RIGHT);
   const innerHeight = Math.max(10, PLOT_HEIGHT - PADDING_TOP - PADDING_BOTTOM);
 
-  // Extract valid numerical values for temperature and humidity independently
+  // Time boundaries: Real timestamp X-axis
+  const effectiveBucketMs = bucketMs || 900000;
+  const firstPointTs = points[0]?.timestamp ?? from ?? 0;
+  const lastPointTs = points[points.length - 1]?.timestamp ?? to ?? 0;
+
+  const startX = Math.min(from ?? firstPointTs, firstPointTs);
+  const endX = Math.max(to ?? (lastPointTs + effectiveBucketMs), lastPointTs + effectiveBucketMs);
+  const timeSpan = Math.max(effectiveBucketMs, endX - startX);
+
+  // Coordinate mapping for X
+  const getX = useCallback(
+    (timestamp: number) => {
+      const ratio = (timestamp - startX) / timeSpan;
+      return PADDING_LEFT + Math.max(0, Math.min(1, ratio)) * innerWidth;
+    },
+    [startX, timeSpan, innerWidth]
+  );
+
+  // Filter valid numbers independently for dynamic Y domain
   const validTemps = useMemo(() => {
     return points
       .map((p) => p.temperature)
-      .filter((v): v is number => v !== null && !isNaN(v));
+      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
   }, [points]);
 
   const validHums = useMemo(() => {
     return points
       .map((p) => p.humidity)
-      .filter((v): v is number => v !== null && !isNaN(v));
+      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
   }, [points]);
 
-  // Compute dynamic ranges for left and right Y-axes independently
-  const tempAxis = useMemo(() => calculateDynamicAxis(validTemps, 'temperature'), [validTemps]);
-  const humAxis = useMemo(() => calculateDynamicAxis(validHums, 'humidity'), [validHums]);
+  const tempAxis = useMemo(() => climateAxis(validTemps), [validTemps]);
+  const humAxis = useMemo(() => climateAxis(validHums), [validHums]);
 
-  // Find latest valid reading point for quick glance badge
-  const latestValidPoint = useMemo(() => {
-    for (let i = points.length - 1; i >= 0; i--) {
-      if (points[i].temperature != null || points[i].humidity != null) {
-        return points[i];
-      }
-    }
-    return null;
-  }, [points]);
-
-  // Selected point index for interactive tooltip inspection
-  const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(
-    points.length > 0 ? points.length - 1 : null
-  );
-
-  const selectedPoint: EnvironmentHistoryPoint | null =
-    selectedPointIndex !== null && points[selectedPointIndex]
-      ? points[selectedPointIndex]
-      : latestValidPoint;
-
-  // Check if all points are null
-  const isAllNull = useMemo(() => {
-    return (
-      points.length > 0 &&
-      points.every((p) => p.temperature === null && p.humidity === null)
-    );
-  }, [points]);
-
-  // Coordinate mapping functions
-  const getX = useCallback(
-    (index: number) => {
-      if (points.length <= 1) return PADDING_LEFT + innerWidth / 2;
-      return PADDING_LEFT + (index / (points.length - 1)) * innerWidth;
-    },
-    [points.length, innerWidth]
-  );
-
+  // Coordinate mapping for Y
   const getTempY = useCallback(
     (val: number) => {
       const span = tempAxis.max - tempAxis.min || 1;
@@ -230,90 +341,72 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
     [humAxis.max, humAxis.min, innerHeight]
   );
 
-  // Generate SVG paths with gaps at null values (breaking the line)
-  const { tempPath, humPath, validTempPoints } = useMemo(() => {
-    let tPath = '';
-    let inTempSeg = false;
-    const validTemp: { x: number; y: number; val: number; index: number }[] = [];
+  // Build monotone spline paths broken on nulls independently
+  const { tempPath, humPath } = useMemo(() => {
+    const tempSegments: SplinePoint[][] = [];
+    let curTempChunk: SplinePoint[] = [];
 
-    let hPath = '';
-    let inHumSeg = false;
+    const humSegments: SplinePoint[][] = [];
+    let curHumChunk: SplinePoint[] = [];
 
-    points.forEach((pt, idx) => {
-      const x = getX(idx);
+    points.forEach((pt) => {
+      const x = getX(pt.timestamp);
 
-      // Temperature path & dots
-      if (pt.temperature !== null && !isNaN(pt.temperature)) {
-        const y = getTempY(pt.temperature);
-        validTemp.push({ x, y, val: pt.temperature, index: idx });
-        if (!inTempSeg) {
-          const prefix = tPath.length > 0 ? ' M ' : 'M ';
-          tPath += `${prefix}${x.toFixed(1)} ${y.toFixed(1)}`;
-          inTempSeg = true;
-        } else {
-          tPath += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
-        }
-      } else {
-        // Break line on null! Next valid point starts with M
-        inTempSeg = false;
+      if (pt.temperature !== null) {
+        curTempChunk.push({ x, y: getTempY(pt.temperature) });
+      } else if (curTempChunk.length > 0) {
+        tempSegments.push(curTempChunk);
+        curTempChunk = [];
       }
 
-      // Humidity path (dashed)
-      if (pt.humidity !== null && !isNaN(pt.humidity)) {
-        const y = getHumY(pt.humidity);
-        if (!inHumSeg) {
-          const prefix = hPath.length > 0 ? ' M ' : 'M ';
-          hPath += `${prefix}${x.toFixed(1)} ${y.toFixed(1)}`;
-          inHumSeg = true;
-        } else {
-          hPath += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
-        }
-      } else {
-        // Break line on null!
-        inHumSeg = false;
+      if (pt.humidity !== null) {
+        curHumChunk.push({ x, y: getHumY(pt.humidity) });
+      } else if (curHumChunk.length > 0) {
+        humSegments.push(curHumChunk);
+        curHumChunk = [];
       }
     });
 
+    if (curTempChunk.length > 0) tempSegments.push(curTempChunk);
+    if (curHumChunk.length > 0) humSegments.push(curHumChunk);
+
     return {
-      tempPath: tPath,
-      humPath: hPath,
-      validTempPoints: validTemp,
+      tempPath: tempSegments.map(buildMonotoneSegments).filter(Boolean).join(' '),
+      humPath: humSegments.map(buildMonotoneSegments).filter(Boolean).join(' '),
     };
   }, [points, getX, getTempY, getHumY]);
 
-  // Touch handler to scrub/select points on mobile
+  // Interactive selection: nearest bucket by timestamp on tap/scrub
+  const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(
+    points.length > 0 ? points.length - 1 : null
+  );
+
   const handleTouch = (e: GestureResponderEvent) => {
     if (points.length === 0 || innerWidth <= 0) return;
     const touchX = e.nativeEvent.locationX;
     const clampedX = Math.max(PADDING_LEFT, Math.min(PADDING_LEFT + innerWidth, touchX));
-    const ratio = (clampedX - PADDING_LEFT) / innerWidth;
-    const nearestIndex = Math.round(ratio * (points.length - 1));
-    if (nearestIndex >= 0 && nearestIndex < points.length) {
-      setSelectedPointIndex(nearestIndex);
-    }
-  };
+    const touchRatio = (clampedX - PADDING_LEFT) / innerWidth;
+    const touchTs = startX + touchRatio * timeSpan;
 
-  // Select 5 evenly spaced points for X-axis timestamps
-  const xTicks = useMemo(() => {
-    if (points.length === 0) return [];
-    const count = Math.min(5, points.length);
-    const result: { index: number; x: number; timeStr: string }[] = [];
-    for (let i = 0; i < count; i++) {
-      const ptIdx = Math.round((i / (count - 1)) * (points.length - 1));
-      const pt = points[ptIdx];
-      if (pt) {
-        result.push({
-          index: ptIdx,
-          x: getX(ptIdx),
-          timeStr: formatTimeHHmm(pt.timestamp),
-        });
+    let nearestIdx = 0;
+    let minDiff = Infinity;
+    for (let i = 0; i < points.length; i++) {
+      const diff = Math.abs(points[i].timestamp - touchTs);
+      if (diff < minDiff) {
+        minDiff = diff;
+        nearestIdx = i;
       }
     }
-    return result;
-  }, [points, getX]);
+    setSelectedPointIndex(nearestIdx);
+  };
 
-  // Selected point coordinates for highlight overlays
-  const selectedX = selectedPointIndex !== null ? getX(selectedPointIndex) : null;
+  const selectedPoint: EnvironmentHistoryPoint | null =
+    selectedPointIndex !== null && points[selectedPointIndex]
+      ? points[selectedPointIndex]
+      : points[points.length - 1] ?? null;
+
+  // Selected point highlight coordinates
+  const selectedX = selectedPoint ? getX(selectedPoint.timestamp) : null;
   const selectedTempY =
     selectedPoint && selectedPoint.temperature !== null
       ? getTempY(selectedPoint.temperature)
@@ -323,178 +416,174 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
       ? getHumY(selectedPoint.humidity)
       : null;
 
-  const thresholds = floor.thresholds;
-  const hasTempThreshold =
-    thresholds &&
-    (thresholds.temperature_min !== null || thresholds.temperature_max !== null);
-  const hasHumThreshold =
-    thresholds &&
-    (thresholds.humidity_min !== null || thresholds.humidity_max !== null);
-
-  // Time range summary
-  const timeRangeLabel = useMemo(() => {
-    if (from && to) {
-      return `${formatFullDateTimeWithSeconds(from)} – ${formatFullDateTimeWithSeconds(to)}`;
+  // X ticks with reference ~45-55px spacing to prevent overlapping
+  const xTicks = useMemo(() => {
+    if (points.length === 0) return [];
+    const count = Math.max(2, Math.min(6, Math.floor(innerWidth / 50)));
+    const result: { timestamp: number; x: number; timeStr: string }[] = [];
+    for (let i = 0; i < count; i++) {
+      const ts = startX + (i / (count - 1)) * timeSpan;
+      result.push({
+        timestamp: ts,
+        x: getX(ts),
+        timeStr: formatTimeHHmm(ts),
+      });
     }
-    return 'Khoảng thời gian: 24 giờ qua (bước 15 phút)';
-  }, [from, to]);
+    return result;
+  }, [startX, timeSpan, innerWidth, getX, points.length]);
+
+  // Threshold evaluations for selected point
+  const tempEval = useMemo(() => {
+    return evaluateThreshold(
+      selectedPoint?.temperature ?? null,
+      floor.thresholds?.temperature_min,
+      floor.thresholds?.temperature_max,
+      '°C'
+    );
+  }, [selectedPoint?.temperature, floor.thresholds]);
+
+  const humEval = useMemo(() => {
+    return evaluateThreshold(
+      selectedPoint?.humidity ?? null,
+      floor.thresholds?.humidity_min,
+      floor.thresholds?.humidity_max,
+      '%RH'
+    );
+  }, [selectedPoint?.humidity, floor.thresholds]);
+
+  // Requirement: Omit floors with empty points from the card list
+  if (points.length === 0) {
+    return null;
+  }
 
   return (
-    <AppCard elevation="sm" style={styles.card}>
-      {/* Floor Card Header */}
+    <View style={styles.card}>
+      {/* Floor Card Header: floorName font 14 */}
       <View style={styles.headerRow}>
-        <View style={styles.titleContainer}>
-          <View style={styles.floorNameRow}>
-            <Ionicons name="layers" size={20} color={theme.colors.primary[600]} />
-            <AppText variant="title" weight="bold">
-              {floor.floorName}
-            </AppText>
-          </View>
-          <AppText variant="caption" color={theme.colors.text.secondary}>
-            Phòng #{floor.roomId} • Node #{floor.nodeId} • Master: {floor.masterId}
+        <View style={styles.floorTitleGroup}>
+          <Ionicons name="business-outline" size={18} color="#0f172a" />
+          <AppText style={styles.floorTitleText} numberOfLines={1}>
+            {floor.floorName}
           </AppText>
         </View>
-
-        {/* Latest Metric Badges */}
-        <View style={styles.latestBadgeContainer}>
-          <View style={styles.tempBadge}>
-            <Ionicons name="thermometer" size={13} color="#8B5CF6" />
-            <AppText variant="caption" weight="bold" color="#7C3AED">
-              {latestValidPoint?.temperature !== null && latestValidPoint?.temperature !== undefined
-                ? `${latestValidPoint.temperature.toFixed(1)}°C`
-                : '—'}
-            </AppText>
-          </View>
-          <View style={styles.humBadge}>
-            <Ionicons name="water" size={13} color="#14B8A6" />
-            <AppText variant="caption" weight="bold" color="#0D9488">
-              {latestValidPoint?.humidity !== null && latestValidPoint?.humidity !== undefined
-                ? `${latestValidPoint.humidity.toFixed(1)}%`
-                : '—'}
-            </AppText>
-          </View>
-        </View>
+        <AppText style={styles.floorMetaText}>
+          Phòng #{floor.roomId} • Node #{floor.nodeId}
+        </AppText>
       </View>
 
-      {/* Threshold chips (only shown if configured, no fake defaults) */}
-      {(hasTempThreshold || hasHumThreshold) && (
-        <View style={styles.thresholdChipsRow}>
-          {hasTempThreshold && (
-            <View style={styles.thresholdChip}>
-              <Ionicons name="shield-checkmark-outline" size={12} color="#8B5CF6" />
-              <AppText variant="caption" color={theme.colors.text.secondary}>
-                Nhiệt độ tối ưu:{' '}
-                <AppText variant="caption" weight="bold">
-                  {thresholds.temperature_min !== null ? `${thresholds.temperature_min}°C` : '—'}
-                  {' – '}
-                  {thresholds.temperature_max !== null ? `${thresholds.temperature_max}°C` : '—'}
-                </AppText>
-              </AppText>
-            </View>
-          )}
-
-          {hasHumThreshold && (
-            <View style={styles.thresholdChip}>
-              <Ionicons name="shield-checkmark-outline" size={12} color="#14B8A6" />
-              <AppText variant="caption" color={theme.colors.text.secondary}>
-                Độ ẩm tối ưu:{' '}
-                <AppText variant="caption" weight="bold">
-                  {thresholds.humidity_min !== null ? `${thresholds.humidity_min}%` : '—'}
-                  {' – '}
-                  {thresholds.humidity_max !== null ? `${thresholds.humidity_max}%` : '—'}
-                </AppText>
-              </AppText>
-            </View>
-          )}
-        </View>
-      )}
-
-      <AppDivider spacing="sm" />
-
-      {/* Interactive Tooltip Inspection Box */}
-      {selectedPoint && (
+      {/* Tooltip on Tap/Press */}
+      {selectedPoint && !isAllNull && (
         <View style={styles.tooltipBox}>
+          {/* Tooltip Time */}
           <View style={styles.tooltipHeaderRow}>
-            <View style={styles.tooltipTimeContainer}>
-              <Ionicons name="time-outline" size={13} color={theme.colors.text.secondary} />
-              <AppText variant="caption" weight="bold" color={theme.colors.text.primary}>
-                {formatFullDateTimeWithSeconds(selectedPoint.timestamp)}
+            <View style={styles.tooltipTimeRow}>
+              <Ionicons name="time-outline" size={13} color="#5b6b80" />
+              <AppText style={styles.tooltipTimeText}>
+                {formatTimeHHmm(selectedPoint.timestamp)}
               </AppText>
             </View>
-            <AppText variant="overline" color={theme.colors.text.muted}>
-              (Asia/Ho_Chi_Minh)
+            <AppText style={styles.tooltipTimeSubtext}>
+              {new Date(selectedPoint.timestamp).toLocaleDateString('vi-VN')}
             </AppText>
           </View>
 
-          <View style={styles.tooltipMetricsRow}>
-            <View style={styles.tooltipMetricItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#8B5CF6' }]} />
-              <AppText variant="caption" color={theme.colors.text.muted}>
-                Nhiệt độ:
-              </AppText>
-              <AppText
-                variant="bodySmall"
-                weight="bold"
-                color={selectedPoint.temperature !== null ? '#8B5CF6' : theme.colors.text.disabled}
-              >
-                {selectedPoint.temperature !== null
-                  ? `${selectedPoint.temperature.toFixed(1)} °C`
-                  : 'Không có dữ liệu'}
-              </AppText>
+          {/* Metric Rows */}
+          <View style={styles.tooltipMetricsContainer}>
+            {/* Temperature Tooltip Row */}
+            <View style={styles.tooltipMetricRow}>
+              <View style={styles.metricLabelValueRow}>
+                <View style={[styles.bullet, { backgroundColor: '#c2413b' }]} />
+                <AppText style={styles.tooltipLabel}>Nhiệt độ: </AppText>
+                <AppText
+                  style={[
+                    styles.tooltipValue,
+                    {
+                      color:
+                        selectedPoint.temperature !== null ? '#c2413b' : '#5b6b80',
+                    },
+                  ]}
+                >
+                  {selectedPoint.temperature !== null
+                    ? `${selectedPoint.temperature.toFixed(1)}°C`
+                    : '—'}
+                </AppText>
+              </View>
+
+              {/* Threshold info & warning */}
+              <View style={styles.thresholdInfoCol}>
+                <AppText style={styles.thresholdRefText}>
+                  Ngưỡng: {tempEval.referenceText}
+                </AppText>
+                {tempEval.warningText && (
+                  <AppText style={styles.thresholdWarningText}>
+                    {tempEval.warningText}
+                  </AppText>
+                )}
+              </View>
             </View>
 
-            <AppDivider orientation="vertical" spacing="sm" />
+            {/* Humidity Tooltip Row */}
+            <View style={styles.tooltipMetricRow}>
+              <View style={styles.metricLabelValueRow}>
+                <View style={[styles.bullet, { backgroundColor: '#2563eb' }]} />
+                <AppText style={styles.tooltipLabel}>Độ ẩm: </AppText>
+                <AppText
+                  style={[
+                    styles.tooltipValue,
+                    {
+                      color:
+                        selectedPoint.humidity !== null ? '#2563eb' : '#5b6b80',
+                    },
+                  ]}
+                >
+                  {selectedPoint.humidity !== null
+                    ? `${selectedPoint.humidity.toFixed(1)}%RH`
+                    : '—'}
+                </AppText>
+              </View>
 
-            <View style={styles.tooltipMetricItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#14B8A6' }]} />
-              <AppText variant="caption" color={theme.colors.text.muted}>
-                Độ ẩm:
-              </AppText>
-              <AppText
-                variant="bodySmall"
-                weight="bold"
-                color={selectedPoint.humidity !== null ? '#14B8A6' : theme.colors.text.disabled}
-              >
-                {selectedPoint.humidity !== null
-                  ? `${selectedPoint.humidity.toFixed(1)} %RH`
-                  : 'Không có dữ liệu'}
-              </AppText>
+              {/* Threshold info & warning */}
+              <View style={styles.thresholdInfoCol}>
+                <AppText style={styles.thresholdRefText}>
+                  Ngưỡng: {humEval.referenceText}
+                </AppText>
+                {humEval.warningText && (
+                  <AppText style={styles.thresholdWarningText}>
+                    {humEval.warningText}
+                  </AppText>
+                )}
+              </View>
             </View>
           </View>
         </View>
       )}
 
-      {/* Chart Canvas Area */}
-      {points.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="stats-chart-outline" size={32} color={theme.colors.text.muted} />
-          <AppText variant="bodySmall" color={theme.colors.text.muted}>
-            Chưa có dữ liệu vi khí hậu cho tầng này.
-          </AppText>
-        </View>
-      ) : isAllNull ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="alert-circle-outline" size={32} color={theme.colors.warning.main} />
-          <AppText variant="bodySmall" color={theme.colors.text.secondary} style={styles.centerText}>
-            Cảm biến chưa ghi nhận dữ liệu trong 24 giờ qua (toàn bộ điểm trống).
-          </AppText>
+      {/* Chart Canvas Area or Empty Floor Data */}
+      {isAllNull ? (
+        <View style={styles.emptyChartContainer}>
+          <Ionicons name="stats-chart-outline" size={28} color="#5b6b80" />
+          <AppText style={styles.emptyChartText}>Chưa có dữ liệu</AppText>
         </View>
       ) : (
         <View style={styles.chartWrapper} onLayout={handleContainerLayout}>
-          {/* Main Chart Canvas: Left Y-Axis | SVG Plot Canvas | Right Y-Axis */}
-          <View style={styles.chartCanvasRow}>
+          {/* Main Chart Canvas: Left Y-Axis | SVG Plot Area | Right Y-Axis */}
+          <View style={styles.canvasRow}>
             {/* Left Y-Axis: Temperature (°C) */}
             <View style={styles.leftYAxis}>
-              <AppText variant="overline" weight="bold" color="#8B5CF6" style={styles.axisHeader}>
+              <AppText style={[styles.axisHeaderText, { color: '#c2413b' }]}>
                 °C
               </AppText>
-              <View style={styles.axisLabelsColumn}>
+              <View style={styles.ticksColumn}>
                 {tempAxis.ticks.map((tick, i) => {
-                  const topPos = PADDING_TOP + (i / (tempAxis.ticks.length - 1)) * innerHeight - 7;
+                  const topPos =
+                    PADDING_TOP + (1 - i / (tempAxis.ticks.length - 1)) * innerHeight - 8;
                   return (
-                    <View key={`t-tick-${i}`} style={[styles.tickLabelWrap, { top: topPos }]}>
-                      <AppText variant="overline" color="#7C3AED" style={styles.axisTickText}>
-                        {tick}°
+                    <View
+                      key={`temp-tick-${i}`}
+                      style={[styles.tickLabelWrapper, { top: topPos, right: 4 }]}
+                    >
+                      <AppText style={styles.axisTickText}>
+                        {formatTick(tick, '°C')}
                       </AppText>
                     </View>
                   );
@@ -502,16 +591,17 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
               </View>
             </View>
 
-            {/* SVG Plot Canvas with Touch Scrubbing */}
+            {/* SVG Plot Canvas with Scrub Touch Support */}
             <View
-              style={[styles.svgContainer, { width: svgWidth, height: PLOT_HEIGHT }]}
+              style={[styles.svgArea, { width: svgWidth, height: PLOT_HEIGHT }]}
               onTouchStart={handleTouch}
               onTouchMove={handleTouch}
             >
               <Svg width={svgWidth} height={PLOT_HEIGHT}>
-                {/* Horizontal Dashed Grid Lines aligned with both axes */}
+                {/* Horizontal Dashed Grid Lines aligned with Left Y ticks */}
                 {tempAxis.ticks.map((_, i) => {
-                  const y = PADDING_TOP + (i / (tempAxis.ticks.length - 1)) * innerHeight;
+                  const y =
+                    PADDING_TOP + (1 - i / (tempAxis.ticks.length - 1)) * innerHeight;
                   return (
                     <Line
                       key={`hgrid-${i}`}
@@ -519,58 +609,58 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
                       y1={y}
                       x2={svgWidth}
                       y2={y}
-                      stroke="#E2E8F0"
+                      stroke="#e2e8f0"
                       strokeWidth={1}
-                      strokeDasharray="4, 4"
+                      strokeDasharray="3, 3"
                     />
                   );
                 })}
 
                 {/* Vertical Dashed Grid Lines aligned with X ticks */}
-                {xTicks.map((tick) => (
+                {xTicks.map((tick, i) => (
                   <Line
-                    key={`vgrid-${tick.index}`}
+                    key={`vgrid-${i}`}
                     x1={tick.x}
                     y1={PADDING_TOP}
                     x2={tick.x}
                     y2={PADDING_TOP + innerHeight}
-                    stroke="#E2E8F0"
+                    stroke="#e2e8f0"
                     strokeWidth={1}
-                    strokeDasharray="4, 4"
+                    strokeDasharray="3, 3"
                   />
                 ))}
 
-                {/* Vertical Indicator Line at Selected Touch Position */}
+                {/* Vertical Active Line at Selected Touch Position */}
                 {selectedX !== null && (
                   <Line
                     x1={selectedX}
                     y1={PADDING_TOP}
                     x2={selectedX}
                     y2={PADDING_TOP + innerHeight}
-                    stroke="#94A3B8"
+                    stroke="#94a3b8"
                     strokeWidth={1.2}
                     strokeDasharray="3, 3"
                   />
                 )}
 
-                {/* Humidity Line: Teal Dashed (#14B8A6) */}
+                {/* Humidity Series: Color #2563eb, dashed [4, 4], width 2 */}
                 {humPath.length > 0 && (
                   <Path
                     d={humPath}
-                    stroke="#14B8A6"
+                    stroke="#2563eb"
                     strokeWidth={2}
-                    strokeDasharray="5, 4"
+                    strokeDasharray="4, 4"
                     fill="none"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
                 )}
 
-                {/* Temperature Line: Purple Solid (#8B5CF6) */}
+                {/* Temperature Series: Color #c2413b, solid line, width 2 */}
                 {tempPath.length > 0 && (
                   <Path
                     d={tempPath}
-                    stroke="#8B5CF6"
+                    stroke="#c2413b"
                     strokeWidth={2}
                     fill="none"
                     strokeLinecap="round"
@@ -578,36 +668,27 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
                   />
                 )}
 
-                {/* Small Circular Dots on Temperature Data Points */}
-                {validTempPoints.map((pt) => (
-                  <Circle
-                    key={`tdot-${pt.index}`}
-                    cx={pt.x}
-                    cy={pt.y}
-                    r={2.5}
-                    fill="#8B5CF6"
-                  />
-                ))}
-
-                {/* Highlight Overlays for Selected Point */}
+                {/* Active Focus Marker on Humidity Series: Radius 4 */}
                 {selectedX !== null && selectedHumY !== null && (
                   <Circle
                     cx={selectedX}
                     cy={selectedHumY}
-                    r={5}
-                    fill="#14B8A6"
-                    stroke="#FFFFFF"
-                    strokeWidth={1.5}
+                    r={4}
+                    fill="#2563eb"
+                    stroke="#ffffff"
+                    strokeWidth={2}
                   />
                 )}
+
+                {/* Active Focus Marker on Temperature Series: Radius 4 */}
                 {selectedX !== null && selectedTempY !== null && (
                   <Circle
                     cx={selectedX}
                     cy={selectedTempY}
-                    r={5}
-                    fill="#8B5CF6"
-                    stroke="#FFFFFF"
-                    strokeWidth={1.5}
+                    r={4}
+                    fill="#c2413b"
+                    stroke="#ffffff"
+                    strokeWidth={2}
                   />
                 )}
               </Svg>
@@ -615,16 +696,20 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
 
             {/* Right Y-Axis: Humidity (%RH) */}
             <View style={styles.rightYAxis}>
-              <AppText variant="overline" weight="bold" color="#14B8A6" style={styles.axisHeader}>
+              <AppText style={[styles.axisHeaderText, { color: '#2563eb' }]}>
                 %RH
               </AppText>
-              <View style={styles.axisLabelsColumn}>
+              <View style={styles.ticksColumn}>
                 {humAxis.ticks.map((tick, i) => {
-                  const topPos = PADDING_TOP + (i / (humAxis.ticks.length - 1)) * innerHeight - 7;
+                  const topPos =
+                    PADDING_TOP + (1 - i / (humAxis.ticks.length - 1)) * innerHeight - 8;
                   return (
-                    <View key={`h-tick-${i}`} style={[styles.tickLabelWrap, { top: topPos }]}>
-                      <AppText variant="overline" color="#0D9488" style={styles.axisTickText}>
-                        {tick}%
+                    <View
+                      key={`hum-tick-${i}`}
+                      style={[styles.tickLabelWrapper, { top: topPos, left: 4 }]}
+                    >
+                      <AppText style={styles.axisTickText}>
+                        {formatTick(tick, '%RH')}
                       </AppText>
                     </View>
                   );
@@ -633,11 +718,11 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
             </View>
           </View>
 
-          {/* X-Axis Hour Labels Row (HH:mm in Asia/Ho_Chi_Minh) */}
+          {/* X-Axis Hour Labels Row (HH:mm) */}
           <View style={[styles.xAxisLabelsRow, { marginLeft: LEFT_AXIS_WIDTH, width: svgWidth }]}>
-            {xTicks.map((tick) => (
+            {xTicks.map((tick, i) => (
               <View
-                key={`xlabel-${tick.index}`}
+                key={`xtick-${i}`}
                 style={[
                   styles.xTickLabelContainer,
                   {
@@ -645,165 +730,160 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
                   },
                 ]}
               >
-                <AppText
-                  variant="overline"
-                  color={selectedPointIndex === tick.index ? '#8B5CF6' : theme.colors.text.muted}
-                  style={[
-                    styles.xTickText,
-                    selectedPointIndex === tick.index && styles.boldText,
-                  ]}
-                >
-                  {tick.timeStr}
-                </AppText>
+                <AppText style={styles.xTickText}>{tick.timeStr}</AppText>
               </View>
             ))}
           </View>
-
-          {/* Overall Time Range Footer */}
-          <AppText variant="overline" color={theme.colors.text.muted} style={styles.timeRangeFooter}>
-            {timeRangeLabel}
-          </AppText>
         </View>
       )}
 
-      {/* Chart Legend */}
+      {/* Legend Below Chart: always shows both series, no toggle */}
       <View style={styles.legendRow}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendLineSolid, { backgroundColor: '#8B5CF6' }]} />
-          <AppText variant="caption" weight="medium" color={theme.colors.text.primary}>
-            Nhiệt độ (°C)
-          </AppText>
+          <View style={[styles.solidLegendLine, { backgroundColor: '#c2413b' }]} />
+          <AppText style={styles.legendText}>Nhiệt độ (°C)</AppText>
         </View>
 
         <View style={styles.legendItem}>
-          <View style={styles.legendDashedWrapper}>
-            <View style={[styles.legendDash, { backgroundColor: '#14B8A6' }]} />
-            <View style={[styles.legendDash, { backgroundColor: '#14B8A6' }]} />
-            <View style={[styles.legendDash, { backgroundColor: '#14B8A6' }]} />
+          <View style={styles.dashedLegendLine}>
+            <View style={[styles.legendDash, { backgroundColor: '#2563eb' }]} />
+            <View style={[styles.legendDash, { backgroundColor: '#2563eb' }]} />
+            <View style={[styles.legendDash, { backgroundColor: '#2563eb' }]} />
           </View>
-          <AppText variant="caption" weight="medium" color={theme.colors.text.primary}>
-            Độ ẩm (%RH)
-          </AppText>
+          <AppText style={styles.legendText}>Độ ẩm (%RH)</AppText>
         </View>
       </View>
-    </AppCard>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: theme.borderRadius.xl,
-    padding: theme.spacing.md,
-    gap: theme.spacing.sm,
+    backgroundColor: '#ffffff',
+    borderColor: '#e2e8f0',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    elevation: 0,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  titleContainer: {
+  floorTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     flex: 1,
-    gap: 2,
   },
-  floorNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  floorTitleText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+    lineHeight: 18,
   },
-  latestBadgeContainer: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  tempBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 3,
-    borderRadius: theme.borderRadius.full,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.25)',
-  },
-  humBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(20, 184, 166, 0.1)',
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 3,
-    borderRadius: theme.borderRadius.full,
-    borderWidth: 1,
-    borderColor: 'rgba(20, 184, 166, 0.25)',
-  },
-  thresholdChipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.xs,
-  },
-  thresholdChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: theme.colors.background.subtle,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 3,
-    borderRadius: theme.borderRadius.md,
+  floorMetaText: {
+    fontSize: 11,
+    color: '#5b6b80',
   },
   tooltipBox: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.sm,
-    borderLeftWidth: 3,
-    borderLeftColor: '#8B5CF6',
+    backgroundColor: '#ffffff',
+    borderColor: '#e2e8f0',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 4,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+    shadowColor: '#000000',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
   tooltipHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    paddingBottom: 6,
+    marginBottom: 8,
   },
-  tooltipTimeContainer: {
+  tooltipTimeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  tooltipMetricsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.md,
-    paddingTop: 2,
+  tooltipTimeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0f172a',
   },
-  tooltipMetricItem: {
+  tooltipTimeSubtext: {
+    fontSize: 11,
+    color: '#5b6b80',
+  },
+  tooltipMetricsContainer: {
+    gap: 8,
+  },
+  tooltipMetricRow: {
+    gap: 2,
+  },
+  metricLabelValueRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  legendDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+  bullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
-  emptyContainer: {
-    paddingVertical: theme.spacing.xl,
+  tooltipLabel: {
+    fontSize: 12,
+    color: '#0f172a',
+    fontWeight: '500',
+  },
+  tooltipValue: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  thresholdInfoCol: {
+    paddingLeft: 12,
+    gap: 1,
+  },
+  thresholdRefText: {
+    fontSize: 11,
+    color: '#5b6b80',
+    lineHeight: 15,
+  },
+  thresholdWarningText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#c2413b',
+    lineHeight: 15,
+  },
+  emptyChartContainer: {
+    height: 180,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: theme.spacing.xs,
+    gap: 8,
   },
-  centerText: {
-    textAlign: 'center',
-    paddingHorizontal: theme.spacing.md,
+  emptyChartText: {
+    fontSize: 13,
+    color: '#5b6b80',
   },
   chartWrapper: {
-    marginTop: theme.spacing.xs,
     width: '100%',
+    minHeight: 240,
+    marginTop: 4,
   },
-  chartCanvasRow: {
+  canvasRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     height: PLOT_HEIGHT,
@@ -811,43 +891,41 @@ const styles = StyleSheet.create({
   leftYAxis: {
     width: LEFT_AXIS_WIDTH,
     height: PLOT_HEIGHT,
-    paddingRight: 4,
     position: 'relative',
   },
   rightYAxis: {
     width: RIGHT_AXIS_WIDTH,
     height: PLOT_HEIGHT,
-    paddingLeft: 4,
     position: 'relative',
   },
-  axisHeader: {
-    fontSize: 10,
-    lineHeight: 12,
+  axisHeaderText: {
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
     position: 'absolute',
     top: 0,
-    alignSelf: 'center',
+    left: 0,
+    right: 0,
   },
-  axisLabelsColumn: {
+  ticksColumn: {
     flex: 1,
     position: 'relative',
     height: PLOT_HEIGHT,
   },
-  tickLabelWrap: {
+  tickLabelWrapper: {
     position: 'absolute',
-    left: 0,
-    right: 0,
   },
   axisTickText: {
-    fontSize: 9,
-    lineHeight: 11,
-    textAlign: 'center',
+    fontSize: 12,
+    color: '#5b6b80',
+    lineHeight: 14,
   },
-  svgContainer: {
+  svgArea: {
     position: 'relative',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#ffffff',
   },
   xAxisLabelsRow: {
-    height: 22,
+    height: 24,
     position: 'relative',
     marginTop: 4,
   },
@@ -857,42 +935,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   xTickText: {
-    fontSize: 9,
-    lineHeight: 12,
-  },
-  boldText: {
-    fontWeight: 'bold',
-  },
-  timeRangeFooter: {
-    textAlign: 'center',
-    marginTop: 6,
+    fontSize: 12,
+    color: '#5b6b80',
+    lineHeight: 14,
   },
   legendRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: theme.spacing.lg,
-    paddingTop: theme.spacing.xs,
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingVertical: 8,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    paddingHorizontal: 4,
   },
-  legendLineSolid: {
-    width: 22,
-    height: 3,
-    borderRadius: 1.5,
+  solidLegendLine: {
+    width: 20,
+    height: 2,
+    borderRadius: 1,
   },
-  legendDashedWrapper: {
+  dashedLegendLine: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    width: 22,
+    width: 20,
   },
   legendDash: {
-    width: 5,
-    height: 3,
-    borderRadius: 1.5,
+    width: 4,
+    height: 2,
+    borderRadius: 1,
+  },
+  legendText: {
+    fontSize: 12,
+    color: '#5b6b80',
   },
 });

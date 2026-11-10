@@ -84,6 +84,7 @@ export interface FloorMapping {
   master_id: number;
   node_address: number;
   misting_ssr_channel: number;
+  fan_ssr_channel?: number | null;
   status: 'ACTIVE' | 'INACTIVE';
   total_rows?: number | null;
   total_columns?: number | null;
