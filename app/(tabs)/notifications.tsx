@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { theme } from '../../src/core/theme';
+import { formatVietnamDateTime } from '../../src/core/utils';
 import { useAuth } from '../../src/features/auth';
 import {
   CustomerNotification,
@@ -571,7 +572,7 @@ export default function NotificationsScreen() {
                         )}
 
                         <AppText variant="caption" color={theme.colors.text.muted}>
-                          {new Date(notification.created_at).toLocaleString('vi-VN')}
+                          {formatVietnamDateTime(notification.created_at)}
                         </AppText>
                       </View>
                     </View>
@@ -634,9 +635,7 @@ export default function NotificationsScreen() {
                   {selectedNotification?.title}
                 </AppText>
                 <AppText variant="caption" color={theme.colors.text.muted}>
-                  {selectedNotification?.created_at
-                    ? new Date(selectedNotification.created_at).toLocaleString('vi-VN')
-                    : ''}
+                  {formatVietnamDateTime(selectedNotification?.created_at)}
                 </AppText>
                 <AppText
                   variant="bodyMedium"
@@ -735,9 +734,7 @@ export default function NotificationsScreen() {
                           Thời điểm phát hiện:
                         </AppText>
                         <AppText variant="captionMedium" color={theme.colors.text.secondary} style={styles.metaValue}>
-                          {activeIncident.detected_at
-                            ? new Date(activeIncident.detected_at).toLocaleString('vi-VN')
-                            : '—'}
+                          {formatVietnamDateTime(activeIncident.detected_at, '—')}
                         </AppText>
                       </View>
 
@@ -749,9 +746,7 @@ export default function NotificationsScreen() {
                               Thời điểm giải quyết:
                             </AppText>
                             <AppText variant="captionMedium" color={theme.colors.success.dark} weight="bold" style={styles.metaValue}>
-                              {activeIncident.resolved_at
-                                ? new Date(activeIncident.resolved_at).toLocaleString('vi-VN')
-                                : '—'}
+                              {formatVietnamDateTime(activeIncident.resolved_at, '—')}
                             </AppText>
                           </View>
 

@@ -1,4 +1,6 @@
 /**
- * Shared utility functions placeholder
+ * Shared utility functions
  */
-export {};
+export * from '../../core/utils/currency';
+export * from '../../core/utils/date';
+
