@@ -97,21 +97,18 @@ export class CultivationRepository {
         API_ENDPOINTS.MUSHROOM_TYPES.BASE,
         { params: status ? { status } : undefined }
       );
-      const mushroomTypes = Array.isArray(response.data)
+      const rawTypes = Array.isArray(response.data)
         ? response.data
-        : response.data.data;
-      return mushroomTypes.map((mushroomType) => {
-        const growingDays = Number(mushroomType.growing_days);
-        const price = Number(mushroomType.price);
-        if (
-          !Number.isSafeInteger(growingDays) ||
-          growingDays <= 0 ||
-          !Number.isFinite(price) ||
-          price < 0
-        ) {
-          throw new AppError('Thông tin loại nấm từ máy chủ không hợp lệ.', 'API_ERROR', 500);
-        }
-        return { ...mushroomType, growing_days: growingDays, price };
+        : (response.data as { data: MushroomType[] })?.data || [];
+      return rawTypes.map((mushroomType) => {
+        const growingDays = Number(mushroomType.growing_days) || 0;
+        const price = Number(mushroomType.price) || 0;
+        return {
+          ...mushroomType,
+          growing_days: growingDays > 0 ? growingDays : 30,
+          price: price >= 0 ? price : 0,
+          image_url: mushroomType.image_url ? String(mushroomType.image_url).trim() : null,
+        };
       });
     } catch (error) {
       throw error instanceof AppError ? error : handleApiError(error);
