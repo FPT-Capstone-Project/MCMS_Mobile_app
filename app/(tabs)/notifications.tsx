@@ -34,6 +34,88 @@ import {
 
 type NotificationFilter = 'all' | 'unread' | 'read';
 
+function localizeNotificationText(notification: CustomerNotification) {
+  const { notification_type: type } = notification;
+  const title = notification.title.trim();
+  const message = notification.message.trim();
+
+  if (type === 'CULTIVATION_STARTED') {
+    return {
+      title: 'Đang chuẩn bị phôi nấm',
+      message: 'Phôi nấm đã được chuẩn bị và đang chờ trang trại xử lý.',
+    };
+  }
+
+  if (type === 'PAYMENT_REFUND_REQUIRED') {
+    return {
+      title: 'Đã nhận thanh toán – cần hoàn tiền',
+      message:
+        'Khoản thanh toán được nhận sau khi thời gian giữ khay đã hết và tài nguyên cần thiết không còn. Đội ngũ của chúng tôi sẽ xử lý hoàn tiền cho bạn.',
+    };
+  }
+
+  if (type === 'OPERATOR_MESSAGE') {
+    if (title === 'Expected harvest date updated') {
+      const date = message.match(/Expected harvest date changed to\s+(.+)\.?$/i)?.[1];
+      return {
+        title: 'Đã cập nhật ngày thu hoạch dự kiến',
+        message: date
+          ? `Ngày thu hoạch dự kiến đã được cập nhật thành ${date}.`
+          : 'Ngày thu hoạch dự kiến đã được cập nhật.',
+      };
+    }
+
+    if (title === 'Mushrooms ready for harvest') {
+      return {
+        title: 'Nấm đã sẵn sàng để thu hoạch',
+        message: 'Vui lòng chọn nhận nấm tại trang trại hoặc giao hàng.',
+      };
+    }
+  }
+
+  if (type === 'MUSHROOM_DISEASE') {
+    if (title === 'New mushroom diagnosis request') {
+      const issueId = message.match(/issue\s+#?(\d+)/i)?.[1];
+      return {
+        title: 'Yêu cầu chuyên gia chẩn đoán nấm mới',
+        message: issueId
+          ? `Có yêu cầu tư vấn chuyên gia mới cho sự cố nấm #${issueId}.`
+          : 'Có yêu cầu tư vấn chuyên gia mới về sự cố nấm.',
+      };
+    }
+
+    if (title === 'Additional issue information provided') {
+      const issueTitle = message.match(/issue\s+"(.+)"\.?$/i)?.[1];
+      return {
+        title: 'Đã bổ sung thông tin sự cố',
+        message: issueTitle
+          ? `Nhân viên đã bổ sung thông tin cho sự cố “${issueTitle}”.`
+          : 'Nhân viên đã bổ sung thông tin cho sự cố.',
+      };
+    }
+
+    if (
+      title === 'More information requested' ||
+      title === 'Expert diagnosis available'
+    ) {
+      const issueTitle = message.match(/issue\s+"(.+)"\.?$/i)?.[1];
+      const needsMoreInfo = title === 'More information requested';
+      return {
+        title: needsMoreInfo ? 'Chuyên gia cần thêm thông tin' : 'Đã có kết quả chẩn đoán từ chuyên gia',
+        message: issueTitle
+          ? needsMoreInfo
+            ? `Chuyên gia cần thêm thông tin về sự cố “${issueTitle}”.`
+            : `Chuyên gia đã gửi kết quả chẩn đoán và phương án xử lý cho sự cố “${issueTitle}”.`
+          : needsMoreInfo
+            ? 'Chuyên gia cần thêm thông tin về sự cố nấm.'
+            : 'Chuyên gia đã gửi kết quả chẩn đoán và phương án xử lý sự cố nấm.',
+      };
+    }
+  }
+
+  return { title: notification.title, message: notification.message };
+}
+
 /**
  * Returns icon based on notification type and reference type
  */
@@ -333,6 +415,9 @@ export default function NotificationsScreen() {
   };
 
   const activeIncident = selectedNotification?.device_incident;
+  const selectedNotificationText = selectedNotification
+    ? localizeNotificationText(selectedNotification)
+    : null;
   const isIncidentResolved = activeIncident?.status === 'RESOLVED';
   const canOperatorConfirm =
     isFarmOperator && activeIncident?.can_confirm_repair === true && !isIncidentResolved;
@@ -450,12 +535,13 @@ export default function NotificationsScreen() {
                 notification.reference_type === 'DEVICE_INCIDENT' ||
                 Boolean(notification.device_incident);
               const incident = notification.device_incident;
+              const localizedText = localizeNotificationText(notification);
 
               return (
                 <Pressable
                   key={notification.notification_id}
                   accessibilityRole="button"
-                  accessibilityLabel={`${notification.title}. ${
+                  accessibilityLabel={`${localizedText.title}. ${
                     notification.is_read ? 'Đã đọc' : 'Chưa đọc'
                   }`}
                   onPress={() => handleOpenNotification(notification)}
@@ -503,7 +589,7 @@ export default function NotificationsScreen() {
                             style={styles.title}
                             numberOfLines={2}
                           >
-                            {notification.title}
+                            {localizedText.title}
                           </AppText>
                           {!notification.is_read ? (
                             <View style={styles.unreadDot} />
@@ -514,7 +600,7 @@ export default function NotificationsScreen() {
                           color={theme.colors.text.secondary}
                           numberOfLines={3}
                         >
-                          {notification.message}
+                          {localizedText.message}
                         </AppText>
 
                         {/* Incident Tag on card if applicable */}
@@ -632,7 +718,7 @@ export default function NotificationsScreen() {
               {/* Notification Core Info */}
               <View style={styles.detailSection}>
                 <AppText variant="title" weight="bold" color={theme.colors.text.primary}>
-                  {selectedNotification?.title}
+                  {selectedNotificationText?.title}
                 </AppText>
                 <AppText variant="caption" color={theme.colors.text.muted}>
                   {formatVietnamDateTime(selectedNotification?.created_at)}
@@ -642,7 +728,7 @@ export default function NotificationsScreen() {
                   color={theme.colors.text.secondary}
                   style={styles.detailMessageText}
                 >
-                  {selectedNotification?.message}
+                  {selectedNotificationText?.message}
                 </AppText>
               </View>
 
