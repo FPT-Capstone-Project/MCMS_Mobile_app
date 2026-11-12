@@ -286,7 +286,11 @@ export default function HomeScreen() {
   }, [loadDashboardData, loadEnvironmentHistory, isStaff]);
 
   const firstMaster = masters[0];
-  const pendingOrders = orders.filter((o) => o.order_status === 'PENDING');
+  const unpaidOrderCount = orders.filter(
+    (order) =>
+      !['CANCELLED', 'COMPLETED'].includes(order.order_status) &&
+      !['PAID', 'REFUND_PENDING', 'REFUNDED'].includes(order.payment_status || '')
+  ).length;
 
   // Compute latest temperature and humidity across floors for high-level dashboard glance
   const { latestDashboardTemp, latestDashboardHum } = useMemo<{
@@ -329,6 +333,40 @@ export default function HomeScreen() {
       <AppHeader
         title="SmartMush"
         subtitle={isStaff ? 'Hệ thống Điều hành & Vận hành IoT (Admin & Farm Operator)' : 'Hệ thống quản lý vi khí hậu & nuôi trồng nấm'}
+        rightAction={
+          isCustomer && !isStaff ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                dashboardError
+                  ? 'Mở đơn hàng, không tải được số đơn chưa thanh toán'
+                  : dashboardLoading
+                  ? 'Mở đơn hàng, đang tải số đơn chưa thanh toán'
+                  : `Mở đơn hàng, ${unpaidOrderCount} đơn chưa thanh toán`
+              }
+              onPress={() => router.push('/(tabs)/orders' as any)}
+              style={styles.orderHeaderAction}
+            >
+              <Ionicons name="receipt-outline" size={22} color={theme.colors.primary[600]} />
+              <AppText
+                variant="caption"
+                color={
+                  unpaidOrderCount > 0
+                    ? theme.colors.warning.dark
+                    : theme.colors.text.muted
+                }
+                numberOfLines={1}
+                style={styles.orderHeaderCount}
+              >
+                {dashboardError
+                  ? '—'
+                  : dashboardLoading
+                  ? '…'
+                  : unpaidOrderCount}
+              </AppText>
+            </Pressable>
+          ) : null
+        }
       />
 
       <View style={styles.content}>
@@ -424,65 +462,6 @@ export default function HomeScreen() {
               loading={dashboardLoading}
               onPress={loadDashboardData}
             />
-          </AppCard>
-        ) : null}
-
-        {/* Pending Order Notice Banner (Customer Only) */}
-        {!isStaff && isCustomer && pendingOrders.length > 0 && (
-          <Pressable onPress={() => router.push('/(tabs)/orders' as any)}>
-            <AppCard elevation="xs" style={styles.pendingOrderBanner}>
-              <View style={styles.pendingOrderRow}>
-                <Ionicons name="alert-circle" size={24} color={theme.colors.warning.main} />
-                <View style={styles.pendingOrderText}>
-                  <AppText variant="label" weight="bold">
-                    Bạn có {pendingOrders.length} đơn hàng chờ thanh toán
-                  </AppText>
-                  <AppText variant="caption" color={theme.colors.text.secondary}>
-                    Nhấn vào đây để thanh toán qua PayOS và hoàn tất giao dịch.
-                  </AppText>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={theme.colors.text.muted} />
-              </View>
-            </AppCard>
-          </Pressable>
-        )}
-
-        {!isStaff ? (
-          <AppCard elevation="sm" style={styles.heroCard}>
-            <View style={styles.heroHeader}>
-              <View style={styles.heroIconBadge}>
-                <Ionicons name="receipt-outline" size={24} color={theme.colors.primary[500]} />
-              </View>
-              <View style={styles.heroTextGroup}>
-                <AppText variant="overline" color={theme.colors.primary[500]}>
-                  Tổng quan tài khoản
-                </AppText>
-                <AppText variant="h3">Đơn hàng của bạn</AppText>
-              </View>
-            </View>
-            {dashboardLoading ? (
-              <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-                Đang tải đơn hàng...
-              </AppText>
-            ) : (
-              <View style={styles.metricsRow}>
-                <View style={styles.metricItem}>
-                  <AppText variant="caption" color={theme.colors.text.muted}>Tổng đơn</AppText>
-                  <AppText variant="title" weight="bold">
-                    {dashboardError ? '—' : orders.length}
-                  </AppText>
-                </View>
-                <AppDivider orientation="vertical" spacing="sm" />
-                <View style={styles.metricItem}>
-                  <AppText variant="caption" color={theme.colors.text.muted}>Chờ thanh toán</AppText>
-                  <AppText variant="title" weight="bold" color={theme.colors.warning.main}>
-                    {dashboardError
-                      ? '—'
-                      : pendingOrders.filter((order) => order.payment_status !== 'PAID').length}
-                  </AppText>
-                </View>
-              </View>
-            )}
           </AppCard>
         ) : null}
 
@@ -668,21 +647,17 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     borderColor: '#FFFFFF',
   },
-  pendingOrderBanner: {
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
-  },
-  pendingOrderRow: {
-    flexDirection: 'row',
+  orderHeaderAction: {
+    width: 44,
     alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
-  pendingOrderText: {
-    flex: 1,
+    justifyContent: 'center',
     gap: 2,
+  },
+  orderHeaderCount: {
+    width: 44,
+    fontSize: 10,
+    lineHeight: 12,
+    textAlign: 'center',
   },
   dashboardError: {
     gap: theme.spacing.sm,
