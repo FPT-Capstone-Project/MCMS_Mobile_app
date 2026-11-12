@@ -42,15 +42,34 @@ export const PaymentQrModal: React.FC<PaymentQrModalProps> = ({
   const [openingCheckout, setOpeningCheckout] = useState(false);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const syncPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isCheckingRef = useRef<boolean>(false);
+  const isSyncingRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
+  const onPaymentSuccessRef = useRef(onPaymentSuccess);
+  const hasReportedPaymentSuccessRef = useRef(false);
+
+  useEffect(() => {
+    onPaymentSuccessRef.current = onPaymentSuccess;
+  }, [onPaymentSuccess]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Stop polling helper
   const stopTimers = () => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
+    }
+    if (syncPollingRef.current) {
+      clearInterval(syncPollingRef.current);
+      syncPollingRef.current = null;
     }
     if (countdownRef.current) {
       clearInterval(countdownRef.current);
@@ -68,6 +87,12 @@ export const PaymentQrModal: React.FC<PaymentQrModalProps> = ({
     onClose();
   };
 
+  const reportPaymentSuccess = useCallback(() => {
+    if (hasReportedPaymentSuccessRef.current) return;
+    hasReportedPaymentSuccessRef.current = true;
+    onPaymentSuccessRef.current?.();
+  }, []);
+
   const applyPaymentStatus = useCallback(
     (statusRes: PaymentStatusData) => {
       setStatusSyncError(null);
@@ -77,7 +102,7 @@ export const PaymentQrModal: React.FC<PaymentQrModalProps> = ({
       if (isOrderPaid) {
         setPaymentStatus('PAID');
         stopTimers();
-        onPaymentSuccess?.();
+        reportPaymentSuccess();
       } else if (
         statusRes.paymentStatus === 'CANCELLED' ||
         statusRes.paymentStatus === 'FAILED'
@@ -89,7 +114,7 @@ export const PaymentQrModal: React.FC<PaymentQrModalProps> = ({
         stopTimers();
       }
     },
-    [onPaymentSuccess]
+    [reportPaymentSuccess]
   );
 
   // Immediate payment status check
@@ -108,8 +133,8 @@ export const PaymentQrModal: React.FC<PaymentQrModalProps> = ({
   }, [applyPaymentStatus, orderId]);
 
   const syncPaymentStatus = useCallback(async () => {
-    if (isCheckingRef.current || !orderId) return;
-    isCheckingRef.current = true;
+    if (isSyncingRef.current || !orderId) return;
+    isSyncingRef.current = true;
     try {
       const statusRes = await orderRepository.syncPayosPayment(orderId);
       if (!isMountedRef.current) return;
@@ -122,7 +147,7 @@ export const PaymentQrModal: React.FC<PaymentQrModalProps> = ({
         setStatusSyncError(`Chưa đồng bộ được thanh toán: ${message}`);
       }
     } finally {
-      isCheckingRef.current = false;
+      isSyncingRef.current = false;
     }
   }, [applyPaymentStatus, orderId]);
 
@@ -145,6 +170,7 @@ export const PaymentQrModal: React.FC<PaymentQrModalProps> = ({
     }
 
     let isMounted = true;
+    hasReportedPaymentSuccessRef.current = false;
     stopTimers();
 
     orderRepository
@@ -157,7 +183,7 @@ export const PaymentQrModal: React.FC<PaymentQrModalProps> = ({
 
         if (data.paymentStatus === 'PAID') {
           setPaymentStatus('PAID');
-          onPaymentSuccess?.();
+          reportPaymentSuccess();
           return;
         }
 
@@ -178,10 +204,14 @@ export const PaymentQrModal: React.FC<PaymentQrModalProps> = ({
           }, 1000);
         }
 
-        // Start polling payment status every 3.5 seconds
+        // Check local status frequently and reconcile directly with PayOS every 5 seconds.
         pollingRef.current = setInterval(() => {
           checkPaymentStatus();
-        }, 3500);
+        }, 1000);
+        void syncPaymentStatus();
+        syncPollingRef.current = setInterval(() => {
+          void syncPaymentStatus();
+        }, 5000);
       })
       .catch((err: unknown) => {
         if (!isMounted) return;
@@ -199,7 +229,7 @@ export const PaymentQrModal: React.FC<PaymentQrModalProps> = ({
       isMounted = false;
       stopTimers();
     };
-  }, [visible, orderId, retryKey, checkPaymentStatus, onPaymentSuccess]);
+  }, [visible, orderId, retryKey, checkPaymentStatus, syncPaymentStatus, reportPaymentSuccess]);
 
   // AppState listener: re-check status as soon as user returns to the app from banking app or browser
   useEffect(() => {
