@@ -93,8 +93,16 @@ export interface BackendCustomerOrder {
 export interface CustomerCultivationStatus {
   orderId: number;
   sessions: {
+    order_item_id?: number;
     session_id: number;
     status: string;
+    harvest_status?: string | null;
+    harvest_method?: 'PICKUP' | 'DELIVERY' | null;
+    harvest_request_status?: string | null;
+    scheduled_at?: string | null;
+    harvest_date?: string | null;
+    current_stage?: string | null;
+    progress_percent?: number | null;
     mushroom_name: string;
     assigned_trays: {
       tray_id: number;

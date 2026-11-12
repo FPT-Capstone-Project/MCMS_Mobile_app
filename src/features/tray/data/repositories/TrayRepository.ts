@@ -44,7 +44,22 @@ export class TrayRepository implements ITrayRepository {
   ): Promise<CustomerTrayDetails> {
     try {
       let progress: any[] = [];
+      let sessionStatus: Awaited<
+        ReturnType<typeof orderRepository.getCustomerCultivationStatus>
+      >['sessions'][number] | undefined;
       if (orderId && orderId > 0) {
+        const cultivationStatus = await orderRepository.getCustomerCultivationStatus(orderId);
+        sessionStatus = cultivationStatus.sessions.find(
+          (session) => Number(session.session_id) === sessionId
+        );
+        if (!sessionStatus) {
+          throw new AppError(
+            'Không tìm thấy trạng thái phiên nuôi trồng của khay này.',
+            'API_ERROR',
+            404
+          );
+        }
+
         try {
           const pRes = await axiosClient.get<{ data: any[] }>(
             API_ENDPOINTS.CUSTOMER.CULTIVATION_PROGRESS(orderId)
@@ -87,17 +102,32 @@ export class TrayRepository implements ITrayRepository {
 
       return {
         session_id: sessionId,
+        cultivation_status: sessionStatus?.status,
+        harvest_status: sessionStatus?.harvest_status,
+        current_stage: sessionStatus?.current_stage,
+        progress_percent: sessionStatus?.progress_percent,
         growth_history: progress
           .filter((item) => Number(item.session_id) === sessionId || !item.session_id)
-          .map((item): CustomerGrowthHistoryItem => ({
-            progress_id: item.progress_id ?? item.id ?? 0,
-            session_id: sessionId,
-            current_stage: item.current_stage || item.growth_status || 'FRUITING_INITIATION',
-            progress_percent: Number(item.progress_percent ?? 0),
-            condition: item.condition ?? null,
-            description: item.description ?? item.notes ?? null,
-            updated_at: item.updated_at || item.created_at || item.recorded_at || new Date().toISOString(),
-          })),
+          .map((item): CustomerGrowthHistoryItem => {
+            const progressPercent =
+              item.progress_percent == null ? null : Number(item.progress_percent);
+            return {
+              progress_id: item.progress_id ?? item.id ?? 0,
+              session_id: sessionId,
+              current_stage: item.current_stage || item.growth_status || 'UNKNOWN',
+              progress_percent:
+                progressPercent !== null && Number.isFinite(progressPercent)
+                  ? progressPercent
+                  : null,
+              condition: item.condition ?? null,
+              description: item.description ?? item.notes ?? null,
+              updated_at:
+                item.updated_at ||
+                item.created_at ||
+                item.recorded_at ||
+                new Date().toISOString(),
+            };
+          }),
         device_logs: Array.isArray(iotHistory?.deviceEvents) ? iotHistory.deviceEvents : [],
         sensor_readings: Array.isArray(sensorHistory?.readings)
           ? sensorHistory.readings.map((reading) => ({

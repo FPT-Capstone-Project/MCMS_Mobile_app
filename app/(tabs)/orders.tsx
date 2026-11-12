@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Pressable,
   StyleSheet,
   View,
 } from 'react-native';
@@ -14,6 +15,7 @@ import { useAuth } from '../../src/features/auth';
 import {
   AdminOrdersScreen,
   CustomerOrder,
+  CustomerCultivationStatus,
   orderRepository,
   PaymentQrModal,
 } from '../../src/features/order';
@@ -128,9 +130,85 @@ function normalizeMushroomName(name?: string) {
     .trim();
 }
 
+function getSessionProgressLabel(status: string, harvestStatus?: string | null): string {
+  if (status === 'CULTIVATING' && harvestStatus === 'HARVEST_READY') {
+    return 'Sẵn sàng thu hoạch';
+  }
+
+  const labels: Record<string, string> = {
+    PENDING: 'Đang chuẩn bị phôi',
+    SPAWN_RESTING: 'Đang ủ phôi',
+    MYCELIAL_DEVELOPMENT: 'Đang phát triển tơ nấm',
+    READY_FOR_CULTIVATION: 'Sẵn sàng nuôi trồng',
+    CULTIVATING: 'Đang nuôi trồng',
+    HARVEST_READY: 'Sẵn sàng thu hoạch',
+    HARVESTING: 'Đang thu hoạch',
+    COMPLETED: 'Đã hoàn tất',
+    CANCELLED: 'Đã hủy',
+  };
+  return labels[status] ?? status.replace(/_/g, ' ');
+}
+
+type CustomerOrderFilter =
+  | 'all'
+  | 'unpaid'
+  | 'in_progress'
+  | 'handover'
+  | 'completed'
+  | 'cancelled';
+
+const customerOrderFilters: { value: CustomerOrderFilter; label: string }[] = [
+  { value: 'all', label: 'Tất cả' },
+  { value: 'unpaid', label: 'Chờ thanh toán' },
+  { value: 'in_progress', label: 'Đang trong quá trình' },
+  { value: 'handover', label: 'Đang giao / đến hái' },
+  { value: 'completed', label: 'Đã hoàn thành' },
+  { value: 'cancelled', label: 'Đã hủy' },
+];
+
+function isUnpaidOrder(order: CustomerOrder): boolean {
+  return (
+    order.order_status === 'PENDING' &&
+    ['UNPAID', 'PENDING', 'FAILED'].includes(order.payment_status || '')
+  );
+}
+
+function hasHandoverProgress(cultivation?: CustomerCultivationStatus): boolean {
+  return (cultivation?.sessions ?? []).some(
+    (session) =>
+      session.status === 'HARVEST_READY' ||
+      session.status === 'HARVESTING' ||
+      session.harvest_status === 'HARVEST_READY' ||
+      (Boolean(session.harvest_method) &&
+        session.harvest_request_status !== 'COMPLETED')
+  );
+}
+
+function matchesOrderFilter(
+  order: CustomerOrder,
+  filter: CustomerOrderFilter,
+  cultivation?: CustomerCultivationStatus
+): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'cancelled') return order.order_status === 'CANCELLED';
+  if (filter === 'completed') return order.order_status === 'COMPLETED';
+  if (filter === 'unpaid') return isUnpaidOrder(order);
+  if (filter === 'handover') return hasHandoverProgress(cultivation);
+  return (
+    order.order_status !== 'COMPLETED' &&
+    order.order_status !== 'CANCELLED' &&
+    !isUnpaidOrder(order) &&
+    !hasHandoverProgress(cultivation)
+  );
+}
+
 function CustomerOrdersContent() {
   const router = useRouter();
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
+  const [orderFilter, setOrderFilter] = useState<CustomerOrderFilter>('all');
+  const [cultivationByOrder, setCultivationByOrder] = useState<
+    Record<number, { data?: CustomerCultivationStatus; error?: string; loading?: boolean }>
+  >({});
   const [mushroomTypes, setMushroomTypes] = useState<MushroomType[]>([]);
   const [mushroomLoadError, setMushroomLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -195,6 +273,17 @@ function CustomerOrdersContent() {
     },
     [mushroomImagesById, mushroomImagesByName, mushroomTypes]
   );
+  const filteredOrders = useMemo(
+    () =>
+      orders.filter((order) =>
+        matchesOrderFilter(
+          order,
+          orderFilter,
+          cultivationByOrder[order.order_id]?.data
+        )
+      ),
+    [cultivationByOrder, orderFilter, orders]
+  );
 
   const loadOrders = useCallback(async () => {
     try {
@@ -205,6 +294,15 @@ function CustomerOrdersContent() {
       ]);
       if (ordersResult.status === 'rejected') throw ordersResult.reason;
       setOrders(ordersResult.value);
+
+      const activePaidOrders = ordersResult.value.filter(
+        (order) =>
+          order.payment_status === 'PAID' &&
+          !['COMPLETED', 'CANCELLED'].includes(order.order_status)
+      );
+      setCultivationByOrder(
+        Object.fromEntries(activePaidOrders.map((order) => [order.order_id, { loading: true }]))
+      );
 
       if (mushroomsResult.status === 'fulfilled') {
         setMushroomTypes(mushroomsResult.value);
@@ -217,6 +315,30 @@ function CustomerOrdersContent() {
             : 'Không thể tải hình ảnh các loại nấm.'
         );
       }
+      setLoading(false);
+
+      const sessionResults = await Promise.allSettled(
+        activePaidOrders.map((order) =>
+          orderRepository.getCustomerCultivationStatus(order.order_id)
+        )
+      );
+      const nextCultivationByOrder: Record<
+        number,
+        { data?: CustomerCultivationStatus; error?: string; loading?: boolean }
+      > = {};
+      sessionResults.forEach((result, index) => {
+        const orderId = activePaidOrders[index].order_id;
+        nextCultivationByOrder[orderId] =
+          result.status === 'fulfilled'
+            ? { data: result.value }
+            : {
+                error:
+                  result.reason instanceof Error
+                    ? result.reason.message
+                    : 'Không thể tải trạng thái nuôi trồng.',
+              };
+      });
+      setCultivationByOrder(nextCultivationByOrder);
     } catch (err: unknown) {
       setErrorMsg(
         typeof err === 'string'
@@ -333,8 +455,33 @@ function CustomerOrdersContent() {
       badgeText = 'Hoàn thành';
       badgeColor = theme.colors.success.dark;
       badgeBg = 'rgba(34, 197, 94, 0.12)';
-    } else if (order.order_status === 'PROCESSING') {
-      badgeText = 'Đang nuôi trồng';
+    } else if (order.payment_status === 'FAILED') {
+      badgeText = 'Thanh toán thất bại';
+      badgeColor = theme.colors.error.main;
+      badgeBg = theme.colors.error.light;
+    } else if (order.payment_status === 'REFUNDED') {
+      badgeText = 'Đã hoàn tiền';
+      badgeColor = theme.colors.success.dark;
+      badgeBg = theme.colors.success.light;
+    } else if (
+      order.payment_status === 'PAID' &&
+      !['COMPLETED', 'CANCELLED'].includes(order.order_status)
+    ) {
+      const cultivation = cultivationByOrder[order.order_id];
+      const labels = [...new Set(
+        (cultivation?.data?.sessions ?? []).map((session) =>
+          getSessionProgressLabel(session.status, session.harvest_status)
+        )
+      )];
+      badgeText = cultivation?.loading
+        ? 'Đang tải tiến độ'
+        : cultivation?.error
+        ? 'Chưa tải được tiến độ'
+        : labels.length === 1
+        ? labels[0]
+        : labels.length > 1
+        ? 'Đang ở nhiều giai đoạn'
+        : 'Đang chuẩn bị phôi';
       badgeColor = theme.colors.primary[600];
       badgeBg = theme.colors.primary[50];
     } else if (order.order_status === 'CONFIRMED') {
@@ -345,10 +492,6 @@ function CustomerOrdersContent() {
       badgeText = 'Đã thanh toán';
       badgeColor = theme.colors.success.dark;
       badgeBg = 'rgba(34, 197, 94, 0.12)';
-    } else if (order.payment_status === 'FAILED') {
-      badgeText = 'Thanh toán thất bại';
-      badgeColor = theme.colors.error.main;
-      badgeBg = theme.colors.error.light;
     }
 
     return (
@@ -406,10 +549,44 @@ function CustomerOrdersContent() {
             onAction={() => router.push('/rental' as any)}
           />
         ) : (
-          orders.map((order) => {
-            const isPendingUnpaid =
-              order.order_status === 'PENDING' &&
-              ['UNPAID', 'PENDING', 'FAILED'].includes(order.payment_status || '');
+          <>
+            <View style={styles.orderFilters}>
+              {customerOrderFilters.map((option) => {
+                const selected = orderFilter === option.value;
+                return (
+                  <Pressable
+                    key={option.value}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={() => setOrderFilter(option.value)}
+                    style={[
+                      styles.orderFilter,
+                      selected && styles.orderFilterSelected,
+                    ]}
+                  >
+                    <AppText
+                      variant="captionMedium"
+                      weight="bold"
+                      color={
+                        selected
+                          ? theme.colors.primary[700]
+                          : theme.colors.text.secondary
+                      }
+                    >
+                      {option.label}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {filteredOrders.length === 0 ? (
+              <AppEmptyState
+                icon={<Ionicons name="receipt-outline" size={44} color={theme.colors.text.muted} />}
+                title="Không có đơn hàng phù hợp"
+                description="Thử chọn một trạng thái khác để xem đơn hàng."
+              />
+            ) : filteredOrders.map((order) => {
+            const isPendingUnpaid = isUnpaidOrder(order);
 
             const items = order.items || order.order_items || [];
             const paymentStatus = getPaymentStatus(order.payment_status);
@@ -492,7 +669,7 @@ function CustomerOrdersContent() {
                         </View>
                         <View style={styles.productInfo}>
                           <AppText variant="bodySmall" weight="bold" style={styles.itemText}>
-                            {product.name ? `Nấm ${product.name}` : product.packageName || 'Sản phẩm'}
+                            {product.name ? `${product.name}` : product.packageName || 'Sản phẩm'}
                           </AppText>
                           <AppText variant="caption" color={theme.colors.text.secondary}>
                             {formatPackageLabel(product.packageName, product.durationDays)}
@@ -513,7 +690,7 @@ function CustomerOrdersContent() {
                       <View style={styles.productInfo}>
                         <AppText variant="bodySmall" weight="bold" style={styles.itemText}>
                           {order.mushroom_name
-                            ? `Nấm ${order.mushroom_name}`
+                            ? `${order.mushroom_name}`
                             : order.package_name || 'Gói dịch vụ nuôi trồng nấm SmartMush'}
                         </AppText>
                         {order.package_name ? (
@@ -534,6 +711,28 @@ function CustomerOrdersContent() {
                     </AppText>
                   </View>
                 </View>
+
+                {cultivationByOrder[order.order_id]?.data?.sessions.length ? (
+                  <View style={styles.orderProgressList}>
+                    {cultivationByOrder[order.order_id].data?.sessions.map((session) => (
+                      <AppText
+                        key={session.session_id}
+                        variant="caption"
+                        color={theme.colors.text.secondary}
+                      >
+                        {session.mushroom_name
+                          ? `${session.mushroom_name}: `
+                          : 'Tiến độ nuôi trồng: '}
+                        {getSessionProgressLabel(session.status, session.harvest_status)}
+                      </AppText>
+                    ))}
+                  </View>
+                ) : null}
+                {cultivationByOrder[order.order_id]?.error ? (
+                  <AppText variant="caption" color={theme.colors.error.main}>
+                    Không thể tải tiến độ nuôi trồng: {cultivationByOrder[order.order_id].error}
+                  </AppText>
+                ) : null}
 
                 <AppButton
                   title={expandedOrderId === order.order_id ? 'Ẩn chi tiết' : 'Xem chi tiết'}
@@ -605,7 +804,7 @@ function CustomerOrdersContent() {
                                 <View style={styles.detailProductInfo}>
                                   <AppText variant="captionMedium" weight="bold">
                                     {mushroomName
-                                      ? `Nấm ${mushroomName}`
+                                      ? `${mushroomName}`
                                       : item.package_name || 'Sản phẩm'}
                                   </AppText>
                                   <AppText variant="caption" color={theme.colors.text.secondary}>
@@ -650,7 +849,8 @@ function CustomerOrdersContent() {
                 )}
               </AppCard>
             );
-          })
+          })}
+          </>
         )}
       </View>
 
@@ -679,6 +879,24 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.md,
     paddingBottom: theme.spacing['2xl'],
     gap: theme.spacing.md,
+  },
+  orderFilters: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.xs,
+  },
+  orderFilter: {
+    minHeight: 36,
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+    backgroundColor: '#FFFFFF',
+  },
+  orderFilterSelected: {
+    backgroundColor: theme.colors.primary[50],
+    borderColor: theme.colors.primary[200],
   },
   loadingContainer: {
     paddingVertical: theme.spacing['2xl'],
@@ -715,6 +933,10 @@ const styles = StyleSheet.create({
   },
   orderItems: {
     gap: theme.spacing.xs,
+  },
+  orderProgressList: {
+    gap: theme.spacing.xxs,
+    paddingHorizontal: theme.spacing.xs,
   },
   itemRow: {
     flexDirection: 'row',

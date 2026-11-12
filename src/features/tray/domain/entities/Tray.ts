@@ -54,7 +54,7 @@ export interface CustomerGrowthHistoryItem {
   progress_id: number | string;
   session_id: number | string;
   current_stage: string;
-  progress_percent: number;
+  progress_percent: number | null;
   condition?: string | null;
   description: string | null;
   updated_at: string;
@@ -93,6 +93,10 @@ export interface CustomerSensorReading {
 
 export interface CustomerTrayDetails {
   session_id: number;
+  cultivation_status?: string;
+  harvest_status?: string | null;
+  current_stage?: string | null;
+  progress_percent?: number | null;
   growth_history: CustomerGrowthHistoryItem[];
   device_logs: CustomerDeviceLogItem[];
   sensor_readings: CustomerSensorReading[];
