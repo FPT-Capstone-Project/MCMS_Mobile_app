@@ -47,6 +47,7 @@ export interface CustomerTrayCard {
   usage: CustomerTrayUsage;
   mushroomName?: string;
   sessionId?: number;
+  sessionTrayId?: number;
   orderId?: number;
   floorId?: number;
   floorNumber?: number;

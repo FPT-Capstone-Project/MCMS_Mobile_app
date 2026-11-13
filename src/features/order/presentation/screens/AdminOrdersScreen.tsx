@@ -838,10 +838,9 @@ export const AdminOrdersScreen: React.FC = () => {
                           leftIcon={<Ionicons name="grid-outline" size={16} color="#FFFFFF" />}
                           onPress={() =>
                             router.push({
-                              pathname: '/cultivation',
+                              pathname: '/(tabs)/tray',
                               params: {
                                 sessionId: String(session.session_id),
-                                floorId: session.floor_id ? String(session.floor_id) : undefined,
                               },
                             } as any)
                           }
@@ -952,10 +951,9 @@ export const AdminOrdersScreen: React.FC = () => {
                             leftIcon={<Ionicons name="layers-outline" size={16} color={theme.colors.primary[600]} />}
                             onPress={() =>
                               router.push({
-                                pathname: '/cultivation',
+                                pathname: '/(tabs)/tray',
                                 params: {
                                   floorId: session.floor_id ? String(session.floor_id) : undefined,
-                                  tab: 'trays',
                                 },
                               } as any)
                             }
@@ -1241,14 +1239,13 @@ export const AdminOrdersScreen: React.FC = () => {
         onNavigateToAssignTrays={() => {
           if (detailSession) {
             router.push({
-              pathname: '/cultivation',
+              pathname: '/(tabs)/tray',
               params: {
                 sessionId: String(detailSession.session_id),
-                floorId: detailSession.floor_id ? String(detailSession.floor_id) : undefined,
               },
             } as any);
           } else {
-            router.push('/cultivation');
+            router.push('/(tabs)/tray');
           }
         }}
       />

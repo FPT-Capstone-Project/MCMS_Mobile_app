@@ -249,6 +249,7 @@ export class TrayRepository implements ITrayRepository {
                 : 'AVAILABLE',
             mushroomName: activeTray?.mushroom_name ?? undefined,
             sessionId: ownedSession?.sessionId ?? activeTray?.session_id ?? undefined,
+            sessionTrayId: activeTray?.session_tray_id ?? undefined,
             orderId: ownedSession?.orderId ?? undefined,
             floorId,
             floorNumber: floor.floor_number,
