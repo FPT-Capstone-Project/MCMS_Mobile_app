@@ -72,7 +72,7 @@ const SpawnInspectionModalContent: React.FC<{
       ? session.spawn_quantity
       : undefined;
   const requiredTrays = session.required_trays || session.tray_count || 1;
-  const expectedSpawnBags = spawnQuantityFromBackend ?? requiredTrays * 3;
+  const expectedSpawnBags = spawnQuantityFromBackend ?? requiredTrays * 2;
 
   const [totalChecked, setTotalChecked] = useState(String(expectedSpawnBags));
   const [normalQuantity, setNormalQuantity] = useState(String(expectedSpawnBags));
@@ -473,7 +473,7 @@ const SpawnInspectionModalContent: React.FC<{
                   <AppText variant="caption" color={theme.colors.primary[700]}>
                     {spawnQuantityFromBackend != null
                       ? `Phiên #${session.session_id} đã xuất đúng ${expectedSpawnBags} bịch phôi (${requiredTrays} khay). Đợt kiểm tra cần đạt chuẩn và kiểm tra đủ ${expectedSpawnBags} bịch để được chuyển sang Sẵn sàng trồng.`
-                      : `Mỗi khay tiêu chuẩn cần đúng 3 bịch phôi. Phiên này cần ${requiredTrays} khay (${expectedSpawnBags} bịch phôi). Đợt kiểm tra phải đạt chuẩn và kiểm tra đủ ${expectedSpawnBags} bịch để được chuyển sang Sẵn sàng trồng.`}
+                      : `Mỗi khay tiêu chuẩn cần đúng ${Math.round(expectedSpawnBags / requiredTrays)} bịch phôi. Phiên này cần ${requiredTrays} khay (${expectedSpawnBags} bịch phôi). Đợt kiểm tra phải đạt chuẩn và kiểm tra đủ ${expectedSpawnBags} bịch để được chuyển sang Sẵn sàng trồng.`}
                   </AppText>
                 </View>
               </View>

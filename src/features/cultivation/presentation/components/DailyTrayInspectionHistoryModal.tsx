@@ -55,6 +55,20 @@ const STAGE_LABELS: Record<GrowthStage, { label: string; color: string; bg: stri
   },
 };
 
+function formatConditionText(text?: string | null): string {
+  if (!text) return 'Bình thường';
+  const upper = text.trim().toUpperCase();
+  const map: Record<string, string> = {
+    NORMAL: 'Đạt tiêu chuẩn, ổn định',
+    GOOD: 'Phát triển tốt, tối ưu',
+    OPTIMAL: 'Tối ưu',
+    WARNING: 'Cần theo dõi thêm',
+    ABNORMAL: 'Bất thường, cần can thiệp',
+    POOR: 'Kém phát triển',
+  };
+  return map[upper] ?? text;
+}
+
 export const DailyTrayInspectionHistoryModal: React.FC<DailyTrayInspectionHistoryModalProps> = ({
   visible,
   session,
@@ -354,13 +368,13 @@ const DailyTrayInspectionHistoryModalContent: React.FC<{
                       <View style={styles.conditionLine}>
                         <Ionicons name="shield-checkmark-outline" size={13} color={theme.colors.text.secondary} />
                         <AppText variant="caption" color={theme.colors.text.secondary} style={{ marginLeft: 4, flex: 1 }}>
-                          Tình trạng khay: <AppText variant="caption" weight="semibold">{item.trayCondition}</AppText>
+                          Tình trạng khay: <AppText variant="caption" weight="semibold">{formatConditionText(item.trayCondition)}</AppText>
                         </AppText>
                       </View>
                       <View style={[styles.conditionLine, { marginTop: 3 }]}>
                         <Ionicons name="leaf-outline" size={13} color={theme.colors.success.dark} />
                         <AppText variant="caption" color={theme.colors.text.secondary} style={{ marginLeft: 4, flex: 1 }}>
-                          Tình trạng nấm: <AppText variant="caption" weight="semibold">{item.mushroomCondition}</AppText>
+                          Tình trạng nấm: <AppText variant="caption" weight="semibold">{formatConditionText(item.mushroomCondition)}</AppText>
                         </AppText>
                       </View>
                     </View>

@@ -40,6 +40,20 @@ interface SessionDetailModalProps {
   onNavigateToAssignTrays?: () => void;
 }
 
+function formatConditionLabel(condition?: string | null): string {
+  if (!condition) return 'Bình thường';
+  const upper = condition.trim().toUpperCase();
+  const map: Record<string, string> = {
+    NORMAL: 'Bình thường',
+    GOOD: 'Phát triển tốt',
+    OPTIMAL: 'Tối ưu',
+    WARNING: 'Cần theo dõi',
+    ABNORMAL: 'Bất thường',
+    POOR: 'Kém phát triển',
+  };
+  return map[upper] ?? condition;
+}
+
 export const SessionDetailModal: React.FC<SessionDetailModalProps> = ({
   visible,
   onClose,
@@ -159,7 +173,11 @@ const SessionDetailModalContent: React.FC<{
 
   const current = sessionDetail || session;
   const reqTrays = current.required_trays || current.tray_quantity || 1;
-  const spawnQuantity = current.spawn_quantity || reqTrays * 3;
+  const spawnQuantity =
+    current.spawn_quantity != null && current.spawn_quantity > 0
+      ? current.spawn_quantity
+      : reqTrays * 2;
+  const bagsPerTray = reqTrays > 0 ? Math.round(spawnQuantity / reqTrays) : 2;
   const assignedTrays = current.trays || [];
   const hasAssignedTrays = assignedTrays.length > 0;
 
@@ -179,7 +197,7 @@ const SessionDetailModalContent: React.FC<{
       ? current.progress_percent
       : 0;
 
-  const conditionText = progressData?.condition || current.condition || 'Bình thường';
+  const conditionText = formatConditionLabel(progressData?.condition || current.condition);
   const harvestStatus = current.status === 'COMPLETED'
     ? 'COMPLETED'
     : (progressData?.harvest_status || current.harvest_status || (current.harvest_ready ? 'HARVEST_READY' : 'NOT_READY'));
@@ -434,7 +452,7 @@ const SessionDetailModalContent: React.FC<{
                         Tiêu chuẩn phôi phiên:
                       </AppText>
                       <AppText variant="caption" weight="bold">
-                        {spawnQuantity} bịch ({reqTrays} khay × 3 bịch/khay)
+                        {spawnQuantity} bịch ({reqTrays} khay × {bagsPerTray} bịch/khay)
                       </AppText>
                     </View>
                     <View style={[styles.workflowDetailRow, { marginTop: 4 }]}>
@@ -631,7 +649,7 @@ const SessionDetailModalContent: React.FC<{
                                 </AppText>
                               </View>
                               <AppText variant="caption" color={theme.colors.text.secondary}>
-                                Tình trạng: <AppText variant="caption" weight="medium">{item.condition || 'Bình thường'}</AppText>
+                                Tình trạng: <AppText variant="caption" weight="medium">{formatConditionLabel(item.condition)}</AppText>
                               </AppText>
                               {item.description && (
                                 <AppText variant="caption" color={theme.colors.text.muted}>
@@ -792,7 +810,7 @@ const SessionDetailModalContent: React.FC<{
                                     : current.progress_percent != null
                                     ? Number(current.progress_percent)
                                     : 0,
-                                condition: progressData.condition || current.condition || 'NORMAL',
+                                condition: formatConditionLabel(progressData.condition || current.condition),
                                 description: '',
                                 expected_harvest_date:
                                   progressData.expected_harvest_date || current.harvest_date,

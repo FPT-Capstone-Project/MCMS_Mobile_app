@@ -611,7 +611,10 @@ export const AdminOrdersScreen: React.FC = () => {
           ) : (
             filteredSessions.map((session) => {
               const reqTrays = session.required_trays || session.tray_quantity || 1;
-              const expectedBags = reqTrays * 3;
+              const expectedBags =
+                session.spawn_quantity != null && session.spawn_quantity > 0
+                  ? session.spawn_quantity
+                  : reqTrays * 2;
               const isActionLoading = actionLoadingSessionId === session.session_id;
 
               return (
@@ -720,7 +723,7 @@ export const AdminOrdersScreen: React.FC = () => {
                     <View style={styles.spawnStatusNotice}>
                       <Ionicons name="git-branch-outline" size={14} color={theme.colors.info.dark} />
                       <AppText variant="caption" color={theme.colors.info.dark}>
-                        Giai đoạn phôi: <AppText variant="caption" weight="bold" color={theme.colors.info.dark}>{session.spawn_status}</AppText>
+                        Giai đoạn phôi: <AppText variant="caption" weight="bold" color={theme.colors.info.dark}>{formatGrowthStatus(session.spawn_status)}</AppText>
                       </AppText>
                     </View>
                   )}
@@ -838,10 +841,9 @@ export const AdminOrdersScreen: React.FC = () => {
                           leftIcon={<Ionicons name="grid-outline" size={16} color="#FFFFFF" />}
                           onPress={() =>
                             router.push({
-                              pathname: '/cultivation',
+                              pathname: '/(tabs)/tray',
                               params: {
                                 sessionId: String(session.session_id),
-                                floorId: session.floor_id ? String(session.floor_id) : undefined,
                               },
                             } as any)
                           }
@@ -909,7 +911,10 @@ export const AdminOrdersScreen: React.FC = () => {
                                         session.progress_percent != null
                                           ? Number(session.progress_percent)
                                           : 0,
-                                      condition: session.condition || 'NORMAL',
+                                      condition:
+                                        session.condition && session.condition !== 'NORMAL'
+                                          ? session.condition
+                                          : 'Bình thường, phát triển ổn định',
                                       description: '',
                                       expected_harvest_date: session.harvest_date,
                                       created_at: new Date().toISOString(),
@@ -952,10 +957,9 @@ export const AdminOrdersScreen: React.FC = () => {
                             leftIcon={<Ionicons name="layers-outline" size={16} color={theme.colors.primary[600]} />}
                             onPress={() =>
                               router.push({
-                                pathname: '/cultivation',
+                                pathname: '/(tabs)/tray',
                                 params: {
                                   floorId: session.floor_id ? String(session.floor_id) : undefined,
-                                  tab: 'trays',
                                 },
                               } as any)
                             }
@@ -1241,14 +1245,13 @@ export const AdminOrdersScreen: React.FC = () => {
         onNavigateToAssignTrays={() => {
           if (detailSession) {
             router.push({
-              pathname: '/cultivation',
+              pathname: '/(tabs)/tray',
               params: {
                 sessionId: String(detailSession.session_id),
-                floorId: detailSession.floor_id ? String(detailSession.floor_id) : undefined,
               },
             } as any);
           } else {
-            router.push('/cultivation');
+            router.push('/(tabs)/tray');
           }
         }}
       />

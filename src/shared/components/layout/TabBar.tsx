@@ -87,6 +87,15 @@ export const TabBar: React.FC<TabBarProps> = ({ state, descriptors, emitter, nav
             };
           }
 
+          if (route.name === 'orders' && canControlIot) {
+            config = {
+              label: 'Đơn & Phiên',
+              activeIcon: 'albums',
+              inactiveIcon: 'albums-outline',
+              accessibilityLabel: 'Tab Quản lý Đơn & Phiên nuôi trồng',
+            };
+          }
+
           const onPress = () => {
             const event = emitter.emit({
               type: 'tabPress',

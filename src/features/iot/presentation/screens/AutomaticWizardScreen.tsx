@@ -7,14 +7,12 @@ import { FloorDetailScreen } from './FloorDetailScreen';
 
 export interface AutomaticWizardScreenProps {
   initialFloorId?: number;
-  initialSessionId?: number;
   defaultTab?: 'overview' | 'trays' | 'logs';
   onBack?: () => void;
 }
 
 export const AutomaticWizardScreen: React.FC<AutomaticWizardScreenProps> = ({
   initialFloorId,
-  initialSessionId,
   defaultTab = 'overview',
   onBack,
 }) => {
@@ -55,7 +53,6 @@ export const AutomaticWizardScreen: React.FC<AutomaticWizardScreenProps> = ({
       <FloorDetailScreen
         floor={selectedFloor}
         initialTab={activeTab}
-        initialSessionId={initialSessionId}
         onBack={() => setSelectedFloor(null)}
         canManage={canControlIot}
       />
@@ -65,7 +62,6 @@ export const AutomaticWizardScreen: React.FC<AutomaticWizardScreenProps> = ({
   return (
     <FloorListScreen
       canManage={canControlIot}
-      assignSessionId={initialSessionId}
       onSelectFloor={(floor, tab) => {
         setSelectedFloor(floor);
         setActiveTab(tab || defaultTab);

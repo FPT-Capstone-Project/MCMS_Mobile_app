@@ -6,4 +6,5 @@ export * from './presentation/screens/FloorListScreen';
 export * from './presentation/screens/FloorDetailScreen';
 export * from './presentation/screens/SensorDetailScreen';
 export * from './presentation/screens/ManualSsrControlScreen';
+export * from './presentation/components/AssignSessionModal';
 export * from './utils/mistingI18n';
