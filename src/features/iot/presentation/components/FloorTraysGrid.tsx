@@ -35,7 +35,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
   trays,
   isAssignMode = false,
   selectedTrayIds = [],
-  availableTrayIds = [],
+  availableTrayIds,
   onToggleSelectTray,
 }) => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -75,7 +75,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
 
   const handlePressTray = (tray: CultivationTrayInfo) => {
     if (isAssignMode) {
-      if (onToggleSelectTray && availableTrayIds.includes(tray.tray_id)) {
+      if (onToggleSelectTray && availableTrayIds?.includes(tray.tray_id)) {
         onToggleSelectTray(tray.tray_id);
       }
     } else {
@@ -84,39 +84,72 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
   };
 
   const renderTrayStatusVisual = (tray: CultivationTrayInfo, isSelected: boolean) => {
-    const hasSession = Boolean(tray.session_id && tray.mushroom_name);
+    const rawStatus = String((tray as any).status || (tray as any).assignment_status || '').trim().toUpperCase();
+    const rawTrayStatus = String(tray.tray_status || '').trim().toUpperCase();
+    const isReleased =
+      rawStatus === 'RELEASE' ||
+      rawStatus === 'RELEASED' ||
+      rawTrayStatus === 'RELEASE' ||
+      rawTrayStatus === 'RELEASED' ||
+      rawTrayStatus === 'AVAILABLE';
+
+    const hasSession = Boolean(
+      tray.session_id &&
+      tray.mushroom_name &&
+      !isReleased &&
+      (!rawStatus || rawStatus === 'ACTIVE')
+    );
     const isMaintenance =
       tray.tray_status === 'MAINTENANCE' || tray.position_status === 'MAINTENANCE';
-    const isEligibleForAssign = availableTrayIds.includes(tray.tray_id);
-    const isLegacyBlocked =
-      !hasSession && !isMaintenance && !isEligibleForAssign && (tray.tray_status === 'AVAILABLE' || !tray.session_id);
+    const isEligibleForAssign = availableTrayIds?.includes(tray.tray_id);
+    const isUnavailable =
+      availableTrayIds !== undefined && !hasSession && !isMaintenance && !isEligibleForAssign && (rawTrayStatus === 'AVAILABLE' || isReleased || !tray.session_id);
 
     return {
       hasSession,
       isMaintenance,
       isEligibleForAssign,
-      isLegacyBlocked,
+      isUnavailable,
       isSelected,
     };
   };
 
   // Count blocked trays for legend
-  const blockedTraysCount = useMemo(() => {
+  const unavailableTraysCount = useMemo(() => {
+    if (!availableTrayIds) return 0;
     return trays.filter((t) => {
-      const hasSession = Boolean(t.session_id && t.mushroom_name);
+      const rawStatus = String((t as any).status || (t as any).assignment_status || '').trim().toUpperCase();
+      const rawTrayStatus = String(t.tray_status || '').trim().toUpperCase();
+      const isReleased =
+        rawStatus === 'RELEASE' ||
+        rawStatus === 'RELEASED' ||
+        rawTrayStatus === 'RELEASE' ||
+        rawTrayStatus === 'RELEASED' ||
+        rawTrayStatus === 'AVAILABLE';
+      const hasSession = Boolean(
+        t.session_id &&
+        t.mushroom_name &&
+        !isReleased &&
+        (!rawStatus || rawStatus === 'ACTIVE')
+      );
       const isMaint = t.tray_status === 'MAINTENANCE' || t.position_status === 'MAINTENANCE';
-      return !hasSession && !isMaint && !availableTrayIds.includes(t.tray_id);
+      return !hasSession && !isMaint && !availableTrayIds?.includes(t.tray_id);
     }).length;
   }, [trays, availableTrayIds]);
 
   return (
     <View style={styles.container}>
+      {availableTrayIds === undefined && (
+        <AppText variant="caption" color={theme.colors.text.secondary}>
+          Chưa xác định được khay có thể gán. Kéo xuống để tải lại.
+        </AppText>
+      )}
       {/* View Switch Header */}
       <View style={styles.topControlRow}>
         <View style={styles.countBadge}>
           <Ionicons name="cube" size={16} color={theme.colors.primary[600]} />
           <AppText variant="caption" weight="bold" color={theme.colors.primary[800]}>
-            Tổng: {trays.length} khay ({maxRows}×{maxCols}) • Có thể gắn: {availableTrayIds.length} khay
+            Tổng: {trays.length} khay ({maxRows}×{maxCols}) • Có thể gắn: {(availableTrayIds?.length ?? '?')} khay
           </AppText>
         </View>
 
@@ -211,7 +244,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                         styles.gridCell,
                         status.hasSession && styles.cellCultivating,
                         status.isEligibleForAssign && !status.hasSession && styles.cellEligible,
-                        status.isLegacyBlocked && styles.cellLegacyBlocked,
+                        status.isUnavailable && styles.cellLegacyBlocked,
                         status.isMaintenance && styles.cellMaintenance,
                         status.isSelected && styles.cellSelected,
                         isAssignMode && !isSelectable && styles.cellDisabled,
@@ -230,7 +263,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                           name={
                             status.hasSession
                               ? 'leaf'
-                              : status.isLegacyBlocked
+                              : status.isUnavailable
                               ? 'lock-closed'
                               : status.isMaintenance
                               ? 'construct'
@@ -242,7 +275,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                               ? theme.colors.primary[700]
                               : status.hasSession
                               ? theme.colors.success.dark
-                              : status.isLegacyBlocked
+                              : status.isUnavailable
                               ? theme.colors.warning.dark
                               : status.isMaintenance
                               ? theme.colors.error.main
@@ -270,7 +303,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                         >
                           {tray.mushroom_name}
                         </AppText>
-                      ) : status.isLegacyBlocked ? (
+                      ) : status.isUnavailable ? (
                         <AppText
                           variant="caption"
                           weight="bold"
@@ -278,7 +311,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                           numberOfLines={1}
                           style={{ fontSize: 8, textAlign: 'center' }}
                         >
-                          Vướng phiên cũ
+                          Chưa thể gán
                         </AppText>
                       ) : status.isEligibleForAssign ? (
                         <AppText
@@ -321,7 +354,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                 style={[
                   styles.listItemCard,
                   status.isSelected && styles.cellSelected,
-                  status.isLegacyBlocked && styles.listItemBlocked,
+                  status.isUnavailable && styles.listItemBlocked,
                   isAssignMode && !isSelectable && styles.cellDisabled,
                 ]}
               >
@@ -330,7 +363,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                     style={[
                       styles.listIconBox,
                       status.hasSession && styles.listIconBoxCultivating,
-                      status.isLegacyBlocked && styles.listIconBoxBlocked,
+                      status.isUnavailable && styles.listIconBoxBlocked,
                       status.isMaintenance && styles.listIconBoxMaintenance,
                     ]}
                   >
@@ -338,7 +371,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                       name={
                         status.hasSession
                           ? 'leaf'
-                          : status.isLegacyBlocked
+                          : status.isUnavailable
                           ? 'lock-closed'
                           : status.isMaintenance
                           ? 'construct'
@@ -348,7 +381,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                       color={
                         status.hasSession
                           ? theme.colors.success.dark
-                          : status.isLegacyBlocked
+                          : status.isUnavailable
                           ? theme.colors.warning.dark
                           : status.isMaintenance
                           ? theme.colors.error.main
@@ -373,9 +406,9 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                       <AppText variant="caption" color={theme.colors.success.dark} weight="semibold">
                         Nấm: {tray.mushroom_name} • Phiên #{tray.session_id}
                       </AppText>
-                    ) : status.isLegacyBlocked ? (
+                    ) : status.isUnavailable ? (
                       <AppText variant="caption" color={theme.colors.warning.dark} weight="bold">
-                        ⚠️ Vướng liên kết phiên cũ • Không đủ điều kiện gắn
+                        ⚠️ Chưa đủ điều kiện gán phiên mới
                       </AppText>
                     ) : status.isEligibleForAssign ? (
                       <AppText variant="caption" color={theme.colors.primary[700]} weight="semibold">
@@ -441,7 +474,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { borderColor: theme.colors.primary[600], backgroundColor: 'rgba(14, 165, 233, 0.15)' }]} />
           <AppText variant="caption" color={theme.colors.text.secondary} style={{ fontSize: 10 }}>
-            Có thể gắn ({availableTrayIds.length})
+            Có thể gắn ({(availableTrayIds?.length ?? '?')})
           </AppText>
         </View>
         <View style={styles.legendItem}>
@@ -450,11 +483,11 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
             Đang trồng
           </AppText>
         </View>
-        {blockedTraysCount > 0 && (
+        {unavailableTraysCount > 0 && (
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { borderColor: theme.colors.warning.main, backgroundColor: 'rgba(245, 158, 11, 0.15)' }]} />
             <AppText variant="caption" color={theme.colors.warning.dark} style={{ fontSize: 10 }}>
-              Vướng liên kết cũ ({blockedTraysCount})
+              Chưa thể gán ({unavailableTraysCount})
             </AppText>
           </View>
         )}
@@ -525,9 +558,10 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
             </View>
 
             {/* Inconsistency / Legacy Block Warning Notice */}
-            {!activeTrayDetail.session_id &&
-              !availableTrayIds.includes(activeTrayDetail.tray_id) &&
-              activeTrayDetail.tray_status !== 'MAINTENANCE' && (
+            {availableTrayIds !== undefined && !activeTrayDetail.session_id &&
+              !availableTrayIds?.includes(activeTrayDetail.tray_id) &&
+              activeTrayDetail.tray_status !== 'MAINTENANCE' &&
+              activeTrayDetail.position_status !== 'MAINTENANCE' && (
                 <AppCard elevation="xs" style={styles.detailBlockedCard}>
                   <View style={styles.blockedCardHeader}>
                     <Ionicons name="lock-closed" size={18} color={theme.colors.warning.dark} />
@@ -536,7 +570,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                     </AppText>
                   </View>
                   <AppText variant="caption" color={theme.colors.warning.dark}>
-                    Khay này có trạng thái vật lý AVAILABLE nhưng backend đang ghi nhận khay còn liên kết ACTIVE với phiên nuôi trồng cũ (Phiên #15) đã hoàn tất. Backend không cho phép gán phiên mới cho đến khi liên kết cũ được giải phóng.
+                    Khay chưa nằm trong danh sách có thể gán phiên mới. Hãy kiểm tra trạng thái khay, vị trí và phiên đang sử dụng khay.
                   </AppText>
                 </AppCard>
               )}
@@ -561,7 +595,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                   </AppText>
                 )}
               </AppCard>
-            ) : availableTrayIds.includes(activeTrayDetail.tray_id) ? (
+            ) : availableTrayIds?.includes(activeTrayDetail.tray_id) ? (
               <AppCard elevation="xs" style={styles.detailAvailableSessionCard}>
                 <Ionicons name="checkmark-circle-outline" size={24} color={theme.colors.primary[600]} />
                 <AppText variant="bodySmall" weight="semibold" color={theme.colors.primary[800]}>

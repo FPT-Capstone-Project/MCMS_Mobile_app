@@ -211,15 +211,14 @@ const ReportCard: React.FC<{
   report: DailyTrayInspection;
   onPressPhoto: (photo: ReportPhoto) => void;
 }> = ({ report, onPressPhoto }) => {
-  const progress = Number(report.growthProgress);
-  const stageLabel = STAGE_LABELS[report.growthStage] ?? report.growthStage;
+  const stageLabel = STAGE_LABELS[report.growthStage ?? ''] ?? report.growthStage ?? 'Chưa cập nhật phiên';
 
   return (
     <AppCard elevation="xs" style={styles.reportCard}>
       <View style={styles.reportHeader}>
         <View style={styles.reportHeading}>
           <AppText variant="bodyMedium" weight="bold" color={theme.colors.text.primary}>
-            {stageLabel}
+            Phiên: {stageLabel}
           </AppText>
           <AppText variant="caption" color={theme.colors.text.muted}>
             {new Date(report.inspectionDate).toLocaleTimeString('vi-VN', {
@@ -229,24 +228,7 @@ const ReportCard: React.FC<{
             {report.inspectedByName ? ` · ${report.inspectedByName}` : ''}
           </AppText>
         </View>
-        <View style={styles.progressValue}>
-          <AppText variant="bodySmall" weight="bold" color={theme.colors.primary[700]}>
-            {Number.isFinite(progress) ? `${progress}%` : '--'}
-          </AppText>
-        </View>
       </View>
-
-      <View style={styles.progressTrack}>
-        <View
-          style={[
-            styles.progressFill,
-            { width: `${Number.isFinite(progress) ? Math.min(100, Math.max(0, progress)) : 0}%` },
-          ]}
-        />
-      </View>
-      <AppText variant="caption" color={theme.colors.text.secondary}>
-        Tiến độ sinh trưởng
-      </AppText>
 
       <View style={styles.conditions}>
         <View style={styles.conditionRow}>
@@ -453,23 +435,6 @@ const styles = StyleSheet.create({
   reportHeading: {
     flex: 1,
     gap: 2,
-  },
-  progressValue: {
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    backgroundColor: theme.colors.primary[50],
-    borderRadius: theme.borderRadius.md,
-  },
-  progressTrack: {
-    height: 8,
-    overflow: 'hidden',
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.neutral[200],
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.primary[600],
   },
   conditions: {
     gap: theme.spacing.xs,

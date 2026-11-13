@@ -51,6 +51,11 @@ export interface CustomerTrayCard {
   orderId?: number;
   floorId?: number;
   floorNumber?: number;
+  pastSessions?: {
+    sessionId: number;
+    mushroomName?: string;
+    sessionTrayId?: number;
+  }[];
 }
 
 export interface CustomerGrowthHistoryItem {

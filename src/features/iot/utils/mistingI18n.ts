@@ -131,6 +131,8 @@ export const POSITION_STATUS_MAP: Record<string, string> = {
  */
 export const TRAY_STATUS_MAP: Record<string, string> = {
   AVAILABLE: 'Khay trống',
+  RELEASE: 'Khay trống',
+  RELEASED: 'Khay trống',
   OCCUPIED: 'Đã xếp khay',
   MAINTENANCE: 'Bảo trì',
   INACTIVE: 'Ngừng sử dụng',

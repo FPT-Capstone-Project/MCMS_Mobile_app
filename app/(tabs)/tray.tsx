@@ -184,6 +184,7 @@ export default function TrayScreen() {
   const [selectedFloorIdForAssign, setSelectedFloorIdForAssign] = useState<number | null>(null);
   const [selectedTrayIdsForAssign, setSelectedTrayIdsForAssign] = useState<number[]>([]);
   const [assignSubmitting, setAssignSubmitting] = useState(false);
+  const [availableTrayIdsByFloor, setAvailableTrayIdsByFloor] = useState<Map<number, Set<number>>>(new Map());
 
   // Daily Inspection workflow state
   const [cultivatingSessionsMap, setCultivatingSessionsMap] = useState<Map<number, CultivationSessionAdmin>>(new Map());
@@ -298,6 +299,44 @@ export default function TrayScreen() {
       isMounted = false;
     };
   }, [canControlIot, params.sessionId, params.floorId]);
+
+  // Requirement 3: Fetch available trays for floors from GET /api/cultivation-sessions/admin/available-trays?floorId=...
+  useEffect(() => {
+    if (!assigningSession) return;
+
+    let isMounted = true;
+    async function fetchAvailableTrays() {
+      try {
+        const floorIds = selectedFloorIdForAssign != null
+          ? [selectedFloorIdForAssign]
+          : racks.map((r) => r.id);
+
+        const results = await Promise.all(
+          floorIds.map(async (fId) => {
+            const list = await iotRepository.getAvailableTraysForFloor(fId).catch(() => []);
+            return [fId, new Set(list.map((t) => Number(t.tray_id)))] as const;
+          })
+        );
+
+        if (!isMounted) return;
+        setAvailableTrayIdsByFloor((prev) => {
+          const next = new Map(prev);
+          results.forEach(([fId, set]) => {
+            next.set(fId, set);
+          });
+          return next;
+        });
+      } catch {
+        // Fall back gracefully
+      }
+    }
+
+    void fetchAvailableTrays();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [assigningSession, selectedFloorIdForAssign, racks]);
 
   const handleRetry = () => {
     setLoadState('loading');
@@ -466,6 +505,7 @@ export default function TrayScreen() {
               await loadRacks();
             } catch (err: unknown) {
               Alert.alert('Không thể xếp khay', getErrorMessage(err, 'Lỗi kết nối máy chủ khi xếp khay.'));
+              void loadRacks();
             } finally {
               setAssignSubmitting(false);
             }
@@ -798,10 +838,19 @@ export default function TrayScreen() {
                       )
                       : false;
 
+                    const isAssignMode = Boolean(assigningSession);
                     const isSelectedForAssign = selectedTrayIdsForAssign.includes(tray.id);
+
+                    // Requirement 3: Use GET /api/cultivation-sessions/admin/available-trays?floorId=...
+                    // as source of truth for selectable trays. Trays in available list MUST NOT be blocked.
+                    const floorAvailableSet = availableTrayIdsByFloor.get(rack.id);
+                    const isTrayAvailableForAssign = floorAvailableSet
+                      ? floorAvailableSet.has(tray.id)
+                      : tray.usage === 'AVAILABLE';
+
                     const isDisabledForAssign =
-                      Boolean(assigningSession) &&
-                      (tray.usage !== 'AVAILABLE' ||
+                      isAssignMode &&
+                      (!isTrayAvailableForAssign ||
                         (selectedFloorIdForAssign !== null &&
                           selectedFloorIdForAssign !== rack.id));
 
@@ -976,8 +1025,8 @@ export default function TrayScreen() {
               </View>
             ) : detailLoadState === 'error' ? (
               <View style={styles.detailState}>
-                <Ionicons name="cloud-offline-outline" size={30} color={theme.colors.error.main} />
-                <AppText variant="bodySmall" color={theme.colors.error.main} align="center">
+                <Ionicons name="cube-outline" size={30} color={theme.colors.text.muted} />
+                <AppText variant="bodySmall" color={theme.colors.text.secondary} align="center" style={{ marginTop: 6 }}>
                   {detailError}
                 </AppText>
                 {canControlIot && !selectedTray?.sessionId ? (
@@ -993,6 +1042,28 @@ export default function TrayScreen() {
                       handleStartAssignWorkflow(fId);
                     }}
                   />
+                ) : null}
+
+                {/* Requirement 4: Show past session history if any */}
+                {selectedTray?.pastSessions && selectedTray.pastSessions.length > 0 ? (
+                  <View style={styles.pastSessionsBox}>
+                    <AppText variant="captionMedium" weight="bold" color={theme.colors.text.secondary}>
+                      Lịch sử phiên trồng trước đây ({selectedTray.pastSessions.length}):
+                    </AppText>
+                    {selectedTray.pastSessions.map((past) => (
+                      <View key={past.sessionId} style={styles.pastSessionRow}>
+                        <Ionicons name="time-outline" size={16} color={theme.colors.text.muted} />
+                        <AppText variant="caption" color={theme.colors.text.primary} weight="medium" style={{ flex: 1 }}>
+                          Phiên #{past.sessionId} • {past.mushroomName || 'Nấm giống'}
+                        </AppText>
+                        <View style={styles.releasedBadge}>
+                          <AppText variant="caption" color="#059669" style={{ fontSize: 10 }}>
+                            Đã giải phóng
+                          </AppText>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
                 ) : null}
               </View>
             ) : (
@@ -1015,6 +1086,28 @@ export default function TrayScreen() {
                         sessionId={selectedTray.sessionId}
                         trayId={selectedTray.id}
                       />
+                    ) : null}
+
+                    {/* Requirement 4: Show past session history if any */}
+                    {selectedTray?.pastSessions && selectedTray.pastSessions.length > 0 ? (
+                      <View style={styles.pastSessionsBox}>
+                        <AppText variant="captionMedium" weight="bold" color={theme.colors.text.secondary}>
+                          Lịch sử các phiên trước đây ({selectedTray.pastSessions.length}):
+                        </AppText>
+                        {selectedTray.pastSessions.map((past) => (
+                          <View key={past.sessionId} style={styles.pastSessionRow}>
+                            <Ionicons name="time-outline" size={16} color={theme.colors.text.muted} />
+                            <AppText variant="caption" color={theme.colors.text.primary} weight="medium" style={{ flex: 1 }}>
+                              Phiên #{past.sessionId} • {past.mushroomName || 'Nấm giống'}
+                            </AppText>
+                            <View style={styles.releasedBadge}>
+                              <AppText variant="caption" color="#059669" style={{ fontSize: 10 }}>
+                                Đã giải phóng
+                              </AppText>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
                     ) : null}
                   </>
                 ) : (
@@ -1124,20 +1217,22 @@ const TrayTile: React.FC<TrayTileProps> = ({
   // Handle tile click
   const handleTilePress = () => {
     if (isAssignMode) {
-      if (!isInUse && !isDisabledForAssign) {
+      if (!isDisabledForAssign) {
         onSelectForAssign();
       }
     } else if (isInUse) {
       onViewDetails(tray);
     } else if (isStaff) {
       onStartAssignOnFloor();
+    } else {
+      onViewDetails(tray);
     }
   };
 
   return (
     <Pressable
       onPress={handleTilePress}
-      disabled={isAssignMode && (isInUse || isDisabledForAssign)}
+      disabled={isAssignMode && isDisabledForAssign}
       style={({ pressed }) => [
         styles.trayTile,
         {
@@ -1170,7 +1265,7 @@ const TrayTile: React.FC<TrayTileProps> = ({
         {isAssignMode ? (
           isSelectedForAssign ? (
             <Ionicons name="checkmark-circle" size={18} color="#059669" />
-          ) : !isInUse ? (
+          ) : !isDisabledForAssign ? (
             <Ionicons name="add-circle-outline" size={17} color="#0284C7" />
           ) : null
         ) : isInUse ? (
@@ -1187,13 +1282,13 @@ const TrayTile: React.FC<TrayTileProps> = ({
                 ĐÃ CHỌN
               </AppText>
             </View>
-          ) : !isInUse ? (
+          ) : !isDisabledForAssign ? (
             <AppText variant="caption" color="#0369A1" align="center" style={{ fontSize: 11 }}>
               Chạm để chọn
             </AppText>
           ) : (
             <AppText variant="caption" color="#94A3B8" align="center" style={{ fontSize: 11 }}>
-              Đang trồng
+              {isInUse ? (tray.mushroomName ?? 'Đang trồng') : 'Không khả dụng'}
             </AppText>
           )}
         </View>
@@ -1890,5 +1985,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.xs,
+  },
+  pastSessionsBox: {
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.sm,
+    backgroundColor: '#F8FAFC',
+    borderRadius: theme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: theme.spacing.xs,
+    width: '100%',
+  },
+  pastSessionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    paddingVertical: 2,
+  },
+  releasedBadge: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
 });

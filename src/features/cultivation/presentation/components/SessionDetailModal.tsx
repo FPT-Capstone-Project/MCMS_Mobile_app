@@ -178,7 +178,10 @@ const SessionDetailModalContent: React.FC<{
       ? current.spawn_quantity
       : reqTrays * 2;
   const bagsPerTray = reqTrays > 0 ? Math.round(spawnQuantity / reqTrays) : 2;
-  const assignedTrays = current.trays || [];
+  const assignedTrays = (current.trays || []).filter((t) => {
+    const st = String(t.assignment_status || t.status || '').trim().toUpperCase();
+    return st === 'ACTIVE';
+  });
   const hasAssignedTrays = assignedTrays.length > 0;
 
   // Stages & Progress

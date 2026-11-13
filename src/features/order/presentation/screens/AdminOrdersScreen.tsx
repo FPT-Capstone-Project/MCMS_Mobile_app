@@ -692,12 +692,18 @@ export const AdminOrdersScreen: React.FC = () => {
                         Vị trí tầng
                       </AppText>
                       {(() => {
+                        const activeAssignedTrays = (session.trays || []).filter((t) => {
+                          const st = String(t.assignment_status || t.status || '').trim().toUpperCase();
+                          return st === 'ACTIVE';
+                        });
+                        const assignedCount = activeAssignedTrays.length;
                         const assignedFloorName =
-                          session.floor_name ||
-                          session.trays?.[0]?.floor_name ||
-                          (session.floor_id != null ? `Tầng ${session.floor_id}` : null) ||
-                          (session.trays?.[0]?.floor_id != null ? `Tầng ${session.trays[0].floor_id}` : null);
-                        const assignedCount = session.trays?.length || 0;
+                          assignedCount > 0
+                            ? session.floor_name ||
+                              activeAssignedTrays[0]?.floor_name ||
+                              (session.floor_id != null ? `Tầng ${session.floor_id}` : null) ||
+                              (activeAssignedTrays[0]?.floor_id != null ? `Tầng ${activeAssignedTrays[0].floor_id}` : null)
+                            : null;
 
                         return (
                           <AppText

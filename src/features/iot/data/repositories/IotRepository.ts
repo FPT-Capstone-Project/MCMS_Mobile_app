@@ -602,14 +602,15 @@ export class IotRepository {
    */
   async getAvailableTraysForFloor(floorId: number): Promise<AvailableTrayForSession[]> {
     try {
-      const response = await axiosClient.get<{ data: AvailableTrayForSession[] } | AvailableTrayForSession[]>(
+      const response = await axiosClient.get<{ data: AvailableTrayForSession[] } | AvailableTrayForSession[] | any>(
         API_ENDPOINTS.CULTIVATION_SESSIONS.ADMIN_AVAILABLE_TRAYS(floorId)
       );
-      if ('data' in response.data && Array.isArray(response.data.data)) {
-        return response.data.data;
+      const resData = (response.data as any)?.data ?? response.data;
+      if (Array.isArray(resData)) {
+        return resData;
       }
-      if (Array.isArray(response.data)) {
-        return response.data;
+      if (Array.isArray(resData?.trays)) {
+        return resData.trays;
       }
       return [];
     } catch (error) {
@@ -714,13 +715,18 @@ export class IotRepository {
                     t.floor_name ||
                     (tFloorId != null ? floorMap.get(tFloorId) : null) ||
                     floorName;
+                  const assignmentStatus = String(
+                    t.assignment_status ||
+                    (t.status === 'ACTIVE' || t.status === 'RELEASED' ? t.status : '')
+                  ).trim().toUpperCase();
                   return {
                     session_tray_id: Number(t.session_tray_id ?? t.id ?? 0),
                     tray_id: Number(t.tray_id),
                     tray_code: String(t.tray_code || `Khay #${t.tray_id}`),
                     floor_id: tFloorId,
                     floor_name: tFloorName,
-                    status: String(t.status || t.assignment_status || 'ACTIVE'),
+                    assignment_status: assignmentStatus,
+                    status: assignmentStatus || String(t.status || '').trim().toUpperCase(),
                     row_number: t.row_number != null ? Number(t.row_number) : undefined,
                     column_number: t.column_number != null ? Number(t.column_number) : undefined,
                   };
@@ -848,13 +854,18 @@ export class IotRepository {
                       t.floor_name ||
                       (tFloorId != null ? floorMap.get(tFloorId) : null) ||
                       floorName;
+                    const assignmentStatus = String(
+                      t.assignment_status ||
+                      (t.status === 'ACTIVE' || t.status === 'RELEASED' ? t.status : '')
+                    ).trim().toUpperCase();
                     return {
                       session_tray_id: Number(t.session_tray_id ?? t.id ?? 0),
                       tray_id: Number(t.tray_id),
                       tray_code: String(t.tray_code || `Khay #${t.tray_id}`),
                       floor_id: tFloorId,
                       floor_name: tFloorName,
-                      status: String(t.status || t.assignment_status || 'ACTIVE'),
+                      assignment_status: assignmentStatus,
+                      status: assignmentStatus || String(t.status || '').trim().toUpperCase(),
                       row_number: t.row_number != null ? Number(t.row_number) : undefined,
                       column_number: t.column_number != null ? Number(t.column_number) : undefined,
                     };
@@ -940,6 +951,10 @@ export class IotRepository {
               if (detail.trays && detail.trays.length > 0) {
                 sess.trays = detail.trays.map((t: any) => {
                   const fid = t.floor_id != null ? Number(t.floor_id) : sess.floor_id;
+                  const assignmentStatus = String(
+                    t.assignment_status ||
+                    (t.status === 'ACTIVE' || t.status === 'RELEASED' ? t.status : '')
+                  ).trim().toUpperCase();
                   return {
                     ...t,
                     floor_id: fid,
@@ -947,6 +962,8 @@ export class IotRepository {
                       t.floor_name ||
                       (fid != null ? floorMap.get(fid) : null) ||
                       sess.floor_name,
+                    assignment_status: assignmentStatus,
+                    status: assignmentStatus || String(t.status || '').trim().toUpperCase(),
                   };
                 });
                 const t0Fid = sess.trays[0].floor_id;

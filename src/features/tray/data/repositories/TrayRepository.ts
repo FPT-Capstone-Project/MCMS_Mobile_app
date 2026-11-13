@@ -183,7 +183,12 @@ export class TrayRepository implements ITrayRepository {
       for (const session of result.sessions) {
         if (!['CULTIVATING', 'HARVEST_READY', 'HARVESTING'].includes(session.status)) continue;
         for (const assignedTray of session.assigned_trays) {
-          if (assignedTray.status === 'ACTIVE') {
+          const assignmentStatus = String(
+            (assignedTray as any).assignment_status ||
+            (assignedTray.status === 'ACTIVE' || assignedTray.status === 'RELEASED' ? assignedTray.status : '')
+          ).trim().toUpperCase();
+          // STRICT RULE: Only ACTIVE assignment status means session is occupying this tray
+          if (assignmentStatus === 'ACTIVE') {
             ownedTraySessions.set(assignedTray.tray_id, {
               sessionId: session.session_id,
               orderId: result.orderId,
@@ -193,27 +198,79 @@ export class TrayRepository implements ITrayRepository {
       }
     }
 
-    const activeFloors = floors.filter((floor) => floor.status === 'ACTIVE' && floor.floor_id);
-    const floorCultivation = await Promise.all(
-      activeFloors.map(async (floor) => {
-        const floorId = floor.floor_id;
-        if (!floorId) throw new AppError('Mã tầng nuôi trồng không hợp lệ.', 'API_ERROR', 500);
-        const config = await iotRepository.getAutoControlConfig(floorId);
-        const activeTrays = config.cultivation?.trays;
-        if (!Array.isArray(activeTrays)) {
-          throw new AppError('Dữ liệu khay đang trồng từ máy chủ không hợp lệ.', 'API_ERROR', 500);
-        }
-        return { floorId, activeTrays };
-      })
-    );
+    // Also fetch active admin cultivation sessions and historical past sessions
+    const activeAdminTraySessions = new Map<
+      number,
+      { sessionId: number; sessionTrayId?: number; mushroomName?: string }
+    >();
+    const pastTraySessions = new Map<
+      number,
+      { sessionId: number; sessionTrayId?: number; mushroomName?: string }[]
+    >();
+    let hasAdminSessionData = false;
 
-    const activeTrayById = new Map(
-      floorCultivation.flatMap(({ activeTrays }) =>
-        activeTrays
-          .filter((tray) => tray.session_id != null)
-          .map((tray) => [tray.tray_id, tray] as const)
-      )
-    );
+    try {
+      const allSessions = await iotRepository.getAdminCultivationSessions();
+      if (Array.isArray(allSessions)) {
+        hasAdminSessionData = true;
+        for (const sess of allSessions) {
+          const sessStatus = String(sess.status || '').trim().toUpperCase();
+          const isSessionActive = ['CULTIVATING', 'HARVEST_READY', 'HARVESTING'].includes(sessStatus);
+
+          if (Array.isArray(sess.trays)) {
+            for (const t of sess.trays) {
+              const trayId = Number(t.tray_id);
+              if (!trayId) continue;
+
+              const assignmentStatus = String(
+                t.assignment_status || (t.status === 'ACTIVE' || t.status === 'RELEASED' ? t.status : '')
+              ).trim().toUpperCase();
+
+              // User requirement: Only assignment_status === 'ACTIVE' on an active session occupies the tray
+              if (isSessionActive && assignmentStatus === 'ACTIVE') {
+                activeAdminTraySessions.set(trayId, {
+                  sessionId: sess.session_id,
+                  sessionTrayId: t.session_tray_id ? Number(t.session_tray_id) : undefined,
+                  mushroomName: sess.mushroom_name || undefined,
+                });
+              } else {
+                // Record into past sessions history (e.g. RELEASED links or completed sessions)
+                const existingPast = pastTraySessions.get(trayId) || [];
+                if (!existingPast.some((p) => p.sessionId === sess.session_id)) {
+                  existingPast.push({
+                    sessionId: sess.session_id,
+                    sessionTrayId: t.session_tray_id ? Number(t.session_tray_id) : undefined,
+                    mushroomName: sess.mushroom_name || undefined,
+                  });
+                  pastTraySessions.set(trayId, existingPast);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // Ignored for non-staff / customers who don't have access to admin endpoints
+    }
+
+    const activeFloors = floors.filter((floor) => floor.status === 'ACTIVE' && floor.floor_id);
+
+    // Fetch available trays directly from backend API for each floor
+    const availableTrayIdsSet = new Set<number>();
+    try {
+      const availableResults = await Promise.all(
+        activeFloors.map((f) =>
+          f.floor_id ? iotRepository.getAvailableTraysForFloor(f.floor_id).catch(() => []) : []
+        )
+      );
+      availableResults.flat().forEach((t) => {
+        if (t && t.tray_id) {
+          availableTrayIdsSet.add(Number(t.tray_id));
+        }
+      });
+    } catch {
+      // Ignore
+    }
 
     return activeFloors
       .map((floor): CustomerFloorRack => {
@@ -227,13 +284,52 @@ export class TrayRepository implements ITrayRepository {
           });
 
         const rackTrays = floorTrays.map((tray): CustomerTrayCard => {
-          const activeTray = activeTrayById.get(tray.tray_id);
+          const rawPhysicalStatus = String(
+            tray.status || (tray as any).tray_status || ''
+          )
+            .trim()
+            .toUpperCase();
+
+          // A tray is AVAILABLE if:
+          // 1. Backend explicitly returns it in available-trays API
+          // 2. Physical tray status is AVAILABLE, RELEASE, or RELEASED
+          const isExplicitlyAvailable = availableTrayIdsSet.has(tray.tray_id);
+          const isPhysicalAvailable =
+            rawPhysicalStatus === 'AVAILABLE' ||
+            rawPhysicalStatus === 'RELEASE' ||
+            rawPhysicalStatus === 'RELEASED';
+
+          let activeSessionId: number | undefined;
+          let activeSessionTrayId: number | undefined;
+          let activeMushroomName: string | undefined;
+
+          // STRICT RULE: If tray is returned in available-trays API or physically AVAILABLE,
+          // it CANNOT be occupied by any session (past or released links are ignored).
+          if (isExplicitlyAvailable || isPhysicalAvailable) {
+            activeSessionId = undefined;
+            activeSessionTrayId = undefined;
+            activeMushroomName = undefined;
+          } else if (hasAdminSessionData) {
+            // For staff: only an assignment with assignment_status === 'ACTIVE' can occupy
+            const adminSessionTray = activeAdminTraySessions.get(tray.tray_id);
+            if (adminSessionTray) {
+              activeSessionId = adminSessionTray.sessionId;
+              activeSessionTrayId = adminSessionTray.sessionTrayId;
+              activeMushroomName = adminSessionTray.mushroomName;
+            }
+          } else {
+            // For customer
+            const ownedSession = ownedTraySessions.get(tray.tray_id);
+            if (ownedSession) {
+              activeSessionId = ownedSession.sessionId;
+            }
+          }
+
+          const isCurrentlyActive = activeSessionId != null;
           const ownedSession = ownedTraySessions.get(tray.tray_id);
           const hasOwnActiveCultivation =
-            activeTray?.session_id != null &&
-            ownedSession?.sessionId === activeTray.session_id;
-          const hasOtherActiveCultivation =
-            activeTray?.session_id != null && !hasOwnActiveCultivation;
+            isCurrentlyActive && ownedSession?.sessionId === activeSessionId;
+
           const positionCode =
             tray.row_number != null && tray.column_number != null
               ? `R${tray.row_number}-C${tray.column_number}`
@@ -242,17 +338,18 @@ export class TrayRepository implements ITrayRepository {
           return {
             id: tray.tray_id,
             code: positionCode,
-            usage: hasOwnActiveCultivation
-              ? 'MY_CULTIVATION'
-              : hasOtherActiveCultivation
-                ? 'OTHER_CULTIVATION'
-                : 'AVAILABLE',
-            mushroomName: activeTray?.mushroom_name ?? undefined,
-            sessionId: ownedSession?.sessionId ?? activeTray?.session_id ?? undefined,
-            sessionTrayId: activeTray?.session_tray_id ?? undefined,
-            orderId: ownedSession?.orderId ?? undefined,
+            usage: isCurrentlyActive
+              ? hasOwnActiveCultivation
+                ? 'MY_CULTIVATION'
+                : 'OTHER_CULTIVATION'
+              : 'AVAILABLE',
+            mushroomName: isCurrentlyActive ? activeMushroomName : undefined,
+            sessionId: isCurrentlyActive ? activeSessionId : undefined,
+            sessionTrayId: isCurrentlyActive ? activeSessionTrayId : undefined,
+            orderId: isCurrentlyActive ? ownedSession?.orderId : undefined,
             floorId,
             floorNumber: floor.floor_number,
+            pastSessions: pastTraySessions.get(tray.tray_id) || [],
           };
         });
 
