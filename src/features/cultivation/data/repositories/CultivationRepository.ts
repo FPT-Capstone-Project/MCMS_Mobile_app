@@ -313,6 +313,22 @@ export class CultivationRepository {
     }
   }
 
+  async getAllDailyInspectionHistory(
+    sessionId: number | string,
+    pageSize = 100
+  ): Promise<DailyInspectionHistoryResponse> {
+    const firstPage = await this.getDailyInspectionHistory(sessionId, 1, pageSize);
+    const totalPages = firstPage.pagination?.totalPages ?? 1;
+    const inspections = [...firstPage.inspections];
+
+    for (let page = 2; page <= totalPages; page += 1) {
+      const result = await this.getDailyInspectionHistory(sessionId, page, pageSize);
+      inspections.push(...result.inspections);
+    }
+
+    return { ...firstPage, inspections };
+  }
+
   /**
    * Get daily inspection history for a single tray
    * GET /api/cultivation-sessions/:sessionId/trays/:sessionTrayId/daily-inspections

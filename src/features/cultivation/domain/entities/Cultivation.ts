@@ -138,8 +138,20 @@ export interface CreateDailyTrayInspectionRequest {
 }
 
 export interface DailyInspectionHistoryResponse {
-  session?: any;
-  tray?: any;
+  session?: {
+    sessionId: number;
+    startAt: string;
+    endAt: string | null;
+    status: string;
+  };
+  tray?: {
+    sessionTrayId: number;
+    sessionId: number;
+    trayId: number;
+    assignmentStatus: string;
+    trayCode: string;
+    trayName: string | null;
+  };
   inspections: DailyTrayInspection[];
   pagination?: {
     page: number;
