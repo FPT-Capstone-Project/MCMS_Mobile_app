@@ -25,7 +25,9 @@ export interface OrderItem {
   mushroom_type_id?: number;
   item_type?: 'MUSHROOM' | 'RENTAL' | string;
   package_name?: string;
+  duration_days?: number;
   mushroom_name?: string;
+  image_url?: string | null;
   price?: number;
   unit_price?: number;
   total_price?: number;
@@ -41,6 +43,10 @@ export interface CustomerOrder {
   discount?: number;
   shipping_fee?: number;
   total_amount: number;
+  package_name?: string;
+  mushroom_name?: string;
+  image_url?: string | null;
+  mushroom_image_url?: string | null;
   created_at?: string;
   updated_at?: string;
   items?: OrderItem[];
@@ -63,6 +69,10 @@ export interface BackendCustomerOrder {
   total_amount: number | string;
   status: string;
   payment_status: string;
+  package_name?: string | null;
+  mushroom_name?: string | null;
+  image_url?: string | null;
+  mushroom_image_url?: string | null;
   created_at?: string;
   updated_at?: string;
   items?: {
@@ -71,7 +81,9 @@ export interface BackendCustomerOrder {
     rental_package_id?: number | null;
     mushroom_type_id?: number | null;
     package_name?: string | null;
+    duration_days?: number | string | null;
     mushroom_name?: string | null;
+    image_url?: string | null;
     quantity?: number | string;
     unit_price?: number | string;
     total_price?: number | string;
@@ -81,8 +93,16 @@ export interface BackendCustomerOrder {
 export interface CustomerCultivationStatus {
   orderId: number;
   sessions: {
+    order_item_id?: number;
     session_id: number;
     status: string;
+    harvest_status?: string | null;
+    harvest_method?: 'PICKUP' | 'DELIVERY' | null;
+    harvest_request_status?: string | null;
+    scheduled_at?: string | null;
+    harvest_date?: string | null;
+    current_stage?: string | null;
+    progress_percent?: number | null;
     mushroom_name: string;
     assigned_trays: {
       tray_id: number;

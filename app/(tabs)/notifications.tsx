@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
+import { Image } from 'expo-image';
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +24,12 @@ import {
   notificationRepository,
 } from '../../src/features/notification';
 import {
+  CustomerCultivationStatus,
+  CustomerOrder,
+  orderRepository,
+} from '../../src/features/order';
+import { MushroomType, cultivationRepository } from '../../src/features/cultivation';
+import {
   AppButton,
   AppCard,
   AppDivider,
@@ -34,6 +41,153 @@ import {
 
 type NotificationFilter = 'all' | 'unread' | 'read';
 
+interface SessionMushroomAsset {
+  imageUrl: string | null;
+  mushroomName: string | null;
+}
+
+function normalizeMushroomName(name?: string | null): string {
+  return (name ?? '')
+    .toLowerCase()
+    .replace(/[đĐ]/g, 'd')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/^nam\s+/i, '')
+    .replace(/[^a-z0-9]/g, '')
+    .trim();
+}
+
+function getSessionMushroomAsset(
+  session: CustomerCultivationStatus['sessions'][number],
+  order: CustomerOrder,
+  catalog: MushroomType[]
+): SessionMushroomAsset {
+  const items = order.items || order.order_items || [];
+  const orderItem =
+    session.order_item_id == null
+      ? undefined
+      : items.find((item) => item.order_item_id === session.order_item_id);
+  const mushroomType = orderItem?.mushroom_type_id
+    ? catalog.find((item) => item.mushroom_type_id === orderItem.mushroom_type_id)
+    : catalog.find(
+        (item) =>
+          normalizeMushroomName(item.name) ===
+          normalizeMushroomName(session.mushroom_name)
+      );
+  const imageUrl =
+    mushroomType?.image_url?.trim() || orderItem?.image_url?.trim() || null;
+
+  return {
+    imageUrl,
+    mushroomName: session.mushroom_name || orderItem?.mushroom_name || mushroomType?.name || null,
+  };
+}
+
+function isCultivationSessionNotification(notification: CustomerNotification): boolean {
+  return (
+    notification.reference_type?.toUpperCase() === 'CULTIVATION_SESSION' ||
+    notification.notification_type.toUpperCase().startsWith('CULTIVATION_')
+  );
+}
+
+function localizeNotificationText(notification: CustomerNotification) {
+  const { notification_type: type } = notification;
+  const title = notification.title.trim();
+  const message = notification.message.trim();
+
+  if (type === 'CULTIVATION_STARTED') {
+    return {
+      title: 'Đơn hàng đang được chuẩn bị',
+      message: 'Đơn hàng đã được xác nhận thanh toán. Trang trại đang chuẩn bị phôi nấm cho bạn.',
+    };
+  }
+
+  if (type === 'PAYMENT_REFUND_REQUIRED') {
+    return {
+      title: 'Cần hoàn tiền cho đơn hàng',
+      message:
+        'Khoản thanh toán được ghi nhận sau khi thời gian giữ khay đã hết và tài nguyên không còn. Đội ngũ SmartMush sẽ liên hệ và hỗ trợ hoàn tiền cho bạn.',
+    };
+  }
+
+  if (type === 'CULTIVATION_COMPLETED') {
+    return {
+      title: 'Vụ trồng đã hoàn tất',
+      message: message || 'Phiên trồng nấm của bạn đã hoàn tất.',
+    };
+  }
+
+  if (type === 'CULTIVATION_CANCELLED') {
+    return {
+      title: 'Phiên nuôi trồng đã bị hủy',
+      message: message
+        ? `Phiên nuôi trồng đã bị hủy. Lý do: ${message}`
+        : 'Phiên nuôi trồng của bạn đã bị hủy.',
+    };
+  }
+
+  if (type === 'OPERATOR_MESSAGE') {
+    if (title === 'Expected harvest date updated') {
+      const date = message.match(/Expected harvest date changed to\s+(.+)\.?$/i)?.[1];
+      return {
+        title: 'Đã cập nhật ngày thu hoạch dự kiến',
+        message: date
+          ? `Ngày thu hoạch dự kiến đã được cập nhật thành ${date}.`
+          : 'Ngày thu hoạch dự kiến đã được cập nhật.',
+      };
+    }
+
+    if (title === 'Mushrooms ready for harvest') {
+      return {
+        title: 'Nấm đã sẵn sàng để thu hoạch',
+        message: 'Vui lòng chọn nhận nấm tại trang trại hoặc giao hàng.',
+      };
+    }
+  }
+
+  if (type === 'MUSHROOM_DISEASE') {
+    if (title === 'New mushroom diagnosis request') {
+      const issueId = message.match(/issue\s+#?(\d+)/i)?.[1];
+      return {
+        title: 'Yêu cầu chuyên gia chẩn đoán nấm mới',
+        message: issueId
+          ? `Có yêu cầu tư vấn chuyên gia mới cho sự cố nấm #${issueId}.`
+          : 'Có yêu cầu tư vấn chuyên gia mới về sự cố nấm.',
+      };
+    }
+
+    if (title === 'Additional issue information provided') {
+      const issueTitle = message.match(/issue\s+"(.+)"\.?$/i)?.[1];
+      return {
+        title: 'Đã bổ sung thông tin sự cố',
+        message: issueTitle
+          ? `Nhân viên đã bổ sung thông tin cho sự cố “${issueTitle}”.`
+          : 'Nhân viên đã bổ sung thông tin cho sự cố.',
+      };
+    }
+
+    if (
+      title === 'More information requested' ||
+      title === 'Expert diagnosis available'
+    ) {
+      const issueTitle = message.match(/issue\s+"(.+)"\.?$/i)?.[1];
+      const needsMoreInfo = title === 'More information requested';
+      return {
+        title: needsMoreInfo ? 'Chuyên gia cần thêm thông tin' : 'Đã có kết quả chẩn đoán từ chuyên gia',
+        message: issueTitle
+          ? needsMoreInfo
+            ? `Chuyên gia cần thêm thông tin về sự cố “${issueTitle}”.`
+            : `Chuyên gia đã gửi kết quả chẩn đoán và phương án xử lý cho sự cố “${issueTitle}”.`
+          : needsMoreInfo
+            ? 'Chuyên gia cần thêm thông tin về sự cố nấm.'
+            : 'Chuyên gia đã gửi kết quả chẩn đoán và phương án xử lý sự cố nấm.',
+      };
+    }
+  }
+
+  return { title: notification.title, message: notification.message };
+}
+
 /**
  * Returns icon based on notification type and reference type
  */
@@ -41,14 +195,23 @@ const notificationIcon = (
   type: string,
   refType?: string | null
 ): keyof typeof Ionicons.glyphMap => {
+  const normalizedType = type.toUpperCase();
+  const normalizedRefType = refType?.toUpperCase() ?? '';
   if (
-    refType === 'DEVICE_INCIDENT' ||
-    type === 'DEVICE_INCIDENT' ||
-    type === 'DEVICE_ISSUE'
+    normalizedRefType.includes('DEVICE') ||
+    normalizedRefType.includes('IOT') ||
+    normalizedType.startsWith('DEVICE_') ||
+    normalizedType.includes('IOT')
   ) {
     return 'hardware-chip-outline';
   }
-  switch (type) {
+  if (normalizedRefType === 'CULTIVATION_SESSION') return 'image-outline';
+  switch (normalizedType) {
+    case 'CULTIVATION_STARTED':
+    case 'CULTIVATION_COMPLETED':
+    case 'CULTIVATION_CANCELLED':
+    case 'CULTIVATION_STATUS':
+      return 'image-outline';
     case 'MUSHROOM_DISEASE':
       return 'leaf-outline';
     default:
@@ -94,7 +257,7 @@ function formatIncidentLocation(incident?: DeviceIncident | null): string {
 }
 
 export default function NotificationsScreen() {
-  const { isFarmOperator, isAdmin } = useAuth();
+  const { user, isCustomer, isFarmOperator, isAdmin } = useAuth();
 
   const [notifications, setNotifications] = useState<CustomerNotification[]>([]);
   const [filter, setFilter] = useState<NotificationFilter>('all');
@@ -106,6 +269,15 @@ export default function NotificationsScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [mushroomAssetError, setMushroomAssetError] = useState<string | null>(null);
+  const [sessionMushroomAssets, setSessionMushroomAssets] = useState<
+    Record<string, SessionMushroomAsset>
+  >({});
+  const sessionMushroomAssetsRef = useRef<Record<string, SessionMushroomAsset>>({});
+  const mushroomAssetOwner = useRef<string | null>(null);
+  const pendingMushroomAssetIds = useRef(new Set<string>());
+  const customerKey = String(user?.user_id ?? user?.id ?? 'anonymous');
+  const totalUnreadCount = unreadCount;
 
   // Detail Modal State
   const [selectedNotification, setSelectedNotification] =
@@ -117,6 +289,125 @@ export default function NotificationsScreen() {
   const [repairNote, setRepairNote] = useState('');
   const [confirmingRepair, setConfirmingRepair] = useState(false);
   const [repairFormError, setRepairFormError] = useState<string | null>(null);
+
+  const mergeSessionMushroomAssets = useCallback(
+    (updates: Record<string, SessionMushroomAsset>) => {
+      const merged = { ...sessionMushroomAssetsRef.current };
+      for (const [sessionId, asset] of Object.entries(updates)) {
+        if (!asset.imageUrl && merged[sessionId]?.imageUrl) continue;
+        merged[sessionId] = asset;
+      }
+      sessionMushroomAssetsRef.current = merged;
+      setSessionMushroomAssets(merged);
+    },
+    []
+  );
+
+  const loadSessionMushroomAssets = useCallback(
+    async (sourceNotifications: CustomerNotification[]) => {
+      if (!isCustomer || isFarmOperator || isAdmin || !user) return;
+
+      if (mushroomAssetOwner.current !== customerKey) {
+        mushroomAssetOwner.current = customerKey;
+        sessionMushroomAssetsRef.current = {};
+        pendingMushroomAssetIds.current.clear();
+        setSessionMushroomAssets({});
+        setMushroomAssetError(null);
+      }
+
+      const requestedIds = [
+        ...new Set(
+          sourceNotifications
+            .filter(isCultivationSessionNotification)
+            .map((notification) => String(notification.reference_id ?? ''))
+            .filter((id) => /^\d+$/.test(id) && Number(id) > 0)
+        ),
+      ];
+      const missingIds = requestedIds.filter(
+        (id) =>
+          !sessionMushroomAssetsRef.current[id] &&
+          !pendingMushroomAssetIds.current.has(id)
+      );
+      if (missingIds.length === 0) return;
+      missingIds.forEach((id) => pendingMushroomAssetIds.current.add(id));
+
+      try {
+        const [ordersResult, catalogResult] = await Promise.allSettled([
+          orderRepository.getCustomerOrders(),
+          cultivationRepository.getMushroomTypes(),
+        ]);
+        if (ordersResult.status === 'rejected') throw ordersResult.reason;
+        const orders = ordersResult.value;
+        const catalog =
+          catalogResult.status === 'fulfilled' ? catalogResult.value : [];
+
+        const statusResults: PromiseSettledResult<CustomerCultivationStatus>[] = [];
+        for (let start = 0; start < orders.length; start += 5) {
+          const batch = orders.slice(start, start + 5);
+          statusResults.push(
+            ...(await Promise.allSettled(
+              batch.map((order) =>
+                orderRepository.getCustomerCultivationStatus(order.order_id)
+              )
+            ))
+          );
+        }
+        const updates: Record<string, SessionMushroomAsset> = {};
+        statusResults.forEach((result, index) => {
+          if (result.status !== 'fulfilled') return;
+
+          const order = orders[index];
+          for (const session of result.value.sessions) {
+            const sessionId = String(session.session_id);
+            if (!missingIds.includes(sessionId)) continue;
+            updates[sessionId] = getSessionMushroomAsset(session, order, catalog);
+          }
+        });
+
+        if (mushroomAssetOwner.current === customerKey) {
+          mergeSessionMushroomAssets(updates);
+          const unresolvedIds = missingIds.filter(
+            (id) => !sessionMushroomAssetsRef.current[id]?.imageUrl
+          );
+          const firstStatusFailure = statusResults.find(
+            (result) => result.status === 'rejected'
+          );
+          const assetError =
+            unresolvedIds.length === 0
+              ? null
+              : firstStatusFailure?.status === 'rejected'
+              ? `Không thể tải phiên trồng để tìm ảnh nấm: ${
+                  firstStatusFailure.reason instanceof Error
+                    ? firstStatusFailure.reason.message
+                    : 'lỗi kết nối máy chủ.'
+                }`
+              : catalogResult.status === 'rejected'
+              ? `Không thể tải danh mục ảnh nấm: ${
+                  catalogResult.reason instanceof Error
+                    ? catalogResult.reason.message
+                    : 'lỗi kết nối máy chủ.'
+                }`
+              : 'Chưa tìm được ảnh loại nấm cho một số thông báo.';
+          setMushroomAssetError(
+            assetError
+          );
+        }
+      } catch (error: unknown) {
+        if (mushroomAssetOwner.current === customerKey) {
+          setMushroomAssetError(
+            error instanceof Error
+              ? `Không thể tải ảnh nấm cho thông báo: ${error.message}`
+              : 'Không thể tải ảnh nấm cho thông báo.'
+          );
+        }
+      } finally {
+        if (mushroomAssetOwner.current === customerKey) {
+          missingIds.forEach((id) => pendingMushroomAssetIds.current.delete(id));
+        }
+      }
+    },
+    [customerKey, isAdmin, isCustomer, isFarmOperator, mergeSessionMushroomAssets, user]
+  );
 
   const loadNotifications = useCallback(
     async (nextPage = 1, append = false) => {
@@ -130,6 +421,7 @@ export default function NotificationsScreen() {
         setNotifications((current) =>
           append ? [...current, ...result.notifications] : result.notifications
         );
+        void loadSessionMushroomAssets(result.notifications);
         setPage(result.page);
         setTotalPages(result.totalPages);
         setUnreadCount(result.unreadCount);
@@ -145,18 +437,23 @@ export default function NotificationsScreen() {
         setLoadingMore(false);
       }
     },
-    [filter]
+    [filter, loadSessionMushroomAssets]
   );
 
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
       loadNotifications();
+      const intervalId = setInterval(() => {
+        void loadNotifications();
+      }, 60_000);
+      return () => clearInterval(intervalId);
     }, [loadNotifications])
   );
 
   const handleMarkRead = async (notification: CustomerNotification) => {
     if (notification.is_read) return;
+
     try {
       const updated = await notificationRepository.markAsRead(
         notification.notification_id
@@ -185,10 +482,12 @@ export default function NotificationsScreen() {
   };
 
   const handleMarkAllRead = async () => {
-    if (unreadCount === 0 || markingAll) return;
+    if (totalUnreadCount === 0 || markingAll) return;
     try {
       setMarkingAll(true);
-      await notificationRepository.markAllAsRead();
+      if (unreadCount > 0) {
+        await notificationRepository.markAllAsRead();
+      }
       await loadNotifications();
     } catch (error: unknown) {
       setErrorMessage(
@@ -333,6 +632,14 @@ export default function NotificationsScreen() {
   };
 
   const activeIncident = selectedNotification?.device_incident;
+  const selectedNotificationText = selectedNotification
+    ? localizeNotificationText(selectedNotification)
+    : null;
+  const selectedMushroomAsset =
+    selectedNotification && isCultivationSessionNotification(selectedNotification)
+      ? sessionMushroomAssets[String(selectedNotification.reference_id)]
+      : undefined;
+  const visibleNotifications = notifications;
   const isIncidentResolved = activeIncident?.status === 'RESOLVED';
   const canOperatorConfirm =
     isFarmOperator && activeIncident?.can_confirm_repair === true && !isIncidentResolved;
@@ -342,8 +649,8 @@ export default function NotificationsScreen() {
       <AppHeader
         title="Thông báo"
         subtitle={
-          unreadCount > 0
-            ? `${unreadCount} thông báo chưa đọc`
+          totalUnreadCount > 0
+            ? `${totalUnreadCount} thông báo chưa đọc`
             : 'Cập nhật từ SmartMush'
         }
         rightAction={
@@ -352,7 +659,7 @@ export default function NotificationsScreen() {
             variant="ghost"
             size="sm"
             loading={markingAll}
-            disabled={unreadCount === 0 || markingAll}
+            disabled={totalUnreadCount === 0 || markingAll}
             onPress={handleMarkAllRead}
           />
         }
@@ -401,7 +708,7 @@ export default function NotificationsScreen() {
               Đang tải thông báo...
             </AppText>
           </View>
-        ) : errorMessage && notifications.length === 0 ? (
+        ) : errorMessage && visibleNotifications.length === 0 ? (
           <View style={styles.center}>
             <Ionicons
               name="alert-circle-outline"
@@ -422,7 +729,7 @@ export default function NotificationsScreen() {
               onPress={() => loadNotifications()}
             />
           </View>
-        ) : notifications.length === 0 ? (
+        ) : visibleNotifications.length === 0 ? (
           <AppEmptyState
             icon={
               <Ionicons
@@ -445,17 +752,26 @@ export default function NotificationsScreen() {
                 {errorMessage}
               </AppText>
             ) : null}
-            {notifications.map((notification) => {
+            {mushroomAssetError ? (
+              <AppText variant="caption" color={theme.colors.warning.dark}>
+                {mushroomAssetError}
+              </AppText>
+            ) : null}
+            {visibleNotifications.map((notification) => {
               const isIncident =
                 notification.reference_type === 'DEVICE_INCIDENT' ||
                 Boolean(notification.device_incident);
               const incident = notification.device_incident;
+              const mushroomAsset = isCultivationSessionNotification(notification)
+                ? sessionMushroomAssets[String(notification.reference_id)]
+                : undefined;
+              const localizedText = localizeNotificationText(notification);
 
               return (
                 <Pressable
                   key={notification.notification_id}
                   accessibilityRole="button"
-                  accessibilityLabel={`${notification.title}. ${
+                  accessibilityLabel={`${localizedText.title}. ${
                     notification.is_read ? 'Đã đọc' : 'Chưa đọc'
                   }`}
                   onPress={() => handleOpenNotification(notification)}
@@ -480,20 +796,33 @@ export default function NotificationsScreen() {
                           },
                         ]}
                       >
-                        <Ionicons
-                          name={notificationIcon(
-                            notification.notification_type,
-                            notification.reference_type
-                          )}
-                          size={22}
-                          color={
-                            notification.is_read
-                              ? theme.colors.neutral[600]
-                              : isIncident
-                              ? theme.colors.error.main
-                              : theme.colors.primary[600]
-                          }
-                        />
+                        {mushroomAsset?.imageUrl ? (
+                          <Image
+                            source={{ uri: mushroomAsset.imageUrl }}
+                            contentFit="cover"
+                            accessibilityLabel={
+                              mushroomAsset.mushroomName
+                                ? `Nấm ${mushroomAsset.mushroomName}`
+                                : 'Nấm đang được trồng'
+                            }
+                            style={styles.notificationImage}
+                          />
+                        ) : (
+                          <Ionicons
+                            name={notificationIcon(
+                              notification.notification_type,
+                              notification.reference_type
+                            )}
+                            size={22}
+                            color={
+                              notification.is_read
+                                ? theme.colors.neutral[600]
+                                : isIncident
+                                ? theme.colors.error.main
+                                : theme.colors.primary[600]
+                            }
+                          />
+                        )}
                       </View>
                       <View style={styles.notificationBody}>
                         <View style={styles.titleRow}>
@@ -503,7 +832,7 @@ export default function NotificationsScreen() {
                             style={styles.title}
                             numberOfLines={2}
                           >
-                            {notification.title}
+                            {localizedText.title}
                           </AppText>
                           {!notification.is_read ? (
                             <View style={styles.unreadDot} />
@@ -514,7 +843,7 @@ export default function NotificationsScreen() {
                           color={theme.colors.text.secondary}
                           numberOfLines={3}
                         >
-                          {notification.message}
+                          {localizedText.message}
                         </AppText>
 
                         {/* Incident Tag on card if applicable */}
@@ -605,14 +934,27 @@ export default function NotificationsScreen() {
             {/* Modal Header */}
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderTitleRow}>
-                <Ionicons
-                  name={notificationIcon(
-                    selectedNotification?.notification_type || '',
-                    selectedNotification?.reference_type
-                  )}
-                  size={20}
-                  color={theme.colors.primary[600]}
-                />
+                {selectedMushroomAsset?.imageUrl ? (
+                  <Image
+                    source={{ uri: selectedMushroomAsset.imageUrl }}
+                    contentFit="cover"
+                    accessibilityLabel={
+                      selectedMushroomAsset.mushroomName
+                        ? `Nấm ${selectedMushroomAsset.mushroomName}`
+                        : 'Nấm đang được trồng'
+                    }
+                    style={styles.modalMushroomImage}
+                  />
+                ) : (
+                  <Ionicons
+                    name={notificationIcon(
+                      selectedNotification?.notification_type || '',
+                      selectedNotification?.reference_type
+                    )}
+                    size={20}
+                    color={theme.colors.primary[600]}
+                  />
+                )}
                 <AppText variant="h3" weight="bold">
                   Chi tiết thông báo
                 </AppText>
@@ -632,7 +974,7 @@ export default function NotificationsScreen() {
               {/* Notification Core Info */}
               <View style={styles.detailSection}>
                 <AppText variant="title" weight="bold" color={theme.colors.text.primary}>
-                  {selectedNotification?.title}
+                  {selectedNotificationText?.title}
                 </AppText>
                 <AppText variant="caption" color={theme.colors.text.muted}>
                   {formatVietnamDateTime(selectedNotification?.created_at)}
@@ -642,7 +984,7 @@ export default function NotificationsScreen() {
                   color={theme.colors.text.secondary}
                   style={styles.detailMessageText}
                 >
-                  {selectedNotification?.message}
+                  {selectedNotificationText?.message}
                 </AppText>
               </View>
 
@@ -1012,6 +1354,11 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  notificationImage: {
+    width: '100%',
+    height: '100%',
   },
   notificationBody: {
     flex: 1,
@@ -1077,6 +1424,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     flex: 1,
+  },
+  modalMushroomImage: {
+    width: 28,
+    height: 28,
+    borderRadius: theme.borderRadius.sm,
   },
   modalCloseBtn: {
     padding: 4,

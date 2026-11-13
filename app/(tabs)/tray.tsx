@@ -46,12 +46,44 @@ function formatDateTime(value: string): string {
 
 function getGrowthStageLabel(stage: string): string {
   const labels: Record<string, string> = {
+    UNKNOWN: 'Chưa cập nhật',
+    SPAWN_PENDING: 'Đang chuẩn bị phôi',
+    SPAWN_RESTING: 'Đang ủ phôi',
+    MYCELIAL_DEVELOPMENT: 'Đang phát triển tơ nấm',
+    READY_FOR_CULTIVATION: 'Sẵn sàng nuôi trồng',
     FRUITING_INITIATION: 'Bắt đầu tạo quả thể',
     PINNING: 'Ra nụ',
     YOUNG_FRUITING: 'Nấm non',
     MATURATION: 'Trưởng thành',
   };
   return labels[stage] ?? stage.replace(/_/g, ' ');
+}
+
+function getCultivationStatusLabel(status?: string): string | null {
+  if (!status) return null;
+  const labels: Record<string, string> = {
+    PENDING: 'Đang chuẩn bị phôi',
+    SPAWN_RESTING: 'Đang ủ phôi',
+    MYCELIAL_DEVELOPMENT: 'Đang phát triển tơ nấm',
+    READY_FOR_CULTIVATION: 'Sẵn sàng nuôi trồng',
+    CULTIVATING: 'Đang nuôi trồng',
+    HARVEST_READY: 'Sẵn sàng thu hoạch',
+    HARVESTING: 'Đang thu hoạch',
+    COMPLETED: 'Đã hoàn tất',
+    CANCELLED: 'Đã hủy',
+  };
+  return labels[status] ?? status.replace(/_/g, ' ');
+}
+
+function getHarvestStatusLabel(cultivationStatus?: string, harvestStatus?: string | null): string {
+  if (cultivationStatus === 'COMPLETED') return 'Đã hoàn tất';
+  if (cultivationStatus === 'CANCELLED') return 'Không áp dụng';
+  if (cultivationStatus === 'HARVESTING') return 'Đang thu hoạch';
+  if (harvestStatus === 'HARVEST_READY' || cultivationStatus === 'HARVEST_READY') {
+    return 'Sẵn sàng thu hoạch';
+  }
+  if (harvestStatus === 'COMPLETED') return 'Đã hoàn tất';
+  return 'Chưa sẵn sàng';
 }
 
 function getAverageSensorReadings(readings: CustomerTrayDetails['sensor_readings']) {
@@ -357,7 +389,13 @@ export default function TrayScreen() {
                 showsVerticalScrollIndicator={false}
               >
                 {detailTab === 'growth' ? (
-                  <GrowthHistory history={details?.growth_history ?? []} />
+                  <GrowthHistory
+                    history={details?.growth_history ?? []}
+                    cultivationStatus={details?.cultivation_status}
+                    harvestStatus={details?.harvest_status}
+                    currentStage={details?.current_stage}
+                    progressPercent={details?.progress_percent}
+                  />
                 ) : (
                   <DeviceHistory
                     logs={details?.device_logs ?? []}
@@ -510,22 +548,48 @@ const DetailTabButton: React.FC<{
   </Pressable>
 );
 
-const GrowthHistory: React.FC<{ history: CustomerGrowthHistoryItem[] }> = ({ history }) => {
-  if (history.length === 0) {
-    return <DetailEmptyState message="Chưa có cập nhật trạng thái nấm cho vụ trồng này." />;
-  }
-
+const GrowthHistory: React.FC<{
+  history: CustomerGrowthHistoryItem[];
+  cultivationStatus?: string;
+  harvestStatus?: string | null;
+  currentStage?: string | null;
+  progressPercent?: number | null;
+}> = ({ history, cultivationStatus, harvestStatus, currentStage, progressPercent }) => {
   return (
     <View style={styles.historyList}>
+      <View style={styles.historyCard}>
+        <AppText variant="bodyMedium" weight="bold">
+          Tiến độ vụ trồng
+        </AppText>
+        {cultivationStatus ? (
+          <AppText variant="caption" color={theme.colors.text.secondary}>
+            Trạng thái phiên: {getCultivationStatusLabel(cultivationStatus)}
+          </AppText>
+        ) : null}
+        <AppText variant="caption" color={theme.colors.text.secondary}>
+          Trạng thái thu hoạch: {getHarvestStatusLabel(cultivationStatus, harvestStatus)}
+        </AppText>
+        {currentStage ? (
+          <AppText variant="caption" color={theme.colors.text.secondary}>
+            Giai đoạn nấm: {getGrowthStageLabel(currentStage)}
+            {typeof progressPercent === 'number' ? ` · ${progressPercent}%` : ''}
+          </AppText>
+        ) : null}
+      </View>
+      {history.length === 0 ? (
+        <DetailEmptyState message="Chưa có nhật ký cập nhật giai đoạn nấm." />
+      ) : null}
       {history.map((item) => (
         <View key={item.progress_id} style={styles.historyCard}>
           <View style={styles.historyHeading}>
             <AppText variant="bodyMedium" weight="bold" style={styles.historyTitle}>
               {getGrowthStageLabel(item.current_stage)}
             </AppText>
-            <AppText variant="captionMedium" weight="bold" color={theme.colors.primary[700]}>
-              {item.progress_percent}%
-            </AppText>
+            {typeof item.progress_percent === 'number' ? (
+              <AppText variant="captionMedium" weight="bold" color={theme.colors.primary[700]}>
+                {item.progress_percent}%
+              </AppText>
+            ) : null}
           </View>
           {item.condition ? (
             <AppText variant="caption" color={theme.colors.text.secondary}>
