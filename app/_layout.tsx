@@ -12,7 +12,7 @@ import { AppLoading } from '../src/shared/components';
 function NavigationGuard() {
   const segments = useSegments();
   const router = useRouter();
-  const { status, user, isShipper, isInitializing, initialize, forceLogout } = useAuth();
+  const { status, user, isExpert, isInitializing, initialize, forceLogout } = useAuth();
 
   useEffect(() => {
     setOnUnauthorized(() => {
@@ -42,7 +42,7 @@ function NavigationGuard() {
       currentSegment === 'cultivation' ||
       currentSegment === 'admin-orders' ||
       currentSegment === 'mushrooms';
-    const inShipperRoutes = currentSegment === '(shipper)';
+    const inExpertRoutes = currentSegment === '(expert)';
     const inStaffOnlyRoute =
       currentSegment === 'control' ||
       currentSegment === 'automatic' ||
@@ -53,28 +53,26 @@ function NavigationGuard() {
       // Route unauthenticated visitors to login screen
       router.replace('/(auth)/login' as Href);
     } else if (status === 'authenticated') {
-      const shipperActive = isShipper || user?.role === 'SHIPPER';
+      const expertActive = isExpert || user?.role === 'EXPERT';
       const staffActive = user?.role === 'ADMIN' || user?.role === 'FARM_OPERATOR';
 
       if (inAuthGroup) {
         // Route away from auth screens based on authenticated role
-        if (shipperActive) {
-          router.replace('/(shipper)' as Href);
+        if (expertActive) {
+          router.replace('/(expert)' as Href);
         } else {
           router.replace('/(tabs)' as Href);
         }
-      } else if (shipperActive && inCustomerRoutes) {
-        // Enforce role boundary: Shippers cannot view Customer screens
-        router.replace('/(shipper)' as Href);
-      } else if (!shipperActive && inShipperRoutes) {
-        // Enforce role boundary: Customers cannot view Shipper screens
+      } else if (expertActive && inCustomerRoutes) {
+        router.replace('/(expert)' as Href);
+      } else if (!expertActive && inExpertRoutes) {
         router.replace('/(tabs)' as Href);
       } else if (!staffActive && inStaffOnlyRoute) {
         // Farm-wide IoT routes are not available to customer accounts.
         router.replace('/(tabs)' as Href);
       }
     }
-  }, [status, user, isShipper, isInitializing, segments, router]);
+  }, [status, user, isExpert, isInitializing, segments, router]);
 
   if (isInitializing) {
     return <AppLoading fullscreen message="Đang khởi tạo SmartMush..." />;
@@ -106,7 +104,7 @@ function NavigationGuard() {
         }}
       />
       <Stack.Screen
-        name="(shipper)"
+        name="(expert)"
         options={{
           headerShown: false,
         }}

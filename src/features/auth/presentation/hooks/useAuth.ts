@@ -117,7 +117,7 @@ export function useAuth() {
     isAuthenticated: status === 'authenticated',
     isInitializing: status === 'initializing',
     role: user?.role,
-    isShipper: user?.role === 'SHIPPER',
+    isExpert: user?.role === 'EXPERT',
     isAdmin: user?.role === 'ADMIN',
     isFarmOperator: user?.role === 'FARM_OPERATOR',
     canControlIot: user?.role === 'ADMIN' || user?.role === 'FARM_OPERATOR',

@@ -5,7 +5,7 @@ export interface AuthTokens {
   expiresIn?: number;
 }
 
-export type UserRole = 'CUSTOMER' | 'SHIPPER' | 'FARM_OPERATOR' | 'ADMIN';
+export type UserRole = 'CUSTOMER' | 'EXPERT' | 'FARM_OPERATOR' | 'ADMIN';
 
 export interface BackendUser {
   user_id: number;
