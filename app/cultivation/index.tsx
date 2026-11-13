@@ -1,33 +1,43 @@
-import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { theme } from '../../src/core/theme';
-import { AppText } from '../../src/shared/components';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React from 'react';
+import { useAuth } from '../../src/features/auth';
+import { AutomaticWizardScreen } from '../../src/features/iot';
+import { AccessDeniedScreen } from '../../src/shared/components';
 
 export default function CultivationScreen() {
   const router = useRouter();
+  const { canControlIot, user } = useAuth();
+  const params = useLocalSearchParams<{ sessionId?: string; floorId?: string; tab?: string }>();
 
-  useFocusEffect(
-    useCallback(() => {
-      router.replace('/(tabs)/tray');
-    }, [router])
-  );
+  if (!canControlIot) {
+    return (
+      <AccessDeniedScreen
+        featureName="Quản lý Phòng, Tầng & Khay"
+        currentRole={user?.role || 'CUSTOMER'}
+        requiredRoles={['ADMIN', 'FARM_OPERATOR']}
+      />
+    );
+  }
+
+  const initialFloorId = params.floorId ? Number(params.floorId) : undefined;
+  const initialSessionId = params.sessionId ? Number(params.sessionId) : undefined;
+  const defaultTab =
+    params.tab === 'overview' || params.tab === 'logs' || params.tab === 'trays'
+      ? params.tab
+      : 'trays';
 
   return (
-    <View style={styles.center}>
-      <ActivityIndicator size="large" color={theme.colors.primary[600]} />
-      <AppText variant="caption" color={theme.colors.text.secondary} style={{ marginTop: 8 }}>
-        Đang chuyển tới sơ đồ Phòng tầng khay...
-      </AppText>
-    </View>
+    <AutomaticWizardScreen
+      initialFloorId={Number.isFinite(initialFloorId) ? initialFloorId : undefined}
+      initialSessionId={Number.isFinite(initialSessionId) ? initialSessionId : undefined}
+      defaultTab={defaultTab}
+      onBack={() => {
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/(tabs)');
+        }
+      }}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.background.default,
-  },
-});

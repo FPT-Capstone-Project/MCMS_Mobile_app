@@ -2,6 +2,7 @@ import { axiosClient } from '../../../../core/api/axiosClient';
 import { API_ENDPOINTS } from '../../../../core/api/endpoints';
 import { AppError } from '../../../../core/errors/appError';
 import { handleApiError } from '../../../../core/errors/errorHandler';
+import { logApiDebug } from '../../../../core/utils';
 import {
   AdminRental,
   AssignTraysToSessionRequest,
@@ -1040,39 +1041,85 @@ export class IotRepository {
     sessionId: number | string,
     data: RecordSpawnInspectionRequest
   ): Promise<SpawnInspection> {
-    try {
-      const payload = {
-        totalChecked: Number(data.totalChecked),
-        normalQuantity: Number(data.normalQuantity),
-        warningQuantity: Number(data.warningQuantity),
-        abnormalQuantity: Number(data.abnormalQuantity),
-        condition: data.condition,
-        ...(data.replacementQuantity != null
-          ? { replacementQuantity: Number(data.replacementQuantity) }
-          : {}),
-        ...(data.notes?.trim() ? { notes: data.notes.trim() } : {}),
-        ...(data.nextCheckAt ? { nextCheckAt: data.nextCheckAt } : {}),
-      };
+    const url = API_ENDPOINTS.FARM.SPAWN_INSPECTIONS(sessionId);
+    const payload = {
+      totalChecked: Number(data.totalChecked),
+      normalQuantity: Number(data.normalQuantity),
+      warningQuantity: Number(data.warningQuantity),
+      abnormalQuantity: Number(data.abnormalQuantity),
+      condition: data.condition,
+      replacementQuantity: Number(data.replacementQuantity ?? 0),
+      notes: data.notes != null ? String(data.notes).trim() : '',
+      ...(data.nextCheckAt ? { nextCheckAt: data.nextCheckAt } : {}),
+    };
 
-      const response = await axiosClient.post<{ data: any } | any>(
-        API_ENDPOINTS.FARM.SPAWN_INSPECTIONS(sessionId),
-        payload
-      );
-      const resItem = ('data' in response.data ? response.data.data : response.data) || {};
+    try {
+      logApiDebug({
+        tag: 'SPAWN_INSPECTION_CREATE_REQ',
+        method: 'POST',
+        url,
+        payload,
+      });
+
+      const response = await axiosClient.post<{ data: any } | any>(url, payload);
+
+      logApiDebug({
+        tag: 'SPAWN_INSPECTION_CREATE_RES',
+        method: 'POST',
+        url,
+        status: response.status,
+        responseBody: response.data,
+      });
+
+      const rawData = response.data;
+      const resItem =
+        rawData && typeof rawData === 'object' && 'data' in rawData
+          ? rawData.data
+          : rawData;
+
+      const parsedItem =
+        Array.isArray(resItem) && resItem.length > 0 ? resItem[0] : resItem;
+
+      const inspectionId =
+        typeof parsedItem === 'number'
+          ? parsedItem
+          : Number(
+              parsedItem?.inspection_id ??
+              parsedItem?.inspectionId ??
+              parsedItem?.id
+            );
+
+      if (!inspectionId || isNaN(inspectionId) || inspectionId <= 0) {
+        throw new AppError(
+          'Không nhận được mã inspection_id hợp lệ từ máy chủ khi tạo báo cáo kiểm tra phôi.',
+          'INVALID_SERVER_RESPONSE',
+          500
+        );
+      }
+
       return {
-        inspection_id: Number(resItem.inspection_id ?? resItem.id ?? Date.now()),
+        inspection_id: inspectionId,
         session_id: Number(sessionId),
         total_checked: payload.totalChecked,
         normal_quantity: payload.normalQuantity,
         warning_quantity: payload.warningQuantity,
         abnormal_quantity: payload.abnormalQuantity,
         condition: payload.condition,
-        replacement_quantity: payload.replacementQuantity ?? null,
-        notes: payload.notes ?? null,
+        replacement_quantity: payload.replacementQuantity,
+        notes: payload.notes,
         next_check_at: payload.nextCheckAt ?? null,
-        inspected_at: resItem.inspected_at ?? new Date().toISOString(),
+        inspected_at: parsedItem?.inspected_at ?? parsedItem?.created_at ?? new Date().toISOString(),
       };
-    } catch (error) {
+    } catch (error: any) {
+      logApiDebug({
+        tag: 'SPAWN_INSPECTION_CREATE_ERROR',
+        method: 'POST',
+        url,
+        status: error?.statusCode || error?.response?.status,
+        responseBody: error?.response?.data || error?.details,
+        error: error?.message,
+        stack: error?.stack,
+      });
       throw error instanceof AppError ? error : handleApiError(error);
     }
   }

@@ -416,7 +416,7 @@ const FloorProfileConfigModalContent: React.FC<FloorProfileConfigModalProps> = (
               </View>
 
               <AppText variant="caption" color={theme.colors.text.secondary}>
-                Cấu hình chung cho tầng (FLOOR) có thể lưu trước khi có phiên trồng. Nếu tầng đã có phiên, loại nấm đang trồng sẽ được khóa bảo vệ.
+                Cấu hình chung cho tầng có thể lưu trước khi có phiên trồng. Nếu tầng đã có phiên, loại nấm đang trồng sẽ được khóa bảo vệ.
               </AppText>
 
               {/* Selected Mushroom Chips */}
@@ -841,7 +841,7 @@ const FloorProfileConfigModalContent: React.FC<FloorProfileConfigModalProps> = (
               </View>
 
               <AppInput
-                label="Tên hồ sơ cấu hình (Profile name)"
+                label="Tên hồ sơ cấu hình"
                 value={profileName}
                 onChangeText={(v) => {
                   setProfileName(v);

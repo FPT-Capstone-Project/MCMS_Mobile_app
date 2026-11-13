@@ -47,22 +47,22 @@ interface DailyTrayInspectionModalProps {
 const STAGE_OPTIONS: { stage: GrowthStage; label: string; desc: string }[] = [
   {
     stage: 'FRUITING_INITIATION',
-    label: 'Bật mầm (FRUITING_INITIATION)',
+    label: 'Bật mầm',
     desc: 'Tơ nấm phủ kín khay, kích ẩm bắt đầu ra quả thể',
   },
   {
     stage: 'PINNING',
-    label: 'Ghim nụ (PINNING)',
+    label: 'Ghim nụ',
     desc: 'Xuất hiện các đầu ghim nhỏ li ti trên bề mặt',
   },
   {
     stage: 'YOUNG_FRUITING',
-    label: 'Nấm non (YOUNG_FRUITING)',
+    label: 'Nấm non',
     desc: 'Tai nấm non hình thành và đang lớn nhanh',
   },
   {
     stage: 'MATURATION',
-    label: 'Trưởng thành (MATURATION)',
+    label: 'Trưởng thành',
     desc: 'Mũ nấm đạt kích thước chuẩn, chuẩn bị thu hoạch',
   },
 ];
@@ -596,7 +596,7 @@ const DailyTrayInspectionModalContent: React.FC<{
                 {/* 2. Growth Stage Picker */}
                 <View style={styles.inputGroup}>
                   <AppText variant="caption" weight="bold">
-                    Giai đoạn sinh trưởng (growthStage):
+                    Giai đoạn sinh trưởng:
                   </AppText>
                   <View style={styles.stageOptionsContainer}>
                     {STAGE_OPTIONS.map((opt) => {
@@ -692,7 +692,7 @@ const DailyTrayInspectionModalContent: React.FC<{
                 {/* 4. Tray condition */}
                 <View style={styles.inputGroup}>
                   <AppText variant="caption" weight="bold">
-                    Tình trạng khay (trayCondition):
+                    Tình trạng khay:
                   </AppText>
                   <TextInput
                     style={styles.textInput}
@@ -706,7 +706,7 @@ const DailyTrayInspectionModalContent: React.FC<{
                 {/* 5. Mushroom condition */}
                 <View style={styles.inputGroup}>
                   <AppText variant="caption" weight="bold">
-                    Tình trạng nấm (mushroomCondition):
+                    Tình trạng nấm:
                   </AppText>
                   <TextInput
                     style={styles.textInput}
@@ -720,7 +720,7 @@ const DailyTrayInspectionModalContent: React.FC<{
                 {/* 6. Notes */}
                 <View style={styles.inputGroup}>
                   <AppText variant="caption" weight="bold">
-                    Ghi chú chi tiết (notes):
+                    Ghi chú chi tiết:
                   </AppText>
                   <TextInput
                     style={[styles.textInput, styles.textArea]}

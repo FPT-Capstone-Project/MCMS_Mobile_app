@@ -179,12 +179,39 @@ const SessionDetailModalContent: React.FC<{
       ? current.progress_percent
       : 0;
 
-  const conditionText = progressData?.condition || current.condition || 'Bình thường (NORMAL)';
+  const conditionText = progressData?.condition || current.condition || 'Bình thường';
   const harvestStatus = current.status === 'COMPLETED'
     ? 'COMPLETED'
     : (progressData?.harvest_status || current.harvest_status || (current.harvest_ready ? 'HARVEST_READY' : 'NOT_READY'));
 
   const expectedHarvest = progressData?.expected_harvest_date || current.harvest_date;
+
+  const formatSessionDetailStatus = (st: string): string => {
+    const map: Record<string, string> = {
+      PENDING: 'Chờ xử lý',
+      SPAWN_RESTING: 'Đang ủ tơ',
+      MYCELIAL_DEVELOPMENT: 'Phát triển tơ nấm',
+      READY_FOR_CULTIVATION: 'Sẵn sàng trồng',
+      CULTIVATING: 'Đang trồng',
+      HARVEST_READY: 'Sẵn sàng thu hoạch',
+      HARVESTING: 'Đang thu hoạch',
+      COMPLETED: 'Đã hoàn thành',
+      CANCELLED: 'Đã hủy',
+    };
+    return map[st] || st;
+  };
+
+  const formatSessionDetailHarvestStatus = (st: string): string => {
+    const map: Record<string, string> = {
+      NOT_READY: 'Chưa sẵn sàng',
+      HARVEST_READY: 'Sẵn sàng thu hoạch',
+      READY: 'Sẵn sàng',
+      HARVESTED: 'Đã thu hoạch',
+      IN_PROGRESS: 'Đang thu hoạch',
+      COMPLETED: 'Đã hoàn thành',
+    };
+    return map[st] || st;
+  };
 
   const renderStatusBadge = (status: string) => {
     let bg: string = theme.colors.neutral[100];
@@ -213,7 +240,7 @@ const SessionDetailModalContent: React.FC<{
     return (
       <View style={[styles.badgePill, { backgroundColor: bg }]}>
         <AppText variant="caption" weight="bold" color={color}>
-          {status}
+          {formatSessionDetailStatus(status)}
         </AppText>
       </View>
     );
@@ -312,7 +339,7 @@ const SessionDetailModalContent: React.FC<{
                         weight="bold"
                         color={harvestStatus === 'HARVEST_READY' ? theme.colors.success.dark : theme.colors.warning.dark}
                       >
-                        {harvestStatus}
+                        {formatSessionDetailHarvestStatus(harvestStatus)}
                       </AppText>
                     </View>
                     {expectedHarvest && (
@@ -578,7 +605,7 @@ const SessionDetailModalContent: React.FC<{
                   <View style={styles.sectionTitleRow}>
                     <Ionicons name="time-outline" size={18} color={theme.colors.primary[600]} />
                     <AppText variant="label" weight="bold">
-                      LỊCH SỬ TIẾN ĐỘ SINH TRƯỞNG (WF-03)
+                      LỊCH SỬ TIẾN ĐỘ SINH TRƯỞNG
                     </AppText>
                   </View>
 
@@ -678,7 +705,7 @@ const SessionDetailModalContent: React.FC<{
                 </View>
                 {onTransitionStage && (
                   <AppButton
-                    title="Xác nhận Sẵn sàng trồng (READY_FOR_CULTIVATION)"
+                    title="Xác nhận Sẵn sàng trồng"
                     variant="secondary"
                     size="sm"
                     leftIcon={<Ionicons name="checkmark-done" size={16} color={theme.colors.success.dark} />}
@@ -794,7 +821,7 @@ const SessionDetailModalContent: React.FC<{
 
                 {harvestStatus === 'HARVEST_READY' && onOpenHarvestAction && (
                   <AppButton
-                    title="Quản lý thu hoạch (HARVEST)"
+                    title="Quản lý thu hoạch"
                     variant="secondary"
                     size="sm"
                     leftIcon={<Ionicons name="leaf" size={16} color={theme.colors.success.dark} />}

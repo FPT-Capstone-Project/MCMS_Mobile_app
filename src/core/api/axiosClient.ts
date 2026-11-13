@@ -36,6 +36,22 @@ axiosClient.interceptors.request.use(
     } catch {
       // Proceed without token if retrieval fails
     }
+
+    // When sending FormData (multipart/form-data), delete default Content-Type header
+    // so React Native's XMLHttpRequest can generate multipart boundary automatically
+    const isFormData =
+      config.data instanceof FormData ||
+      (config.data && typeof config.data === 'object' && '_parts' in config.data);
+    if (isFormData && config.headers) {
+      if ('delete' in config.headers && typeof config.headers.delete === 'function') {
+        config.headers.delete('Content-Type');
+        config.headers.delete('content-type');
+      } else {
+        delete (config.headers as Record<string, any>)['Content-Type'];
+        delete (config.headers as Record<string, any>)['content-type'];
+      }
+    }
+
     return config;
   },
   (error) => Promise.reject(handleApiError(error))

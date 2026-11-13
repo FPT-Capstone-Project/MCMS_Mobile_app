@@ -246,7 +246,7 @@ const ConditionFormSheet: React.FC<ConditionFormSheetProps> = ({
               <View style={styles.rowTwoCols}>
                 <View style={styles.col}>
                   <AppInput
-                    label="Tối thiểu (Min)"
+                    label="Tối thiểu"
                     placeholder="VD: 18"
                     keyboardType="numeric"
                     value={form.temperatureMin}
@@ -256,7 +256,7 @@ const ConditionFormSheet: React.FC<ConditionFormSheetProps> = ({
                 </View>
                 <View style={styles.col}>
                   <AppInput
-                    label="Tối đa (Max)"
+                    label="Tối đa"
                     placeholder="VD: 24"
                     keyboardType="numeric"
                     value={form.temperatureMax}
@@ -278,7 +278,7 @@ const ConditionFormSheet: React.FC<ConditionFormSheetProps> = ({
               <View style={styles.rowTwoCols}>
                 <View style={styles.col}>
                   <AppInput
-                    label="Tối thiểu (Min)"
+                    label="Tối thiểu"
                     placeholder="VD: 80"
                     keyboardType="numeric"
                     value={form.humidityMin}
@@ -288,7 +288,7 @@ const ConditionFormSheet: React.FC<ConditionFormSheetProps> = ({
                 </View>
                 <View style={styles.col}>
                   <AppInput
-                    label="Tối đa (Max)"
+                    label="Tối đa"
                     placeholder="VD: 90"
                     keyboardType="numeric"
                     value={form.humidityMax}
