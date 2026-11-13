@@ -28,6 +28,7 @@ import {
   CustomerTrayDetails,
 } from '../../src/features/tray';
 import { trayRepository } from '../../src/features/tray/data/repositories/TrayRepository';
+import { CustomerDailyReport } from '../../src/features/tray/presentation/components/CustomerDailyReport';
 import { useAuth } from '../../src/features/auth';
 import {
   CultivationSessionAdmin,
@@ -657,9 +658,8 @@ export default function TrayScreen() {
                   {selectedTrayIdsForAssign.length}/{requiredTraysForAssign} khay
                 </AppText>
                 {selectedFloorIdForAssign !== null &&
-                  `  |  Tầng: ${
-                    racks.find((r) => r.id === selectedFloorIdForAssign)?.floorNumber ||
-                    selectedFloorIdForAssign
+                  `  |  Tầng: ${racks.find((r) => r.id === selectedFloorIdForAssign)?.floorNumber ||
+                  selectedFloorIdForAssign
                   }`}
               </AppText>
               <AppText variant="caption" color={theme.colors.text.muted} style={{ marginTop: 2 }}>
@@ -744,92 +744,92 @@ export default function TrayScreen() {
 
         {loadState === 'ready'
           ? racks.map((rack) => (
-              <View key={rack.id} style={styles.floorSection}>
-                <View style={styles.floorHeading}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <AppText variant="title" weight="bold" style={styles.floorTitle}>
-                      Tầng {rack.floorNumber}
-                    </AppText>
-                    <AppText variant="caption" color={theme.colors.text.secondary}>
-                      ({rack.trays.length} khay)
-                    </AppText>
-                  </View>
-                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                    {canControlIot && !assigningSession && (
-                      <AppButton
-                        title="Xếp khay"
-                        variant="secondary"
-                        size="sm"
-                        leftIcon={<Ionicons name="grid-outline" size={14} color={theme.colors.primary[700]} />}
-                        onPress={() => handleStartAssignWorkflow(rack.id)}
-                      />
-                    )}
-                    {getCameraIdForFloor(rack.floorNumber) ? (
-                      <AppButton
-                        title="Camera"
-                        variant="outline"
-                        size="sm"
-                        leftIcon={
-                          <Ionicons
-                            name="videocam-outline"
-                            size={16}
-                            color={theme.colors.primary[500]}
-                          />
-                        }
-                        accessibilityLabel={`Xem camera tầng ${rack.floorNumber}`}
-                        onPress={() => {
-                          const cameraId = getCameraIdForFloor(rack.floorNumber);
-                          if (cameraId) handleViewCamera(cameraId);
-                        }}
-                      />
-                    ) : null}
-                  </View>
-                </View>
-
-                {rack.trays.length > 0 ? (
-                  <View style={styles.trayGrid}>
-                    {rack.trays.map((tray) => {
-                      const isCultivating = tray.usage !== 'AVAILABLE' && Boolean(tray.sessionId);
-                      const isReportedToday = isCultivating
-                        ? Boolean(
-                            (tray.sessionTrayId != null &&
-                              inspectedSessionTrayIdsToday.has(tray.sessionTrayId)) ||
-                              inspectedTrayIdsToday.has(tray.id)
-                          )
-                        : false;
-
-                      const isSelectedForAssign = selectedTrayIdsForAssign.includes(tray.id);
-                      const isDisabledForAssign =
-                        Boolean(assigningSession) &&
-                        (tray.usage !== 'AVAILABLE' ||
-                          (selectedFloorIdForAssign !== null &&
-                            selectedFloorIdForAssign !== rack.id));
-
-                      return (
-                        <TrayTile
-                          key={tray.id}
-                          tray={tray}
-                          isStaff={canControlIot}
-                          isAssignMode={Boolean(assigningSession)}
-                          isSelectedForAssign={isSelectedForAssign}
-                          isDisabledForAssign={isDisabledForAssign}
-                          isReportedToday={isReportedToday}
-                          onSelectForAssign={() => handleToggleSelectTrayForAssign(tray, rack.id)}
-                          onViewDetails={handleViewDetails}
-                          onOpenReport={handleOpenDailyReport}
-                          onOpenHistory={handleOpenDailyHistory}
-                          onStartAssignOnFloor={() => handleStartAssignWorkflow(rack.id)}
-                        />
-                      );
-                    })}
-                  </View>
-                ) : (
-                  <AppText variant="caption" color={theme.colors.text.secondary}>
-                    Tầng này chưa có khay.
+            <View key={rack.id} style={styles.floorSection}>
+              <View style={styles.floorHeading}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <AppText variant="title" weight="bold" style={styles.floorTitle}>
+                    Tầng {rack.floorNumber}
                   </AppText>
-                )}
+                  <AppText variant="caption" color={theme.colors.text.secondary}>
+                    ({rack.trays.length} khay)
+                  </AppText>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  {canControlIot && !assigningSession && (
+                    <AppButton
+                      title="Xếp khay"
+                      variant="secondary"
+                      size="sm"
+                      leftIcon={<Ionicons name="grid-outline" size={14} color={theme.colors.primary[700]} />}
+                      onPress={() => handleStartAssignWorkflow(rack.id)}
+                    />
+                  )}
+                  {getCameraIdForFloor(rack.floorNumber) ? (
+                    <AppButton
+                      title="Camera"
+                      variant="outline"
+                      size="sm"
+                      leftIcon={
+                        <Ionicons
+                          name="videocam-outline"
+                          size={16}
+                          color={theme.colors.primary[500]}
+                        />
+                      }
+                      accessibilityLabel={`Xem camera tầng ${rack.floorNumber}`}
+                      onPress={() => {
+                        const cameraId = getCameraIdForFloor(rack.floorNumber);
+                        if (cameraId) handleViewCamera(cameraId);
+                      }}
+                    />
+                  ) : null}
+                </View>
               </View>
-            ))
+
+              {rack.trays.length > 0 ? (
+                <View style={styles.trayGrid}>
+                  {rack.trays.map((tray) => {
+                    const isCultivating = tray.usage !== 'AVAILABLE' && Boolean(tray.sessionId);
+                    const isReportedToday = isCultivating
+                      ? Boolean(
+                        (tray.sessionTrayId != null &&
+                          inspectedSessionTrayIdsToday.has(tray.sessionTrayId)) ||
+                        inspectedTrayIdsToday.has(tray.id)
+                      )
+                      : false;
+
+                    const isSelectedForAssign = selectedTrayIdsForAssign.includes(tray.id);
+                    const isDisabledForAssign =
+                      Boolean(assigningSession) &&
+                      (tray.usage !== 'AVAILABLE' ||
+                        (selectedFloorIdForAssign !== null &&
+                          selectedFloorIdForAssign !== rack.id));
+
+                    return (
+                      <TrayTile
+                        key={tray.id}
+                        tray={tray}
+                        isStaff={canControlIot}
+                        isAssignMode={Boolean(assigningSession)}
+                        isSelectedForAssign={isSelectedForAssign}
+                        isDisabledForAssign={isDisabledForAssign}
+                        isReportedToday={isReportedToday}
+                        onSelectForAssign={() => handleToggleSelectTrayForAssign(tray, rack.id)}
+                        onViewDetails={handleViewDetails}
+                        onOpenReport={handleOpenDailyReport}
+                        onOpenHistory={handleOpenDailyHistory}
+                        onStartAssignOnFloor={() => handleStartAssignWorkflow(rack.id)}
+                      />
+                    );
+                  })}
+                </View>
+              ) : (
+                <AppText variant="caption" color={theme.colors.text.secondary}>
+                  Tầng này chưa có khay.
+                </AppText>
+              )}
+            </View>
+          ))
           : null}
       </ScrollView>
 
@@ -842,10 +842,9 @@ export default function TrayScreen() {
             </AppText>
             <AppText variant="caption" color={theme.colors.text.secondary}>
               {selectedFloorIdForAssign !== null
-                ? `Tầng ${
-                    racks.find((r) => r.id === selectedFloorIdForAssign)?.floorNumber ??
-                    selectedFloorIdForAssign
-                  }`
+                ? `Tầng ${racks.find((r) => r.id === selectedFloorIdForAssign)?.floorNumber ??
+                selectedFloorIdForAssign
+                }`
                 : 'Chưa chọn tầng'}
             </AppText>
           </View>
@@ -1002,13 +1001,22 @@ export default function TrayScreen() {
                 showsVerticalScrollIndicator={false}
               >
                 {detailTab === 'growth' ? (
-                  <GrowthHistory
-                    history={details?.growth_history ?? []}
-                    cultivationStatus={details?.cultivation_status}
-                    harvestStatus={details?.harvest_status}
-                    currentStage={details?.current_stage}
-                    progressPercent={details?.progress_percent}
-                  />
+                  <>
+                    <GrowthHistory
+                      history={details?.growth_history ?? []}
+                      cultivationStatus={details?.cultivation_status}
+                      harvestStatus={details?.harvest_status}
+                      currentStage={details?.current_stage}
+                      progressPercent={details?.progress_percent}
+                    />
+                    {selectedTray?.sessionId ? (
+                      <CustomerDailyReport
+                        key={`${selectedTray.sessionId}-${selectedTray.id}`}
+                        sessionId={selectedTray.sessionId}
+                        trayId={selectedTray.id}
+                      />
+                    ) : null}
+                  </>
                 ) : (
                   <DeviceHistory
                     logs={details?.device_logs ?? []}
@@ -1141,13 +1149,12 @@ const TrayTile: React.FC<TrayTileProps> = ({
         isDisabledForAssign && { opacity: 0.4 },
         pressed && !isDisabledForAssign && { opacity: 0.8 },
       ]}
-      accessibilityLabel={`${tray.code}, ${
-        isMine
+      accessibilityLabel={`${tray.code}, ${isMine
           ? `khay của tôi, đang trồng ${tray.mushroomName ?? 'nấm'}`
           : isInUse
-          ? `đang trồng ${tray.mushroomName ?? 'nấm'}`
-          : 'chưa sử dụng'
-      }`}
+            ? `đang trồng ${tray.mushroomName ?? 'nấm'}`
+            : 'chưa sử dụng'
+        }`}
     >
       {/* Top Header Row */}
       <View style={styles.tileHeading}>
@@ -1487,11 +1494,11 @@ const DeviceHistory: React.FC<{
               {log.action === 'ON' ? 'Bật' : 'Tắt'}{' '}
               {log.floors.length > 0
                 ? log.floors
-                    .map(
-                      (floor) =>
-                        `${floor.deviceType === 'MISTING' ? 'phun sương' : 'đèn'} · ${floor.floorName}`
-                    )
-                    .join(', ')
+                  .map(
+                    (floor) =>
+                      `${floor.deviceType === 'MISTING' ? 'phun sương' : 'đèn'} · ${floor.floorName}`
+                  )
+                  .join(', ')
                 : 'thiết bị'}
             </AppText>
           </View>
