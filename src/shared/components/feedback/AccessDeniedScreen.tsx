@@ -29,7 +29,7 @@ export const AccessDeniedScreen: React.FC<AccessDeniedScreenProps> = ({
 
   const roleLabelMap: Record<string, string> = {
     CUSTOMER: 'Khách hàng',
-    SHIPPER: 'Nhân viên giao hàng',
+    EXPERT: 'Chuyên gia nấm',
     FARM_OPERATOR: 'Kỹ thuật viên nông trại',
     ADMIN: 'Quản trị viên',
   };

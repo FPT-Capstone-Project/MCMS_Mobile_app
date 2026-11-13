@@ -82,7 +82,7 @@ export function resolveUserRole(backendUser: any): UserRole {
     if (rawRole.includes('OPERATOR') || rawRole.includes('FARM') || rawRole.includes('STAFF')) {
       return 'FARM_OPERATOR';
     }
-    if (rawRole.includes('SHIPPER')) return 'SHIPPER';
+    if (rawRole.includes('EXPERT')) return 'EXPERT';
     if (rawRole.includes('CUSTOMER') || rawRole.includes('USER')) return 'CUSTOMER';
   }
 
@@ -95,7 +95,7 @@ export function resolveUserRole(backendUser: any): UserRole {
     case 3:
       return 'CUSTOMER';
     case 4:
-      return 'SHIPPER';
+      return 'EXPERT';
     default:
       return 'CUSTOMER';
   }
@@ -515,8 +515,18 @@ export class AuthRepository implements IAuthRepository {
         // If offline or temporary server error, fallback to cached user session
         const cachedUser = await secureStorage.getObject<AuthUser>(STORAGE_KEYS.USER_SESSION);
         if (cachedUser) {
+          const normalizedUser: AuthUser = {
+            ...cachedUser,
+            role: resolveUserRole({
+              role: cachedUser.role,
+              role_id: cachedUser.role_id,
+            }),
+          };
+          if (normalizedUser.role !== cachedUser.role) {
+            await secureStorage.setObject<AuthUser>(STORAGE_KEYS.USER_SESSION, normalizedUser);
+          }
           return {
-            user: cachedUser,
+            user: normalizedUser,
             tokens: {
               accessToken: token,
             },

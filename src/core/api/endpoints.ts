@@ -70,6 +70,23 @@ export const API_ENDPOINTS = {
       `/api/customer/orders/${orderId}/cultivation-status`,
     CULTIVATION_PROGRESS: (orderId: string | number) =>
       `/api/customer/orders/${orderId}/cultivation-progress`,
+    IOT_HISTORY: (sessionId: string | number) =>
+      `/api/customer/sessions/${sessionId}/iot-history`,
+    IOT_SENSOR_HISTORY: (sessionId: string | number) =>
+      `/api/customer/sessions/${sessionId}/iot-history/sensors`,
+  },
+  EXPERT: {
+    CONSULTATIONS: '/api/consultations',
+    CONSULTATION: (consultationId: number | string) =>
+      `/api/consultations/${consultationId}`,
+    ASSIGN_CONSULTATION: (consultationId: number | string) =>
+      `/api/consultations/${consultationId}/assign`,
+    RESPOND_TO_CONSULTATION: (consultationId: number | string) =>
+      `/api/consultations/${consultationId}/respond`,
+    CLOSE_CONSULTATION: (consultationId: number | string) =>
+      `/api/consultations/${consultationId}/close`,
+    ISSUE: (issueId: number | string) => `/api/issues/${issueId}`,
+    RESOLVE_ISSUE: (issueId: number | string) => `/api/issues/${issueId}/resolve`,
   },
   // Payments (PayOS)
   PAYMENTS: {
@@ -134,10 +151,6 @@ export const API_ENDPOINTS = {
       `/api/cultivation-sessions/admin/${sessionId}`,
     ADMIN_PROGRESS: (sessionId: number | string) =>
       `/api/cultivation-sessions/admin/${sessionId}/progress`,
-    ADMIN_IOT_HISTORY: (sessionId: number | string) =>
-      `/api/cultivation-sessions/admin/${sessionId}/iot-history`,
-    ADMIN_IOT_SENSOR_HISTORY: (sessionId: number | string) =>
-      `/api/cultivation-sessions/admin/${sessionId}/iot-history/sensors`,
     ADMIN_GROWTH: (sessionId: number | string) =>
       `/api/cultivation-sessions/admin/${sessionId}/growth`,
     ADMIN_HARVEST_READINESS: (sessionId: number | string) =>

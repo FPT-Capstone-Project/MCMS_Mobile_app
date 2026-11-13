@@ -5,18 +5,18 @@ import { AppLoading } from '../src/shared/components';
 
 /**
  * Root Entry Point
- * Redirects to /(tabs) if authenticated, or /(auth)/login if unauthenticated.
+ * Redirects authenticated experts to their workflow and other users to the main tabs.
  */
 export default function Index() {
-  const { isAuthenticated, isInitializing, isShipper } = useAuth();
+  const { isAuthenticated, isInitializing, isExpert } = useAuth();
 
   if (isInitializing) {
     return <AppLoading fullscreen message="Đang khởi tạo SmartMush..." />;
   }
 
   if (isAuthenticated) {
-    if (isShipper) {
-      return <Redirect href="/(shipper)" />;
+    if (isExpert) {
+      return <Redirect href="/(expert)" />;
     }
     return <Redirect href="/(tabs)" />;
   }

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -34,6 +35,14 @@ import {
   AppText,
   ScreenContainer,
 } from '../../src/shared/components';
+
+const mushroomHeroSlides = [
+  require('../../assets/cach-lam-sach-nam-kim-cham-dspl-10472227-1715177938630-17151779394772100853484.png'),
+  require('../../assets/bao-ngu-xam.png'),
+  require('../../assets/cong-dung-nam-bao-ngu-trang.png'),
+  require('../../assets/nam-dui-ga_9887ce40e0c6433eb0d06c46f6b1cda0.png'),
+  require('../../assets/OIP.png'),
+];
 
 interface QuickActionItem {
   id: string;
@@ -184,6 +193,7 @@ export default function HomeScreen() {
   }
 
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
+  const [heroSlideIndex, setHeroSlideIndex] = useState(0);
   const [masters, setMasters] = useState<IotMaster[]>([]);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
@@ -270,6 +280,18 @@ export default function HomeScreen() {
         };
       }
     }, [loadDashboardData, loadEnvironmentHistory, isStaff, refreshIntervalMs])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isCustomer) return;
+
+      const intervalId = setInterval(() => {
+        setHeroSlideIndex((current) => (current + 1) % mushroomHeroSlides.length);
+      }, 4500);
+
+      return () => clearInterval(intervalId);
+    }, [isCustomer])
   );
 
   // Manual pull-to-refresh
@@ -418,34 +440,44 @@ export default function HomeScreen() {
         ) : (
           /* Customer Rental Banner */
           <AppCard elevation="sm" style={styles.rentalCtaCard}>
-            <View style={styles.ctaHeader}>
-              <View style={styles.ctaBadge}>
-                <Ionicons name="sparkles" size={16} color="#FFFFFF" />
-                <AppText variant="overline" color="#FFFFFF">
-                  Trang trại nấm thông minh
+            <Image
+              source={mushroomHeroSlides[heroSlideIndex]}
+              contentFit="cover"
+              transition={700}
+              accessibilityLabel="Hình ảnh nấm"
+              style={styles.rentalCtaImage}
+            />
+            <View pointerEvents="none" style={styles.rentalCtaImageTint} />
+            <View style={styles.rentalCtaForeground}>
+              <View style={styles.ctaHeader}>
+                <View style={styles.ctaBadge}>
+                  <Ionicons name="sparkles" size={16} color="#FFFFFF" />
+                  <AppText variant="overline" color="#FFFFFF">
+                    Trang trại nấm thông minh
+                  </AppText>
+                </View>
+              </View>
+
+              <View style={styles.ctaContent}>
+                <AppText variant="h2" weight="bold" color="#FFFFFF">
+                  Nuôi trồng chuẩn xác, theo dõi từng khay.
+                </AppText>
+                <AppText variant="bodySmall" color="rgba(255, 255, 255, 0.9)" style={styles.ctaSubtitle}>
+                  Nền tảng giám sát IoT chuyên sâu: tự động hoá vi khí hậu buồng nuôi, quản lý giống nấm và gói thuê khay trong một hệ thống duy nhất.
                 </AppText>
               </View>
-              
-            </View>
 
-            <View style={styles.ctaContent}>
-              <AppText variant="h2" weight="bold" color="#FFFFFF">
-                Nuôi trồng chuẩn xác, theo dõi từng khay.
-              </AppText>
-              <AppText variant="bodySmall" color="rgba(255, 255, 255, 0.9)" style={styles.ctaSubtitle}>
-                Nền tảng giám sát IoT chuyên sâu: tự động hoá vi khí hậu buồng nuôi, quản lý giống nấm và gói thuê khay trong một hệ thống duy nhất.
-              </AppText>
-            </View>
+              <View style={styles.ctaActionRow}>
+                <AppButton
+                  title="Thuê khay ngay"
+                  variant="secondary"
+                  size="md"
+                  style={styles.ctaButton}
+                  leftIcon={<Ionicons name="cube" size={18} color={theme.colors.primary[700]} />}
+                  onPress={() => router.push('/rental' as any)}
+                />
+              </View>
 
-            <View style={styles.ctaActionRow}>
-              <AppButton
-                title="Thuê khay ngay"
-                variant="secondary"
-                size="md"
-                style={styles.ctaButton}
-                leftIcon={<Ionicons name="cube" size={18} color={theme.colors.primary[700]} />}
-                onPress={() => router.push('/rental' as any)}
-              />
             </View>
           </AppCard>
         )}
@@ -609,10 +641,26 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
   },
   rentalCtaCard: {
+    position: 'relative',
     backgroundColor: theme.colors.primary[600],
     borderRadius: theme.borderRadius.xl,
+    height: 300,
     padding: theme.spacing.lg,
     gap: theme.spacing.sm,
+  },
+  rentalCtaImage: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: theme.borderRadius.xl,
+  },
+  rentalCtaImageTint: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(20, 92, 39, 0.78)',
+    borderRadius: theme.borderRadius.xl,
+  },
+  rentalCtaForeground: {
+    flex: 1,
+    gap: theme.spacing.sm,
+    justifyContent: 'space-between',
   },
   ctaHeader: {
     flexDirection: 'row',
