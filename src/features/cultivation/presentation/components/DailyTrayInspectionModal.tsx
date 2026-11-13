@@ -67,6 +67,51 @@ const STAGE_OPTIONS: { stage: GrowthStage; label: string; desc: string }[] = [
   },
 ];
 
+const TRAY_CONDITION_PRESETS = [
+  'Khay sạch, độ ẩm đạt tiêu chuẩn',
+  'Khay thông thoáng, thoát nước tốt',
+  'Độ ẩm cao, cần giảm phun sương',
+  'Khay khô, cần tăng độ ẩm',
+];
+
+const MUSHROOM_CONDITION_PRESETS = [
+  'Nấm phát triển đều, không phát hiện sâu bệnh',
+  'Mũ nấm dày, màu sắc tự nhiên, mọc cụm đẹp',
+  'Tai nấm non mọc nhiều, phát triển nhanh',
+  'Nấm mọc thưa, cần tăng ẩm kích nụ',
+];
+
+function sanitizeConditionToVietnamese(
+  val?: string | null,
+  fallback = 'Khay sạch, độ ẩm đạt tiêu chuẩn'
+): string {
+  if (!val) return fallback;
+  const trimmed = val.trim();
+  const upper = trimmed.toUpperCase();
+  if (upper === 'NORMAL') return 'Khay sạch, độ ẩm đạt tiêu chuẩn';
+  if (upper === 'GOOD' || upper === 'OPTIMAL') return 'Khay phát triển tốt, điều kiện tối ưu';
+  if (upper === 'WARNING') return 'Cần theo dõi, độ ẩm chưa tối ưu';
+  if (upper === 'ABNORMAL') return 'Bất thường, cần can thiệp xử lý';
+  if (upper === 'POOR') return 'Kém phát triển, thiếu ẩm';
+  return trimmed;
+}
+
+function sanitizeMushroomConditionToVietnamese(
+  val?: string | null,
+  fallback = 'Nấm phát triển đều, không phát hiện sâu bệnh'
+): string {
+  if (!val) return fallback;
+  const trimmed = val.trim();
+  const upper = trimmed.toUpperCase();
+  if (upper === 'NORMAL') return 'Nấm phát triển đều, không phát hiện sâu bệnh';
+  if (upper === 'GOOD' || upper === 'HEALTHY' || upper === 'OPTIMAL')
+    return 'Nấm phát triển khỏe mạnh, đồng đều';
+  if (upper === 'WARNING') return 'Nấm phát triển chậm, cần theo dõi';
+  if (upper === 'ABNORMAL') return 'Nấm có dấu hiệu dị hình hoặc sâu bệnh';
+  if (upper === 'POOR') return 'Nấm còi cọc, phát triển kém';
+  return trimmed;
+}
+
 export const DailyTrayInspectionModal: React.FC<DailyTrayInspectionModalProps> = ({
   visible,
   session,
@@ -110,10 +155,10 @@ const DailyTrayInspectionModalContent: React.FC<{
   const [growthStage, setGrowthStage] = useState<GrowthStage>(initialStage);
   const [growthProgress, setGrowthProgress] = useState<string>(initialProgress);
   const [trayCondition, setTrayCondition] = useState<string>(
-    session.condition || 'Khay sạch, độ ẩm đạt tiêu chuẩn'
+    sanitizeConditionToVietnamese(session.condition)
   );
   const [mushroomCondition, setMushroomCondition] = useState<string>(
-    'Nấm phát triển đều, không phát hiện sâu bệnh'
+    sanitizeMushroomConditionToVietnamese(session.condition)
   );
   const [notes, setNotes] = useState('');
   const [loadingTrayData, setLoadingTrayData] = useState(false);
@@ -184,11 +229,10 @@ const DailyTrayInspectionModalContent: React.FC<{
           setGrowthStage(stage);
           setGrowthProgress(progress);
           setTrayCondition(
-            latestTrayInspection.trayCondition || 'Khay sạch, độ ẩm đạt tiêu chuẩn'
+            sanitizeConditionToVietnamese(latestTrayInspection.trayCondition)
           );
           setMushroomCondition(
-            latestTrayInspection.mushroomCondition ||
-              'Nấm phát triển đều, không phát hiện sâu bệnh'
+            sanitizeMushroomConditionToVietnamese(latestTrayInspection.mushroomCondition)
           );
           setDataSourceBadge(
             `Đã nạp từ báo cáo gần nhất của khay này (${progress}%)`
@@ -211,16 +255,18 @@ const DailyTrayInspectionModalContent: React.FC<{
               ? String(session.progress_percent)
               : '0';
 
-          const cond =
+          const cond = sanitizeConditionToVietnamese(
             sessionProg.latest_progress?.condition ||
             sessionProg.condition ||
-            session.condition ||
-            'Khay sạch, độ ẩm đạt tiêu chuẩn';
+            session.condition
+          );
 
           setGrowthStage(stage);
           setGrowthProgress(progress);
           setTrayCondition(cond);
-          setMushroomCondition('Nấm phát triển đều, không phát hiện sâu bệnh');
+          setMushroomCondition(
+            sanitizeMushroomConditionToVietnamese(sessionProg.latest_progress?.condition || session.condition)
+          );
           setDataSourceBadge(
             `Khay chưa có báo cáo riêng • Đã nạp từ tiến độ chung của phiên (${progress}%)`
           );
@@ -236,8 +282,8 @@ const DailyTrayInspectionModalContent: React.FC<{
 
           setGrowthStage(stage);
           setGrowthProgress(progress);
-          setTrayCondition(session.condition || 'Khay sạch, độ ẩm đạt tiêu chuẩn');
-          setMushroomCondition('Nấm phát triển đều, không phát hiện sâu bệnh');
+          setTrayCondition(sanitizeConditionToVietnamese(session.condition));
+          setMushroomCondition(sanitizeMushroomConditionToVietnamese(session.condition));
           setDataSourceBadge(`Đã nạp từ thông tin phiên (${progress}%)`);
         }
       } catch {
@@ -694,6 +740,27 @@ const DailyTrayInspectionModalContent: React.FC<{
                   <AppText variant="caption" weight="bold">
                     Tình trạng khay:
                   </AppText>
+                  <View style={styles.conditionPresetsRow}>
+                    {TRAY_CONDITION_PRESETS.map((preset) => {
+                      const isChosen = trayCondition === preset;
+                      return (
+                        <Pressable
+                          key={preset}
+                          style={[styles.presetChip, isChosen && styles.presetChipActive]}
+                          onPress={() => setTrayCondition(preset)}
+                        >
+                          <AppText
+                            variant="caption"
+                            weight={isChosen ? 'bold' : 'normal'}
+                            color={isChosen ? theme.colors.primary[700] : theme.colors.text.secondary}
+                            style={{ fontSize: 11 }}
+                          >
+                            {preset}
+                          </AppText>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
                   <TextInput
                     style={styles.textInput}
                     value={trayCondition}
@@ -708,6 +775,27 @@ const DailyTrayInspectionModalContent: React.FC<{
                   <AppText variant="caption" weight="bold">
                     Tình trạng nấm:
                   </AppText>
+                  <View style={styles.conditionPresetsRow}>
+                    {MUSHROOM_CONDITION_PRESETS.map((preset) => {
+                      const isChosen = mushroomCondition === preset;
+                      return (
+                        <Pressable
+                          key={preset}
+                          style={[styles.presetChip, isChosen && styles.presetChipActive]}
+                          onPress={() => setMushroomCondition(preset)}
+                        >
+                          <AppText
+                            variant="caption"
+                            weight={isChosen ? 'bold' : 'normal'}
+                            color={isChosen ? theme.colors.primary[700] : theme.colors.text.secondary}
+                            style={{ fontSize: 11 }}
+                          >
+                            {preset}
+                          </AppText>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
                   <TextInput
                     style={styles.textInput}
                     value={mushroomCondition}
@@ -1077,6 +1165,25 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: theme.borderRadius.sm,
     marginTop: 6,
+  },
+  conditionPresetsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 6,
+    marginTop: 2,
+  },
+  presetChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+    backgroundColor: theme.colors.neutral[50],
+  },
+  presetChipActive: {
+    borderColor: theme.colors.primary[500],
+    backgroundColor: theme.colors.primary[50],
   },
 });
 

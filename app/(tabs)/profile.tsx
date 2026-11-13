@@ -306,8 +306,21 @@ export default function ProfileScreen() {
 
           <Pressable style={styles.settingItem} onPress={() => router.push('/(tabs)/orders')}>
             <View style={styles.settingLeft}>
-              <Ionicons name="receipt-outline" size={20} color={theme.colors.text.primary} />
-              <AppText variant="bodyMedium">Đơn hàng của tôi</AppText>
+              <Ionicons
+                name={isCustomer ? 'receipt-outline' : 'albums-outline'}
+                size={20}
+                color={theme.colors.primary[600]}
+              />
+              <View>
+                <AppText variant="bodyMedium" weight="medium">
+                  {isCustomer ? 'Đơn hàng của tôi' : 'Quản lý Đơn & Phiên nuôi trồng'}
+                </AppText>
+                <AppText variant="caption" color={theme.colors.text.muted}>
+                  {isCustomer
+                    ? 'Lịch sử đặt thuê khay và nông sản'
+                    : 'Quản lý vòng đời phôi, gán khay và đơn khách hàng'}
+                </AppText>
+              </View>
             </View>
             <Ionicons name="chevron-forward" size={18} color={theme.colors.text.muted} />
           </Pressable>

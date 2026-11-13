@@ -140,11 +140,35 @@ const GROWTH_STAGE_OPTIONS: { stage: GrowthStage; label: string; desc: string }[
 ];
 
 const CONDITION_PRESETS = [
-  { label: 'Bình thường', value: 'Bình thường' },
+  { label: 'Bình thường', value: 'Bình thường, phát triển ổn định' },
   { label: 'Phát triển tốt', value: 'Phát triển đồng đều, nụ khỏe mạnh' },
   { label: 'Chậm lớn', value: 'Tốc độ phát triển chậm hơn thông thường' },
   { label: 'Cần lưu ý ẩm độ', value: 'Độ ẩm chưa tối ưu, cần theo dõi phun sương' },
 ];
+
+function sanitizeGrowthConditionToVietnamese(val?: string | null): string {
+  if (!val) return 'Bình thường, phát triển ổn định';
+  const trimmed = val.trim();
+  const upper = trimmed.toUpperCase();
+  if (upper === 'NORMAL') return 'Bình thường, phát triển ổn định';
+  if (upper === 'GOOD' || upper === 'OPTIMAL' || upper === 'HEALTHY')
+    return 'Phát triển đồng đều, nụ khỏe mạnh';
+  if (upper === 'WARNING') return 'Cần theo dõi, độ ẩm chưa tối ưu';
+  if (upper === 'ABNORMAL') return 'Bất thường, cần can thiệp xử lý';
+  if (upper === 'POOR') return 'Tốc độ phát triển chậm hơn thông thường';
+  return trimmed;
+}
+
+function sanitizeNotesToVietnamese(val?: string | null): string {
+  if (!val) return '';
+  const trimmed = val.trim();
+  const upper = trimmed.toUpperCase();
+  if (upper === 'NORMAL' || upper === 'REGULAR' || upper === 'REGULAR GROWTH')
+    return 'Sinh trưởng bình thường, đúng tiến độ.';
+  if (upper === 'GOOD' || upper === 'OPTIMAL')
+    return 'Quả thể phát triển tốt, màu sắc tự nhiên.';
+  return trimmed;
+}
 
 export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
   visible,
@@ -169,10 +193,12 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
   const [baselineStage, setBaselineStage] = useState<GrowthStage>(initialStage);
   const [selectedStage, setSelectedStage] = useState<GrowthStage>(initialStage);
   const [progressPercent, setProgressPercent] = useState<string>(String(initialPercent));
-  const [condition, setCondition] = useState<string>(
-    latestProgress?.condition || session.condition || 'NORMAL'
+  const [condition, setCondition] = useState<string>(() =>
+    sanitizeGrowthConditionToVietnamese(latestProgress?.condition || session.condition)
   );
-  const [notes, setNotes] = useState<string>(latestProgress?.description || '');
+  const [notes, setNotes] = useState<string>(() =>
+    sanitizeNotesToVietnamese(latestProgress?.description)
+  );
   const [expectedHarvestDate, setExpectedHarvestDate] = useState<string>(() => {
     const raw = latestProgress?.expected_harvest_date || session.harvest_date;
     return sanitizeDateToYYYYMMDD(raw);
@@ -233,17 +259,17 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
             ? Number(session.progress_percent)
             : 0;
 
-        const resolvedCondition =
+        const resolvedCondition = sanitizeGrowthConditionToVietnamese(
           prog.latest_progress?.condition ||
           prog.condition ||
           latestProgress?.condition ||
-          session.condition ||
-          'NORMAL';
+          session.condition
+        );
 
-        const resolvedNotes =
+        const resolvedNotes = sanitizeNotesToVietnamese(
           prog.latest_progress?.description ||
-          latestProgress?.description ||
-          '';
+          latestProgress?.description
+        );
 
         const resolvedHarvestDate =
           prog.expected_harvest_date ||
@@ -286,8 +312,8 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
         setBaselineStage(fallbackStage);
         setSelectedStage(fallbackStage);
         setProgressPercent(String(fallbackPercent));
-        setCondition(latestProgress?.condition || session.condition || 'NORMAL');
-        setNotes(latestProgress?.description || '');
+        setCondition(sanitizeGrowthConditionToVietnamese(latestProgress?.condition || session.condition));
+        setNotes(sanitizeNotesToVietnamese(latestProgress?.description));
         setExpectedHarvestDate(fallbackHarvestDate);
         if (/^\d{4}-\d{2}-\d{2}$/.test(fallbackHarvestDate)) {
           const [y, m] = fallbackHarvestDate.split('-').map(Number);

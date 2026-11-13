@@ -32,7 +32,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="orders"
         options={{
-          title: 'Đơn hàng',
+          title: canControlIot ? 'Đơn & Phiên' : 'Đơn hàng',
         }}
       />
       <Tabs.Screen

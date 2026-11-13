@@ -20,7 +20,6 @@ export default function CultivationScreen() {
   }
 
   const initialFloorId = params.floorId ? Number(params.floorId) : undefined;
-  const initialSessionId = params.sessionId ? Number(params.sessionId) : undefined;
   const defaultTab =
     params.tab === 'overview' || params.tab === 'logs' || params.tab === 'trays'
       ? params.tab
@@ -29,7 +28,6 @@ export default function CultivationScreen() {
   return (
     <AutomaticWizardScreen
       initialFloorId={Number.isFinite(initialFloorId) ? initialFloorId : undefined}
-      initialSessionId={Number.isFinite(initialSessionId) ? initialSessionId : undefined}
       defaultTab={defaultTab}
       onBack={() => {
         if (router.canGoBack()) {

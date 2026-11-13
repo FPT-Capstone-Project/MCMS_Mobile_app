@@ -17,8 +17,6 @@ import {
   AutoControlStatus,
   AutoControlSuggestions,
   AutoMistingConfig,
-  AvailableTrayForSession,
-  CultivationSessionAdmin,
   CultivationTrayInfo,
   FloorEnvironment,
   FloorMapping,
@@ -37,14 +35,12 @@ import { formatMistingCode } from '../../utils/mistingI18n';
 import { FloorProfileConfigModal } from '../components/FloorProfileConfigModal';
 import { FloorTraysGrid } from '../components/FloorTraysGrid';
 import { FloorLogsTimeline } from '../components/FloorLogsTimeline';
-import { AssignSessionModal } from '../components/AssignSessionModal';
 
 interface FloorDetailScreenProps {
   floor: FloorMapping;
   roomName?: string;
   masters?: IotMaster[];
   initialTab?: 'overview' | 'trays' | 'logs';
-  initialSessionId?: number;
   onBack: () => void;
   canManage?: boolean;
 }
@@ -53,7 +49,6 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
   floor,
   roomName = 'Phòng nuôi trồng',
   initialTab = 'overview',
-  initialSessionId,
   onBack,
   canManage = true,
 }) => {
@@ -82,17 +77,10 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
 
   // Modals
   const [configModalVisible, setConfigModalVisible] = useState(false);
-  const [assignSessionModalVisible, setAssignSessionModalVisible] = useState(false);
   const [confirmStartModal, setConfirmStartModal] = useState<{
     visible: boolean;
     dryRun: boolean;
   }>({ visible: false, dryRun: false });
-
-  // Session Tray Assignment Mode State
-  const [selectedSessionForAssign, setSelectedSessionForAssign] = useState<CultivationSessionAdmin | null>(null);
-  const [selectedTrayIdsForAssign, setSelectedTrayIdsForAssign] = useState<number[]>([]);
-  const [availableTraysForFloor, setAvailableTraysForFloor] = useState<AvailableTrayForSession[]>([]);
-  const [assignConflictMessage, setAssignConflictMessage] = useState<string | null>(null);
 
   // Action Loading
   const [actionLoading, setActionLoading] = useState(false);
@@ -119,12 +107,11 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
     if (!floorId) return;
 
     try {
-      const [cfgRes, envRes, statusRes, logsRes, availRes] = await Promise.allSettled([
+      const [cfgRes, envRes, statusRes, logsRes] = await Promise.allSettled([
         iotRepository.getAutoControlConfig(floorId),
         iotRepository.getFloorEnvironment(floorId),
         iotRepository.getAutoControlStatus(floorId),
         iotRepository.getAutoControlLogs(floorId, 30, 0),
-        iotRepository.getAvailableTraysForFloor(floorId),
       ]);
 
       if (currentFloorIdRef.current !== floorId) return;
@@ -140,10 +127,6 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
         setCultivationTrays(cfgRes.value.cultivation?.trays || []);
       } else if (fallbackConfig) {
         setAutoConfig(fallbackConfig);
-      }
-
-      if (availRes.status === 'fulfilled') {
-        setAvailableTraysForFloor(availRes.value);
       }
 
       if (envRes.status === 'fulfilled') {
@@ -304,7 +287,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
     if (!hasActiveCultivatingSessions && !dryRun) {
       Alert.alert(
         'Không thể khởi động AUTO',
-        'Tầng hiện chưa có phiên nuôi trồng nào đang hoạt động. Bạn cần gán khay cho phiên trồng trước khi bật AUTO thiết bị thật.'
+        'Tầng hiện chưa có phiên nuôi trồng nào đang hoạt động. Bạn cần xếp khay cho phiên trồng ở mục Phòng tầng khay trước khi bật AUTO thiết bị thật.'
       );
       return;
     }
@@ -378,128 +361,6 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
     }
   };
 
-  // SESSION TRAY ASSIGNMENT WORKFLOW
-  const handleStartAssignWorkflow = useCallback((session: CultivationSessionAdmin) => {
-    setSelectedSessionForAssign(session);
-    setSelectedTrayIdsForAssign([]);
-    setAssignConflictMessage(null);
-    setActiveTab('trays');
-
-    // Load available trays on this floor strictly from backend
-    iotRepository
-      .getAvailableTraysForFloor(floorId)
-      .then((available) => {
-        setAvailableTraysForFloor(available);
-      })
-      .catch((err: any) => {
-        Alert.alert(
-          'Lỗi tải khay khả dụng',
-          err?.message || 'Không thể lấy danh sách khay đủ điều kiện gán từ máy chủ.'
-        );
-      });
-  }, [floorId]);
-
-  // Auto-initiate assign workflow if initialSessionId is provided
-  useEffect(() => {
-    if (!initialSessionId || selectedSessionForAssign) return;
-    let isMounted = true;
-
-    iotRepository
-      .getSessionAdminDetail(initialSessionId)
-      .then((sess) => {
-        if (isMounted && sess) {
-          handleStartAssignWorkflow(sess);
-        }
-      })
-      .catch(() => {
-        iotRepository
-          .getReadyCultivationSessions()
-          .then((sessions) => {
-            if (!isMounted) return;
-            const targetId = Number(initialSessionId);
-            const found = sessions.find((s) => Number(s.session_id) === targetId);
-            if (found) {
-              handleStartAssignWorkflow(found);
-            }
-          })
-          .catch(() => {});
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [initialSessionId, selectedSessionForAssign, handleStartAssignWorkflow]);
-
-  const handleToggleSelectTrayForSession = (trayId: number) => {
-    const requiredCount = selectedSessionForAssign?.required_trays || 1;
-
-    if (selectedTrayIdsForAssign.includes(trayId)) {
-      setSelectedTrayIdsForAssign((prev) => prev.filter((id) => id !== trayId));
-    } else {
-      if (selectedTrayIdsForAssign.length >= requiredCount) {
-        Alert.alert(
-          'Đã chọn đủ khay',
-          `Phiên #${selectedSessionForAssign?.session_id} chỉ yêu cầu đúng ${requiredCount} khay. Vui lòng bỏ chọn khay khác nếu muốn đổi.`
-        );
-        return;
-      }
-      setSelectedTrayIdsForAssign((prev) => [...prev, trayId]);
-    }
-  };
-
-  const handleExecuteAssignTrays = async () => {
-    if (!selectedSessionForAssign || !floorId) return;
-
-    const requiredCount = selectedSessionForAssign.required_trays || 1;
-    if (selectedTrayIdsForAssign.length !== requiredCount) {
-      Alert.alert(
-        'Chưa chọn đủ số khay',
-        `Phiên yêu cầu đúng ${requiredCount} khay. Bạn hiện đã chọn ${selectedTrayIdsForAssign.length} khay.`
-      );
-      return;
-    }
-
-    setActionLoading(true);
-    setAssignConflictMessage(null);
-
-    try {
-      await iotRepository.assignTraysToSession(
-        selectedSessionForAssign.session_id,
-        floorId,
-        selectedTrayIdsForAssign
-      );
-
-      // Success
-      const assignedCount = selectedTrayIdsForAssign.length;
-      const assignedSessionId = selectedSessionForAssign.session_id;
-
-      setSelectedSessionForAssign(null);
-      setSelectedTrayIdsForAssign([]);
-      await loadFloorData();
-
-      Alert.alert(
-        'Đã gán khay thành công',
-        `Đã gán ${assignedCount} khay cho Phiên #${assignedSessionId}. Phiên đã bắt đầu trồng.\n\nLưu ý: Hệ thống tự động không tự bật; người vận hành cần chủ động bấm Khởi động tự động khi sẵn sàng.`
-      );
-    } catch (err: any) {
-      // 409 Conflict Handling
-      if (err?.status === 409 || err?.statusCode === 409 || String(err?.message).includes('409')) {
-        setAssignConflictMessage(
-          'Khay bạn vừa chọn đã bị nhân viên khác gán đồng thời. Danh sách khay khả dụng đã được làm mới, vui lòng chọn lại.'
-        );
-        // Reload available trays and drop stale selections
-        const freshAvailable = await iotRepository.getAvailableTraysForFloor(floorId).catch(() => []);
-        setAvailableTraysForFloor(freshAvailable);
-        const validAvailableIds = freshAvailable.map((t) => t.tray_id);
-        setSelectedTrayIdsForAssign((prev) => prev.filter((id) => validAvailableIds.includes(id)));
-      } else {
-        Alert.alert('Lỗi gán khay', err?.message || 'Không thể gán khay cho phiên trồng.');
-      }
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   // Generate Trays (Floor rack grid generation)
   const handleGenerateTrays = async () => {
     if (!floorId || !floor.total_rows || !floor.total_columns) {
@@ -551,7 +412,6 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
     );
   }
 
-  const availableTrayIdList = availableTraysForFloor.map((t) => t.tray_id);
 
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
@@ -984,99 +844,23 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
         {/* ================= TAB 2: KHAY ================= */}
         {activeTab === 'trays' && (
           <View style={styles.tabContentWrap}>
-            {/* Active Session Assign Banner */}
-            {selectedSessionForAssign ? (
-              <AppCard elevation="xs" style={styles.assignBannerCard}>
-                <View style={styles.assignBannerHeader}>
-                  <View style={{ flex: 1 }}>
-                    <AppText variant="label" weight="bold" color={theme.colors.primary[800]}>
-                      ĐANG GÁN KHAY CHO PHIÊN #{selectedSessionForAssign.session_id}
-                    </AppText>
-                    <AppText variant="caption" color={theme.colors.text.secondary}>
-                      Giống nấm: <AppText variant="caption" weight="bold">{selectedSessionForAssign.mushroom_name}</AppText> • Cần đúng{' '}
-                      <AppText variant="caption" weight="bold">{selectedSessionForAssign.required_trays || 1} khay</AppText> trên tầng này
-                    </AppText>
-                  </View>
-
-                  <AppButton
-                    title="Hủy gán"
-                    variant="ghost"
-                    size="sm"
-                    onPress={() => {
-                      setSelectedSessionForAssign(null);
-                      setSelectedTrayIdsForAssign([]);
-                    }}
-                  />
-                </View>
-
-                {assignConflictMessage && (
-                  <View style={styles.conflictMessageBox}>
-                    <Ionicons name="alert-circle" size={16} color={theme.colors.error.main} />
-                    <AppText variant="caption" color={theme.colors.error.main} style={{ flex: 1, marginLeft: 4 }}>
-                      {assignConflictMessage}
-                    </AppText>
-                  </View>
-                )}
-              </AppCard>
-            ) : (
-              /* Normal mode buttons */
-              <View style={styles.traysToolbarRow}>
-                {canManage && (
-                  <AppButton
-                    title="+ Gán khay cho phiên trồng"
-                    variant="primary"
-                    size="sm"
-                    onPress={() => setAssignSessionModalVisible(true)}
-                  />
-                )}
-                {canManage && (
-                  <AppButton
-                    title="Sinh lưới khay"
-                    variant="ghost"
-                    size="sm"
-                    onPress={handleGenerateTrays}
-                  />
-                )}
-              </View>
-            )}
+            <View style={styles.traysToolbarRow}>
+              {canManage && (
+                <AppButton
+                  title="Sinh lưới khay"
+                  variant="outline"
+                  size="sm"
+                  onPress={handleGenerateTrays}
+                />
+              )}
+            </View>
 
             {/* Rack Grid Component */}
             <FloorTraysGrid
               floor={floor}
               trays={cultivationTrays}
-              isAssignMode={Boolean(selectedSessionForAssign)}
-              requiredTrayCount={selectedSessionForAssign?.required_trays || 1}
-              selectedTrayIds={selectedTrayIdsForAssign}
-              availableTrayIds={availableTrayIdList}
-              onToggleSelectTray={handleToggleSelectTrayForSession}
+              isAssignMode={false}
             />
-
-            {/* Fixed Footer for Assign Execution */}
-            {selectedSessionForAssign && (
-              <View style={styles.fixedAssignFooter}>
-                <View>
-                  <AppText variant="caption" color={theme.colors.text.muted}>
-                    Tiến độ chọn:
-                  </AppText>
-                  <AppText variant="title" weight="bold" color={theme.colors.primary[700]}>
-                    Đã chọn {selectedTrayIdsForAssign.length}/
-                    {selectedSessionForAssign.required_trays || 1} khay
-                  </AppText>
-                </View>
-
-                <AppButton
-                  title={`Gán ${selectedSessionForAssign.required_trays || 1} khay`}
-                  variant="primary"
-                  size="md"
-                  loading={actionLoading}
-                  disabled={
-                    selectedTrayIdsForAssign.length !==
-                    (selectedSessionForAssign.required_trays || 1)
-                  }
-                  onPress={handleExecuteAssignTrays}
-                />
-              </View>
-            )}
           </View>
         )}
 
@@ -1103,13 +887,6 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
         activeMushroomIds={activeCultivatingMushroomIds}
         onSave={handleSaveConfig}
         loading={actionLoading}
-      />
-
-      {/* Assign Session Modal */}
-      <AssignSessionModal
-        visible={assignSessionModalVisible}
-        onClose={() => setAssignSessionModalVisible(false)}
-        onSelectSession={handleStartAssignWorkflow}
       />
 
       {/* Confirm Start Modal */}
@@ -1398,40 +1175,9 @@ const styles = StyleSheet.create({
   },
   traysToolbarRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     marginBottom: 4,
-  },
-  assignBannerCard: {
-    backgroundColor: 'rgba(34, 197, 94, 0.08)',
-    borderColor: 'rgba(34, 197, 94, 0.3)',
-    borderWidth: 1,
-    padding: theme.spacing.sm,
-    gap: 4,
-  },
-  assignBannerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  conflictMessageBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderRadius: 4,
-    padding: 6,
-    marginTop: 4,
-  },
-  fixedAssignFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.primary[500],
-    padding: theme.spacing.md,
-    marginTop: theme.spacing.sm,
   },
   confirmBackdrop: {
     flex: 1,

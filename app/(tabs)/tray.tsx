@@ -109,6 +109,20 @@ function getHarvestStatusLabel(cultivationStatus?: string, harvestStatus?: strin
   return 'Chưa sẵn sàng';
 }
 
+function formatGrowthConditionText(condition?: string | null): string {
+  if (!condition) return 'Bình thường';
+  const upper = condition.trim().toUpperCase();
+  const map: Record<string, string> = {
+    NORMAL: 'Bình thường, phát triển ổn định',
+    GOOD: 'Phát triển tốt',
+    OPTIMAL: 'Tối ưu',
+    WARNING: 'Cần theo dõi thêm',
+    ABNORMAL: 'Bất thường, cần can thiệp',
+    POOR: 'Kém phát triển',
+  };
+  return map[upper] ?? condition;
+}
+
 function getAverageSensorReadings(readings: CustomerTrayDetails['sensor_readings']) {
   const latestBySensor = new Map<string, CustomerTrayDetails['sensor_readings'][number]>();
   const newestFirst = [...readings].sort((left, right) => {
@@ -1395,7 +1409,7 @@ const GrowthHistory: React.FC<{
           </View>
           {item.condition ? (
             <AppText variant="caption" color={theme.colors.text.secondary}>
-              Tình trạng: {item.condition}
+              Tình trạng: {formatGrowthConditionText(item.condition)}
             </AppText>
           ) : null}
           {item.description ? (

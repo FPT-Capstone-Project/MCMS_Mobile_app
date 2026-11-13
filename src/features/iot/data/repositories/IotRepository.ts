@@ -756,7 +756,9 @@ export class IotRepository {
             spawn_quantity:
               item.spawn_quantity != null
                 ? Number(item.spawn_quantity)
-                : Number(item.tray_quantity ?? 1) * 3,
+                : item.spawn_count != null
+                ? Number(item.spawn_count)
+                : Number(item.tray_quantity ?? item.required_trays ?? 1) * 2,
             customer_name:
               item.customer_name ??
               item.customer?.full_name ??
@@ -811,6 +813,11 @@ export class IotRepository {
             }
             if (!existing.customer_name && item.customer_name) {
               existing.customer_name = item.customer_name;
+            }
+            if (item.spawn_quantity != null && Number(item.spawn_quantity) > 0) {
+              existing.spawn_quantity = Number(item.spawn_quantity);
+            } else if (item.spawn_count != null && Number(item.spawn_count) > 0) {
+              existing.spawn_quantity = Number(item.spawn_count);
             }
           } else {
             // If session was only returned by farm endpoint
@@ -883,7 +890,9 @@ export class IotRepository {
               spawn_quantity:
                 item.spawn_quantity != null
                   ? Number(item.spawn_quantity)
-                  : Number(item.tray_quantity ?? 1) * 3,
+                  : item.spawn_count != null
+                  ? Number(item.spawn_count)
+                  : Number(item.tray_quantity ?? item.required_trays ?? 1) * 2,
               customer_name:
                 item.customer_name ??
                 item.customer?.full_name ??
