@@ -28,6 +28,7 @@ import {
   CustomerTrayDetails,
 } from '../../src/features/tray';
 import { trayRepository } from '../../src/features/tray/data/repositories/TrayRepository';
+import { CustomerDailyReport } from '../../src/features/tray/presentation/components/CustomerDailyReport';
 import { useAuth } from '../../src/features/auth';
 import {
   CultivationSessionAdmin,
@@ -1002,13 +1003,22 @@ export default function TrayScreen() {
                 showsVerticalScrollIndicator={false}
               >
                 {detailTab === 'growth' ? (
-                  <GrowthHistory
-                    history={details?.growth_history ?? []}
-                    cultivationStatus={details?.cultivation_status}
-                    harvestStatus={details?.harvest_status}
-                    currentStage={details?.current_stage}
-                    progressPercent={details?.progress_percent}
-                  />
+                  <>
+                    <GrowthHistory
+                      history={details?.growth_history ?? []}
+                      cultivationStatus={details?.cultivation_status}
+                      harvestStatus={details?.harvest_status}
+                      currentStage={details?.current_stage}
+                      progressPercent={details?.progress_percent}
+                    />
+                    {selectedTray?.sessionId ? (
+                      <CustomerDailyReport
+                        key={`${selectedTray.sessionId}-${selectedTray.id}`}
+                        sessionId={selectedTray.sessionId}
+                        trayId={selectedTray.id}
+                      />
+                    ) : null}
+                  </>
                 ) : (
                   <DeviceHistory
                     logs={details?.device_logs ?? []}
