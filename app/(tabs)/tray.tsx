@@ -237,16 +237,49 @@ export default function TrayScreen() {
         title={canControlIot ? "Phòng tầng khay" : "Khay của tôi"}
         subtitle={canControlIot ? "Sơ đồ phòng, tầng và khay tại SmartMush Farm" : "Sơ đồ khay tại SmartMush Farm"}
         rightAction={
-          <AppIconButton
-            icon={<Ionicons name="refresh-outline" size={20} color={theme.colors.text.primary} />}
-            onPress={handleRetry}
-            accessibilityLabel="Tải lại sơ đồ khay"
-            disabled={loadState === 'loading'}
-          />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {canControlIot && (
+              <AppButton
+                title="Xếp khay"
+                size="sm"
+                variant="primary"
+                leftIcon={<Ionicons name="grid-outline" size={14} color="#FFFFFF" />}
+                onPress={() => router.push('/cultivation')}
+              />
+            )}
+            <AppIconButton
+              icon={<Ionicons name="refresh-outline" size={20} color={theme.colors.text.primary} />}
+              onPress={handleRetry}
+              accessibilityLabel="Tải lại sơ đồ khay"
+              disabled={loadState === 'loading'}
+            />
+          </View>
         }
       />
 
       <View style={styles.content}>
+        {canControlIot && (
+          <AppCard elevation="xs" style={styles.staffActionCard}>
+            <View style={styles.staffActionRow}>
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <AppText variant="bodySmall" weight="bold" color={theme.colors.primary[800]}>
+                  Quản lý & Xếp khay vào tầng
+                </AppText>
+                <AppText variant="caption" color={theme.colors.text.secondary} style={{ marginTop: 2 }}>
+                  Phân bổ khay cho phiên trồng, sinh lưới khay và cấu hình vi khí hậu.
+                </AppText>
+              </View>
+              <AppButton
+                title="Xếp khay ngay"
+                variant="primary"
+                size="sm"
+                leftIcon={<Ionicons name="grid-outline" size={14} color="#FFFFFF" />}
+                onPress={() => router.push('/cultivation')}
+              />
+            </View>
+          </AppCard>
+        )}
+
         <TrayLegend isStaff={canControlIot} />
 
         {loadState === 'loading' ? (
@@ -287,25 +320,44 @@ export default function TrayScreen() {
                 <AppText variant="title" weight="bold" style={styles.floorTitle}>
                   Tầng {rack.floorNumber}
                 </AppText>
-                {getCameraIdForFloor(rack.floorNumber) ? (
-                  <AppButton
-                    title="Xem camera"
-                    variant="outline"
-                    size="sm"
-                    leftIcon={
-                      <Ionicons
-                        name="videocam-outline"
-                        size={16}
-                        color={theme.colors.primary[500]}
-                      />
-                    }
-                    accessibilityLabel={`Xem camera tầng ${rack.floorNumber}`}
-                    onPress={() => {
-                      const cameraId = getCameraIdForFloor(rack.floorNumber);
-                      if (cameraId) handleViewCamera(cameraId);
-                    }}
-                  />
-                ) : null}
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  {canControlIot && (
+                    <AppButton
+                      title="Xếp khay"
+                      variant="secondary"
+                      size="sm"
+                      leftIcon={<Ionicons name="grid-outline" size={14} color={theme.colors.primary[700]} />}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/cultivation',
+                          params: {
+                            floorId: String(rack.id || rack.floorNumber),
+                            tab: 'trays',
+                          },
+                        } as any)
+                      }
+                    />
+                  )}
+                  {getCameraIdForFloor(rack.floorNumber) ? (
+                    <AppButton
+                      title="Xem camera"
+                      variant="outline"
+                      size="sm"
+                      leftIcon={
+                        <Ionicons
+                          name="videocam-outline"
+                          size={16}
+                          color={theme.colors.primary[500]}
+                        />
+                      }
+                      accessibilityLabel={`Xem camera tầng ${rack.floorNumber}`}
+                      onPress={() => {
+                        const cameraId = getCameraIdForFloor(rack.floorNumber);
+                        if (cameraId) handleViewCamera(cameraId);
+                      }}
+                    />
+                  ) : null}
+                </View>
               </View>
               {rack.trays.length > 0 ? (
                 <View style={styles.trayGrid}>
@@ -382,6 +434,26 @@ export default function TrayScreen() {
                 <AppText variant="bodySmall" color={theme.colors.error.main} align="center">
                   {detailError}
                 </AppText>
+                {canControlIot && !selectedTray?.sessionId ? (
+                  <AppButton
+                    title="Xếp khay cho phiên trồng"
+                    variant="primary"
+                    size="sm"
+                    style={{ marginTop: 12 }}
+                    leftIcon={<Ionicons name="grid-outline" size={16} color="#FFFFFF" />}
+                    onPress={() => {
+                      const fNum = selectedTray?.floorNumber;
+                      handleCloseDetails();
+                      router.push({
+                        pathname: '/cultivation',
+                        params: {
+                          floorId: fNum ? String(fNum) : undefined,
+                          tab: 'trays',
+                        },
+                      } as any);
+                    }}
+                  />
+                ) : null}
               </View>
             ) : (
               <ScrollView
@@ -720,6 +792,18 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.md,
     paddingBottom: theme.spacing['2xl'],
     gap: theme.spacing.lg,
+  },
+  staffActionCard: {
+    backgroundColor: 'rgba(5, 150, 105, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(5, 150, 105, 0.25)',
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+  },
+  staffActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   centerState: {
     alignItems: 'center',

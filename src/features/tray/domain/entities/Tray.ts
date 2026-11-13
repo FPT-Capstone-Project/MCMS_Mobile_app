@@ -48,6 +48,8 @@ export interface CustomerTrayCard {
   mushroomName?: string;
   sessionId?: number;
   orderId?: number;
+  floorId?: number;
+  floorNumber?: number;
 }
 
 export interface CustomerGrowthHistoryItem {

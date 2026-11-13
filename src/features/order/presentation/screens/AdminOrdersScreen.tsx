@@ -836,7 +836,15 @@ export const AdminOrdersScreen: React.FC = () => {
                           variant="primary"
                           size="sm"
                           leftIcon={<Ionicons name="grid-outline" size={16} color="#FFFFFF" />}
-                          onPress={() => router.push('/cultivation')}
+                          onPress={() =>
+                            router.push({
+                              pathname: '/cultivation',
+                              params: {
+                                sessionId: String(session.session_id),
+                                floorId: session.floor_id ? String(session.floor_id) : undefined,
+                              },
+                            } as any)
+                          }
                         />
                         <AppButton
                           title="Xem chi tiết phiên"
@@ -942,7 +950,15 @@ export const AdminOrdersScreen: React.FC = () => {
                             variant="outline"
                             size="sm"
                             leftIcon={<Ionicons name="layers-outline" size={16} color={theme.colors.primary[600]} />}
-                            onPress={() => router.push('/cultivation')}
+                            onPress={() =>
+                              router.push({
+                                pathname: '/cultivation',
+                                params: {
+                                  floorId: session.floor_id ? String(session.floor_id) : undefined,
+                                  tab: 'trays',
+                                },
+                              } as any)
+                            }
                           />
                           <AppButton
                             title="Xem chi tiết"
@@ -1223,7 +1239,17 @@ export const AdminOrdersScreen: React.FC = () => {
           handleTransitionStage(sess, stage);
         }}
         onNavigateToAssignTrays={() => {
-          router.push('/cultivation');
+          if (detailSession) {
+            router.push({
+              pathname: '/cultivation',
+              params: {
+                sessionId: String(detailSession.session_id),
+                floorId: detailSession.floor_id ? String(detailSession.floor_id) : undefined,
+              },
+            } as any);
+          } else {
+            router.push('/cultivation');
+          }
         }}
       />
 

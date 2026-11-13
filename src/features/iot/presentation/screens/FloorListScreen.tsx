@@ -35,12 +35,14 @@ import { CreateFloorModal } from '../components/CreateFloorModal';
 interface FloorListScreenProps {
   onSelectFloor: (floor: FloorMapping, initialTab?: 'overview' | 'trays' | 'logs') => void;
   canManage?: boolean;
+  assignSessionId?: number;
   onBack?: () => void;
 }
 
 export const FloorListScreen: React.FC<FloorListScreenProps> = ({
   onSelectFloor,
   canManage = true,
+  assignSessionId,
   onBack,
 }) => {
   const router = useRouter();
@@ -277,6 +279,23 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* Assign Session Guidance Banner */}
+        {assignSessionId ? (
+          <AppCard elevation="xs" style={styles.assignGuideCard}>
+            <View style={styles.assignGuideRow}>
+              <Ionicons name="information-circle" size={24} color={theme.colors.info.main} />
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <AppText variant="bodySmall" weight="bold" color={theme.colors.info.dark}>
+                  Chọn tầng để xếp khay cho Phiên #{assignSessionId}
+                </AppText>
+                <AppText variant="caption" color={theme.colors.info.dark} style={{ marginTop: 2 }}>
+                  Vui lòng chọn tầng có khay khả dụng bên dưới rồi bấm nút Khay để tiến hành xếp khay.
+                </AppText>
+              </View>
+            </View>
+          </AppCard>
+        ) : null}
+
         {/* Room Picker Section */}
         <View style={styles.sectionWrap}>
           <AppText variant="label" color={theme.colors.text.muted}>
@@ -809,5 +828,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: theme.spacing.xl,
     gap: theme.spacing.xs,
+  },
+  assignGuideCard: {
+    backgroundColor: 'rgba(2, 132, 199, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(2, 132, 199, 0.3)',
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+  },
+  assignGuideRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });

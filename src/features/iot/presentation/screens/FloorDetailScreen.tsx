@@ -44,6 +44,7 @@ interface FloorDetailScreenProps {
   roomName?: string;
   masters?: IotMaster[];
   initialTab?: 'overview' | 'trays' | 'logs';
+  initialSessionId?: number;
   onBack: () => void;
   canManage?: boolean;
 }
@@ -52,6 +53,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
   floor,
   roomName = 'Phòng nuôi trồng',
   initialTab = 'overview',
+  initialSessionId,
   onBack,
   canManage = true,
 }) => {
@@ -377,7 +379,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
   };
 
   // SESSION TRAY ASSIGNMENT WORKFLOW
-  const handleStartAssignWorkflow = (session: CultivationSessionAdmin) => {
+  const handleStartAssignWorkflow = useCallback((session: CultivationSessionAdmin) => {
     setSelectedSessionForAssign(session);
     setSelectedTrayIdsForAssign([]);
     setAssignConflictMessage(null);
@@ -395,7 +397,38 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
           err?.message || 'Không thể lấy danh sách khay đủ điều kiện gán từ máy chủ.'
         );
       });
-  };
+  }, [floorId]);
+
+  // Auto-initiate assign workflow if initialSessionId is provided
+  useEffect(() => {
+    if (!initialSessionId || selectedSessionForAssign) return;
+    let isMounted = true;
+
+    iotRepository
+      .getSessionAdminDetail(initialSessionId)
+      .then((sess) => {
+        if (isMounted && sess) {
+          handleStartAssignWorkflow(sess);
+        }
+      })
+      .catch(() => {
+        iotRepository
+          .getReadyCultivationSessions()
+          .then((sessions) => {
+            if (!isMounted) return;
+            const targetId = Number(initialSessionId);
+            const found = sessions.find((s) => Number(s.session_id) === targetId);
+            if (found) {
+              handleStartAssignWorkflow(found);
+            }
+          })
+          .catch(() => {});
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [initialSessionId, selectedSessionForAssign, handleStartAssignWorkflow]);
 
   const handleToggleSelectTrayForSession = (trayId: number) => {
     const requiredCount = selectedSessionForAssign?.required_trays || 1;

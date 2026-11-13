@@ -250,6 +250,8 @@ export class TrayRepository implements ITrayRepository {
             mushroomName: activeTray?.mushroom_name ?? undefined,
             sessionId: ownedSession?.sessionId ?? activeTray?.session_id ?? undefined,
             orderId: ownedSession?.orderId ?? undefined,
+            floorId,
+            floorNumber: floor.floor_number,
           };
         });
 
