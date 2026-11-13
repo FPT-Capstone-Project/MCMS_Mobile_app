@@ -88,11 +88,11 @@ export class TrayRepository implements ITrayRepository {
 
       const [iotResponse, sensorResponse] = await Promise.allSettled([
         axiosClient.get<{ data: CustomerSessionIotHistory }>(
-          API_ENDPOINTS.CULTIVATION_SESSIONS.ADMIN_IOT_HISTORY(sessionId),
+          API_ENDPOINTS.CUSTOMER.IOT_HISTORY(sessionId),
           { params: { page: 1, pageSize: 100 } }
         ),
         axiosClient.get<{ data: CustomerSensorHistory }>(
-          API_ENDPOINTS.CULTIVATION_SESSIONS.ADMIN_IOT_SENSOR_HISTORY(sessionId),
+          API_ENDPOINTS.CUSTOMER.IOT_SENSOR_HISTORY(sessionId),
           { params: { page: 1, pageSize: 100 } }
         ),
       ]);
@@ -145,7 +145,7 @@ export class TrayRepository implements ITrayRepository {
   async getCustomerSensorHistory(sessionId: number): Promise<CustomerSensorReading[]> {
     try {
       const response = await axiosClient.get<{ data: CustomerSensorHistory }>(
-        API_ENDPOINTS.CULTIVATION_SESSIONS.ADMIN_IOT_SENSOR_HISTORY(sessionId),
+        API_ENDPOINTS.CUSTOMER.IOT_SENSOR_HISTORY(sessionId),
         { params: { page: 1, pageSize: 100 } }
       );
       if (!Array.isArray(response.data?.data?.readings)) {

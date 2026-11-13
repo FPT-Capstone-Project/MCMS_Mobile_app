@@ -68,7 +68,7 @@ export interface CustomerDeviceLogItem {
   action: string;
   status: string;
   controlMode: 'AUTOMATIC' | 'MANUAL';
-  reason: string;
+  reason: string | null;
   requestedAt: string;
   publishedAt: string | null;
   completedAt: string | null;
