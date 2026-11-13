@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -96,7 +96,13 @@ const DailyTrayInspectionHistoryModalContent: React.FC<{
   onClose: () => void;
   onOpenCreateReport?: (sessionTrayId?: number | null) => void;
 }> = ({ visible, session, initialSessionTrayId, onClose, onOpenCreateReport }) => {
-  const trays = session.trays || [];
+  const trays = useMemo(() => {
+    const raw: NonNullable<CultivationSessionAdmin['trays']> = session.trays || [];
+    return raw.filter((t) => {
+      const st = String(t.status || '').trim().toUpperCase();
+      return st !== 'RELEASE' && st !== 'RELEASED';
+    });
+  }, [session.trays]);
 
   // Tab filter: null = All trays, number = specific sessionTrayId
   const [selectedTrayId, setSelectedTrayId] = useState<number | null>(
@@ -311,8 +317,8 @@ const DailyTrayInspectionHistoryModalContent: React.FC<{
           ) : (
             <ScrollView style={styles.listArea} showsVerticalScrollIndicator={false}>
               {inspections.map((item, index) => {
-                const stageConfig = STAGE_LABELS[item.growthStage] || {
-                  label: item.growthStage,
+                const stageConfig = (item.growthStage ? STAGE_LABELS[item.growthStage] : null) || {
+                  label: item.growthStage || 'Chưa cập nhật phiên',
                   color: theme.colors.text.secondary,
                   bg: theme.colors.neutral[100],
                 };
@@ -338,27 +344,9 @@ const DailyTrayInspectionHistoryModalContent: React.FC<{
 
                       <View style={[styles.stageBadge, { backgroundColor: stageConfig.bg }]}>
                         <AppText variant="caption" weight="bold" color={stageConfig.color}>
-                          {stageConfig.label}
+                          Phiên: {stageConfig.label}
                         </AppText>
                       </View>
-                    </View>
-
-                    {/* Progress Bar */}
-                    <View style={styles.progressRow}>
-                      <View style={styles.progressBg}>
-                        <View
-                          style={[
-                            styles.progressFill,
-                            {
-                              width: `${Math.min(100, Math.max(0, item.growthProgress))}%`,
-                              backgroundColor: stageConfig.color,
-                            },
-                          ]}
-                        />
-                      </View>
-                      <AppText variant="caption" weight="bold" color={stageConfig.color} style={{ marginLeft: 8 }}>
-                        {item.growthProgress}%
-                      </AppText>
                     </View>
 
                     <AppDivider spacing="xs" />
@@ -603,22 +591,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: theme.borderRadius.full,
-  },
-  progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  progressBg: {
-    flex: 1,
-    height: 6,
-    backgroundColor: theme.colors.neutral[200],
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
   },
   conditionsBox: {
     marginTop: 4,

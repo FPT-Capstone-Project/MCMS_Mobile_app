@@ -15,9 +15,7 @@ import {
 import { theme } from '../../../../core/theme';
 import {
   CultivationSessionAdmin,
-  GrowthStage,
 } from '../../../iot/domain/entities/Iot';
-import { iotRepository } from '../../../iot/data/repositories/IotRepository';
 import {
   CreateDailyTrayInspectionRequest,
 } from '../../domain/entities/Cultivation';
@@ -43,29 +41,6 @@ interface DailyTrayInspectionModalProps {
   onClose: () => void;
   onSuccess: () => void;
 }
-
-const STAGE_OPTIONS: { stage: GrowthStage; label: string; desc: string }[] = [
-  {
-    stage: 'FRUITING_INITIATION',
-    label: 'Bật mầm',
-    desc: 'Tơ nấm phủ kín khay, kích ẩm bắt đầu ra quả thể',
-  },
-  {
-    stage: 'PINNING',
-    label: 'Ghim nụ',
-    desc: 'Xuất hiện các đầu ghim nhỏ li ti trên bề mặt',
-  },
-  {
-    stage: 'YOUNG_FRUITING',
-    label: 'Nấm non',
-    desc: 'Tai nấm non hình thành và đang lớn nhanh',
-  },
-  {
-    stage: 'MATURATION',
-    label: 'Trưởng thành',
-    desc: 'Mũ nấm đạt kích thước chuẩn, chuẩn bị thu hoạch',
-  },
-];
 
 const TRAY_CONDITION_PRESETS = [
   'Khay sạch, độ ẩm đạt tiêu chuẩn',
@@ -140,20 +115,18 @@ const DailyTrayInspectionModalContent: React.FC<{
   onClose: () => void;
   onSuccess: () => void;
 }> = ({ visible, session, initialSessionTrayId, onClose, onSuccess }) => {
-  const trays = useMemo(() => session.trays || [], [session.trays]);
+  const trays = useMemo(() => {
+    const raw = session.trays || [];
+    return raw.filter((t) => {
+      const st = String(t.status || '').trim().toUpperCase();
+      return st !== 'RELEASE' && st !== 'RELEASED';
+    });
+  }, [session.trays]);
   const defaultTrayId =
     initialSessionTrayId ||
     (trays.length > 0 ? trays[0].session_tray_id : null);
 
-  const initialStage = (session.current_stage ||
-    session.growth_status ||
-    'FRUITING_INITIATION') as GrowthStage;
-  const initialProgress =
-    session.progress_percent != null ? String(session.progress_percent) : '0';
-
   const [selectedSessionTrayId, setSelectedSessionTrayId] = useState<number | null>(defaultTrayId);
-  const [growthStage, setGrowthStage] = useState<GrowthStage>(initialStage);
-  const [growthProgress, setGrowthProgress] = useState<string>(initialProgress);
   const [trayCondition, setTrayCondition] = useState<string>(
     sanitizeConditionToVietnamese(session.condition)
   );
@@ -162,7 +135,6 @@ const DailyTrayInspectionModalContent: React.FC<{
   );
   const [notes, setNotes] = useState('');
   const [loadingTrayData, setLoadingTrayData] = useState(false);
-  const [dataSourceBadge, setDataSourceBadge] = useState<string | null>(null);
 
   // Selected Images
   const [images, setImages] = useState<SelectedImageItem[]>([]);
@@ -184,108 +156,15 @@ const DailyTrayInspectionModalContent: React.FC<{
     const loadRealData = async () => {
       setLoadingTrayData(true);
       try {
-        const [trayHistoryRes, sessionProgRes] = await Promise.allSettled([
-          selectedSessionTrayId
-            ? cultivationRepository.getTrayDailyInspectionHistory(
-                session.session_id,
-                selectedSessionTrayId,
-                1,
-                1
-              )
-            : Promise.reject(new Error('No tray selected')),
-          iotRepository.getSessionProgress(session.session_id),
-        ]);
-
+        const history = selectedSessionTrayId
+          ? await cultivationRepository.getTrayDailyInspectionHistory(
+              session.session_id, selectedSessionTrayId, 1, 1
+            )
+          : null;
         if (!isMounted) return;
-
-        const trayHistory =
-          trayHistoryRes.status === 'fulfilled' ? trayHistoryRes.value : null;
-        const latestTrayInspection =
-          trayHistory?.inspections && trayHistory.inspections.length > 0
-            ? trayHistory.inspections[0]
-            : null;
-
-        const sessionProg =
-          sessionProgRes.status === 'fulfilled' ? sessionProgRes.value : null;
-
-        if (latestTrayInspection) {
-          // Pre-fill from the tray's most recent daily report
-          const stage = (latestTrayInspection.growthStage ||
-            sessionProg?.current_stage ||
-            sessionProg?.growth_status ||
-            session.current_stage ||
-            session.growth_status ||
-            'FRUITING_INITIATION') as GrowthStage;
-
-          const progress =
-            latestTrayInspection.growthProgress != null
-              ? String(latestTrayInspection.growthProgress)
-              : sessionProg?.progress_percent != null
-              ? String(sessionProg.progress_percent)
-              : session.progress_percent != null
-              ? String(session.progress_percent)
-              : '0';
-
-          setGrowthStage(stage);
-          setGrowthProgress(progress);
-          setTrayCondition(
-            sanitizeConditionToVietnamese(latestTrayInspection.trayCondition)
-          );
-          setMushroomCondition(
-            sanitizeMushroomConditionToVietnamese(latestTrayInspection.mushroomCondition)
-          );
-          setDataSourceBadge(
-            `Đã nạp từ báo cáo gần nhất của khay này (${progress}%)`
-          );
-        } else if (sessionProg) {
-          // Fallback to session-wide progress
-          const stage = (sessionProg.current_stage ||
-            sessionProg.growth_status ||
-            sessionProg.latest_progress?.current_stage ||
-            session.current_stage ||
-            session.growth_status ||
-            'FRUITING_INITIATION') as GrowthStage;
-
-          const progress =
-            sessionProg.progress_percent != null
-              ? String(sessionProg.progress_percent)
-              : sessionProg.latest_progress?.progress_percent != null
-              ? String(sessionProg.latest_progress.progress_percent)
-              : session.progress_percent != null
-              ? String(session.progress_percent)
-              : '0';
-
-          const cond = sanitizeConditionToVietnamese(
-            sessionProg.latest_progress?.condition ||
-            sessionProg.condition ||
-            session.condition
-          );
-
-          setGrowthStage(stage);
-          setGrowthProgress(progress);
-          setTrayCondition(cond);
-          setMushroomCondition(
-            sanitizeMushroomConditionToVietnamese(sessionProg.latest_progress?.condition || session.condition)
-          );
-          setDataSourceBadge(
-            `Khay chưa có báo cáo riêng • Đã nạp từ tiến độ chung của phiên (${progress}%)`
-          );
-        } else {
-          // Session props fallback
-          const stage = (session.current_stage ||
-            session.growth_status ||
-            'FRUITING_INITIATION') as GrowthStage;
-          const progress =
-            session.progress_percent != null
-              ? String(session.progress_percent)
-              : '0';
-
-          setGrowthStage(stage);
-          setGrowthProgress(progress);
-          setTrayCondition(sanitizeConditionToVietnamese(session.condition));
-          setMushroomCondition(sanitizeMushroomConditionToVietnamese(session.condition));
-          setDataSourceBadge(`Đã nạp từ thông tin phiên (${progress}%)`);
-        }
+        const latest = history?.inspections[0];
+        setTrayCondition(sanitizeConditionToVietnamese(latest?.trayCondition ?? session.condition));
+        setMushroomCondition(sanitizeMushroomConditionToVietnamese(latest?.mushroomCondition ?? session.condition));
       } catch {
         // Fallback gracefully
       } finally {
@@ -304,17 +183,8 @@ const DailyTrayInspectionModalContent: React.FC<{
     visible,
     session.session_id,
     session.condition,
-    session.current_stage,
-    session.growth_status,
-    session.progress_percent,
     selectedSessionTrayId,
   ]);
-
-  const handleQuickAddPercent = (delta: number) => {
-    const cur = Number(growthProgress) || 0;
-    const next = Math.min(100, Math.max(0, cur + delta));
-    setGrowthProgress(String(next));
-  };
 
   const selectedTray = trays.find((t) => t.session_tray_id === selectedSessionTrayId);
 
@@ -398,11 +268,6 @@ const DailyTrayInspectionModalContent: React.FC<{
       Alert.alert('Chưa chọn khay', 'Vui lòng chọn khay vật lý cần lập báo cáo.');
       return;
     }
-    const progressNum = Number(growthProgress);
-    if (isNaN(progressNum) || progressNum < 0 || progressNum > 100) {
-      Alert.alert('Tiến độ không hợp lệ', 'Tiến độ sinh trưởng phải từ 0 đến 100%.');
-      return;
-    }
     if (!trayCondition.trim()) {
       Alert.alert('Thiếu thông tin', 'Vui lòng nhập tình trạng khay.');
       return;
@@ -423,8 +288,6 @@ const DailyTrayInspectionModalContent: React.FC<{
       if (!inspectionId) {
         setUploadProgressText('Đang lưu thông tin báo cáo...');
         const payload: CreateDailyTrayInspectionRequest = {
-          growthStage,
-          growthProgress: progressNum,
           trayCondition: trayCondition.trim(),
           mushroomCondition: mushroomCondition.trim(),
           notes: notes.trim() || undefined,
@@ -629,111 +492,12 @@ const DailyTrayInspectionModalContent: React.FC<{
                         Đang nạp dữ liệu thực tế của khay...
                       </AppText>
                     </View>
-                  ) : dataSourceBadge ? (
-                    <View style={styles.sourceBadgeRow}>
-                      <Ionicons name="sparkles" size={13} color={theme.colors.primary[600]} />
-                      <AppText variant="caption" weight="medium" color={theme.colors.primary[700]} style={{ marginLeft: 4 }}>
-                        {dataSourceBadge}
-                      </AppText>
-                    </View>
                   ) : null}
                 </View>
 
-                {/* 2. Growth Stage Picker */}
-                <View style={styles.inputGroup}>
-                  <AppText variant="caption" weight="bold">
-                    Giai đoạn sinh trưởng:
-                  </AppText>
-                  <View style={styles.stageOptionsContainer}>
-                    {STAGE_OPTIONS.map((opt) => {
-                      const isChosen = growthStage === opt.stage;
-                      return (
-                        <Pressable
-                          key={opt.stage}
-                          onPress={() => setGrowthStage(opt.stage)}
-                          style={[styles.stageOptionCard, isChosen && styles.stageOptionCardActive]}
-                        >
-                          <View style={styles.stageOptionHeader}>
-                            <Ionicons
-                              name={isChosen ? 'radio-button-on' : 'radio-button-off'}
-                              size={16}
-                              color={isChosen ? theme.colors.primary[600] : theme.colors.neutral[400]}
-                            />
-                            <AppText
-                              variant="caption"
-                              weight="bold"
-                              color={isChosen ? theme.colors.primary[800] : theme.colors.text.primary}
-                              style={{ marginLeft: 6 }}
-                            >
-                              {opt.label}
-                            </AppText>
-                          </View>
-                          <AppText variant="caption" color={theme.colors.text.secondary} style={{ marginTop: 2 }}>
-                            {opt.desc}
-                          </AppText>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
-
-                {/* 3. Growth Progress % */}
-                <View style={styles.inputGroup}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <AppText variant="caption" weight="bold">
-                      Tiến độ sinh trưởng (%):
-                    </AppText>
-                    <View style={styles.progressPercentBadge}>
-                      <AppText variant="caption" weight="bold" color={theme.colors.primary[700]}>
-                        {growthProgress}%
-                      </AppText>
-                    </View>
-                  </View>
-                  <View style={styles.quickPercentRow}>
-                    <Pressable
-                      style={styles.percentQuickBtn}
-                      onPress={() => handleQuickAddPercent(5)}
-                    >
-                      <AppText variant="caption" weight="bold" color={theme.colors.primary[700]}>
-                        +5%
-                      </AppText>
-                    </Pressable>
-                    <Pressable
-                      style={styles.percentQuickBtn}
-                      onPress={() => handleQuickAddPercent(10)}
-                    >
-                      <AppText variant="caption" weight="bold" color={theme.colors.primary[700]}>
-                        +10%
-                      </AppText>
-                    </Pressable>
-                    {['25', '50', '75', '100'].map((val) => (
-                      <Pressable
-                        key={val}
-                        onPress={() => setGrowthProgress(val)}
-                        style={[
-                          styles.percentQuickBtn,
-                          growthProgress === val && styles.percentQuickBtnActive,
-                        ]}
-                      >
-                        <AppText
-                          variant="caption"
-                          weight={growthProgress === val ? 'bold' : 'normal'}
-                          color={growthProgress === val ? '#FFFFFF' : theme.colors.text.primary}
-                        >
-                          {val}%
-                        </AppText>
-                      </Pressable>
-                    ))}
-                  </View>
-                  <TextInput
-                    style={styles.textInput}
-                    keyboardType="numeric"
-                    value={growthProgress}
-                    onChangeText={setGrowthProgress}
-                    placeholder="Nhập phần trăm (0 - 100)"
-                    placeholderTextColor={theme.colors.text.muted}
-                  />
-                </View>
+                <AppText variant="caption" color={theme.colors.text.secondary} style={{ marginBottom: 12 }}>
+                  Giai đoạn và tiến độ sinh trưởng được quản lý tại Cập nhật phiên.
+                </AppText>
 
                 {/* 4. Tray condition */}
                 <View style={styles.inputGroup}>
@@ -1025,48 +789,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary[600],
     borderColor: theme.colors.primary[600],
   },
-  stageOptionsContainer: {
-    gap: 8,
-    marginTop: 6,
-  },
-  stageOptionCard: {
-    padding: theme.spacing.sm,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.neutral[200],
-    backgroundColor: '#FFFFFF',
-  },
-  stageOptionCardActive: {
-    borderColor: theme.colors.primary[600],
-    backgroundColor: theme.colors.primary[50],
-  },
-  stageOptionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  progressPercentBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    backgroundColor: theme.colors.primary[100],
-    borderRadius: theme.borderRadius.sm,
-  },
-  quickPercentRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 6,
-  },
-  percentQuickBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    borderRadius: theme.borderRadius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.neutral[200],
-    backgroundColor: theme.colors.neutral[50],
-  },
-  percentQuickBtnActive: {
-    backgroundColor: theme.colors.primary[600],
-    borderColor: theme.colors.primary[600],
-  },
   textInput: {
     borderWidth: 1,
     borderColor: theme.colors.neutral[300],
@@ -1149,15 +871,6 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.primary[300],
   },
   loadingBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.primary[50],
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 6,
-    borderRadius: theme.borderRadius.sm,
-    marginTop: 6,
-  },
-  sourceBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.primary[50],

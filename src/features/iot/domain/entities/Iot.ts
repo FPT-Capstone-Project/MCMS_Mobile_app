@@ -236,6 +236,7 @@ export interface CultivationSessionAdmin {
     row_number?: number | null;
     column_number?: number | null;
     status: string;
+    assignment_status?: string;
   }[];
 }
 

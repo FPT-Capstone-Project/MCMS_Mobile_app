@@ -69,6 +69,8 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
   const [floorSuggestion, setFloorSuggestion] = useState<AutoControlSuggestions | null>(null);
   const [cultivationTrays, setCultivationTrays] = useState<CultivationTrayInfo[]>([]);
 
+  const [availableTrayIds, setAvailableTrayIds] = useState<number[] | undefined>(undefined);
+
   // Logs & Pagination
   const [logs, setLogs] = useState<AutoControlLogItem[]>([]);
   const [logsOffset, setLogsOffset] = useState(0);
@@ -107,14 +109,19 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
     if (!floorId) return;
 
     try {
-      const [cfgRes, envRes, statusRes, logsRes] = await Promise.allSettled([
+      const [cfgRes, envRes, statusRes, logsRes, availableRes] = await Promise.allSettled([
         iotRepository.getAutoControlConfig(floorId),
         iotRepository.getFloorEnvironment(floorId),
         iotRepository.getAutoControlStatus(floorId),
         iotRepository.getAutoControlLogs(floorId, 30, 0),
+        iotRepository.getAvailableTraysForFloor(floorId),
       ]);
 
       if (currentFloorIdRef.current !== floorId) return;
+
+      setAvailableTrayIds(availableRes.status === 'fulfilled'
+        ? availableRes.value.map((tray) => Number(tray.tray_id))
+        : undefined);
 
       const fallbackConfig =
         statusRes.status === 'fulfilled'
@@ -859,6 +866,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
             <FloorTraysGrid
               floor={floor}
               trays={cultivationTrays}
+              availableTrayIds={availableTrayIds}
               isAssignMode={false}
             />
           </View>

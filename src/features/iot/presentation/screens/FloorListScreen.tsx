@@ -162,7 +162,18 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
 
       if (cfg?.cultivation?.trays) {
         const trays = cfg.cultivation.trays;
-        const cultivating = trays.filter((t) => t.session_id && t.mushroom_name).length;
+        const cultivating = trays.filter((t) => {
+          if (!t.session_id || !t.mushroom_name) return false;
+          const rawStatus = String((t as any).status || (t as any).assignment_status || '').trim().toUpperCase();
+          const rawTrayStatus = String(t.tray_status || '').trim().toUpperCase();
+          const isReleased =
+            rawStatus === 'RELEASE' ||
+            rawStatus === 'RELEASED' ||
+            rawTrayStatus === 'RELEASE' ||
+            rawTrayStatus === 'RELEASED' ||
+            rawTrayStatus === 'AVAILABLE';
+          return !isReleased && (!rawStatus || rawStatus === 'ACTIVE');
+        }).length;
         setFloorTrayCounts((prev) => ({
           ...prev,
           [fid]: {

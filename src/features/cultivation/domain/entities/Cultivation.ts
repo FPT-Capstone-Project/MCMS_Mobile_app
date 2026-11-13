@@ -119,8 +119,8 @@ export interface DailyTrayInspection {
   trayCode?: string;
   trayName?: string;
   inspectionDate: string;
-  growthStage: GrowthStage;
-  growthProgress: number;
+  growthStage: GrowthStage | null;
+  growthProgress: number | null;
   trayCondition: string;
   mushroomCondition: string;
   notes?: string | null;
@@ -130,8 +130,6 @@ export interface DailyTrayInspection {
 }
 
 export interface CreateDailyTrayInspectionRequest {
-  growthStage: GrowthStage;
-  growthProgress: number;
   trayCondition: string;
   mushroomCondition: string;
   notes?: string;
