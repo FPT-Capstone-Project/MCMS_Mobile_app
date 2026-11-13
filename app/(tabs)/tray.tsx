@@ -27,6 +27,7 @@ import {
   CustomerTrayDetails,
 } from '../../src/features/tray';
 import { trayRepository } from '../../src/features/tray/data/repositories/TrayRepository';
+import { CustomerDailyReport } from '../../src/features/tray/presentation/components/CustomerDailyReport';
 import { useAuth } from '../../src/features/auth';
 
 type TrayLoadState = 'loading' | 'ready' | 'error';
@@ -461,13 +462,22 @@ export default function TrayScreen() {
                 showsVerticalScrollIndicator={false}
               >
                 {detailTab === 'growth' ? (
-                  <GrowthHistory
-                    history={details?.growth_history ?? []}
-                    cultivationStatus={details?.cultivation_status}
-                    harvestStatus={details?.harvest_status}
-                    currentStage={details?.current_stage}
-                    progressPercent={details?.progress_percent}
-                  />
+                  <>
+                    <GrowthHistory
+                      history={details?.growth_history ?? []}
+                      cultivationStatus={details?.cultivation_status}
+                      harvestStatus={details?.harvest_status}
+                      currentStage={details?.current_stage}
+                      progressPercent={details?.progress_percent}
+                    />
+                    {selectedTray?.sessionId ? (
+                      <CustomerDailyReport
+                        key={`${selectedTray.sessionId}-${selectedTray.id}`}
+                        sessionId={selectedTray.sessionId}
+                        trayId={selectedTray.id}
+                      />
+                    ) : null}
+                  </>
                 ) : (
                   <DeviceHistory
                     logs={details?.device_logs ?? []}
@@ -627,59 +637,7 @@ const GrowthHistory: React.FC<{
   currentStage?: string | null;
   progressPercent?: number | null;
 }> = ({ history, cultivationStatus, harvestStatus, currentStage, progressPercent }) => {
-  return (
-    <View style={styles.historyList}>
-      <View style={styles.historyCard}>
-        <AppText variant="bodyMedium" weight="bold">
-          Tiến độ vụ trồng
-        </AppText>
-        {cultivationStatus ? (
-          <AppText variant="caption" color={theme.colors.text.secondary}>
-            Trạng thái phiên: {getCultivationStatusLabel(cultivationStatus)}
-          </AppText>
-        ) : null}
-        <AppText variant="caption" color={theme.colors.text.secondary}>
-          Trạng thái thu hoạch: {getHarvestStatusLabel(cultivationStatus, harvestStatus)}
-        </AppText>
-        {currentStage ? (
-          <AppText variant="caption" color={theme.colors.text.secondary}>
-            Giai đoạn nấm: {getGrowthStageLabel(currentStage)}
-            {typeof progressPercent === 'number' ? ` · ${progressPercent}%` : ''}
-          </AppText>
-        ) : null}
-      </View>
-      {history.length === 0 ? (
-        <DetailEmptyState message="Chưa có nhật ký cập nhật giai đoạn nấm." />
-      ) : null}
-      {history.map((item) => (
-        <View key={item.progress_id} style={styles.historyCard}>
-          <View style={styles.historyHeading}>
-            <AppText variant="bodyMedium" weight="bold" style={styles.historyTitle}>
-              {getGrowthStageLabel(item.current_stage)}
-            </AppText>
-            {typeof item.progress_percent === 'number' ? (
-              <AppText variant="captionMedium" weight="bold" color={theme.colors.primary[700]}>
-                {item.progress_percent}%
-              </AppText>
-            ) : null}
-          </View>
-          {item.condition ? (
-            <AppText variant="caption" color={theme.colors.text.secondary}>
-              Tình trạng: {item.condition}
-            </AppText>
-          ) : null}
-          {item.description ? (
-            <AppText variant="bodySmall" color={theme.colors.text.primary}>
-              {item.description}
-            </AppText>
-          ) : null}
-          <AppText variant="caption" color={theme.colors.text.muted}>
-            {formatDateTime(item.updated_at)}
-          </AppText>
-        </View>
-      ))}
-    </View>
-  );
+  
 };
 
 const DeviceHistory: React.FC<{
