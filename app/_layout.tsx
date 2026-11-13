@@ -157,6 +157,12 @@ function NavigationGuard() {
           headerShown: false,
         }}
       />
+      <Stack.Screen
+        name="about/index"
+        options={{
+          headerShown: false,
+        }}
+      />
     </Stack>
   );
 }

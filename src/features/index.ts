@@ -14,3 +14,4 @@ export * from './order';
 export * from './cultivation';
 export * from './iot';
 export * from './expert';
+export * from './profile';

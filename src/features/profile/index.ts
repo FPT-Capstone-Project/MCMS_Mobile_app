@@ -1,2 +1,2 @@
-// Profile feature scaffold - clean architecture (domain, data, presentation)
-export {};
+export * from './data/policiesData';
+export * from './presentation/screens/AboutUsScreen';

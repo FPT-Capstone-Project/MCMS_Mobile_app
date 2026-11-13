@@ -321,6 +321,23 @@ export default function ProfileScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color={theme.colors.text.muted} />
           </Pressable>
+
+          <AppDivider spacing="xs" />
+
+          <Pressable style={styles.settingItem} onPress={() => router.push('/about' as any)}>
+            <View style={styles.settingLeft}>
+              <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary[600]} />
+              <View>
+                <AppText variant="bodyMedium" weight="medium">
+                  Về chúng tôi
+                </AppText>
+                <AppText variant="caption" color={theme.colors.text.muted}>
+                  Cập nhật chính sách, điều khoản và giới thiệu
+                </AppText>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.text.muted} />
+          </Pressable>
         </AppCard>
 
         {/* Version Info Card */}
