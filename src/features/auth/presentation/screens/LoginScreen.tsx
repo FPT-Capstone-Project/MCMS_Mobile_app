@@ -49,8 +49,8 @@ export const LoginScreen: React.FC = () => {
     try {
       const session = await login(data);
       // Route based on authenticated user role
-      if (session.user?.role === 'SHIPPER') {
-        router.replace('/(shipper)' as Href);
+      if (session.user?.role === 'EXPERT') {
+        router.replace('/(expert)' as Href);
       } else {
         router.replace('/(tabs)' as Href);
       }

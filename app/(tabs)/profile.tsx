@@ -243,8 +243,8 @@ export default function ProfileScreen() {
                     ? 'Quản trị viên'
                     : user?.role === 'FARM_OPERATOR'
                     ? 'Kỹ thuật viên'
-                    : user?.role === 'SHIPPER'
-                    ? 'Nhân viên giao hàng'
+                    : user?.role === 'EXPERT'
+                    ? 'Chuyên gia nấm'
                     : 'Khách hàng'}
                 </AppText>
               </View>

@@ -71,6 +71,19 @@ export const API_ENDPOINTS = {
     CULTIVATION_PROGRESS: (orderId: string | number) =>
       `/api/customer/orders/${orderId}/cultivation-progress`,
   },
+  EXPERT: {
+    CONSULTATIONS: '/api/consultations',
+    CONSULTATION: (consultationId: number | string) =>
+      `/api/consultations/${consultationId}`,
+    ASSIGN_CONSULTATION: (consultationId: number | string) =>
+      `/api/consultations/${consultationId}/assign`,
+    RESPOND_TO_CONSULTATION: (consultationId: number | string) =>
+      `/api/consultations/${consultationId}/respond`,
+    CLOSE_CONSULTATION: (consultationId: number | string) =>
+      `/api/consultations/${consultationId}/close`,
+    ISSUE: (issueId: number | string) => `/api/issues/${issueId}`,
+    RESOLVE_ISSUE: (issueId: number | string) => `/api/issues/${issueId}/resolve`,
+  },
   // Payments (PayOS)
   PAYMENTS: {
     PAYOS: (orderId: string | number) => `/api/payments/orders/${orderId}/payos`,
