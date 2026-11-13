@@ -240,10 +240,12 @@ export default function ProfileScreen() {
                   }
                 >
                   {user?.role === 'ADMIN'
-                    ? 'Quản trị viên (ADMIN)'
+                    ? 'Quản trị viên'
                     : user?.role === 'FARM_OPERATOR'
-                    ? 'Kỹ thuật viên (FARM_OPERATOR)'
-                    : 'Khách hàng (CUSTOMER)'}
+                    ? 'Kỹ thuật viên'
+                    : user?.role === 'SHIPPER'
+                    ? 'Nhân viên giao hàng'
+                    : 'Khách hàng'}
                 </AppText>
               </View>
             </View>

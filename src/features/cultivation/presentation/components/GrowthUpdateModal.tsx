@@ -119,28 +119,28 @@ export function getDaysUntil(dateStr?: string | null): string {
 const GROWTH_STAGE_OPTIONS: { stage: GrowthStage; label: string; desc: string }[] = [
   {
     stage: 'FRUITING_INITIATION',
-    label: '1. Kích nụ (FRUITING_INITIATION)',
+    label: '1. Kích nụ',
     desc: 'Bắt đầu kích thích mầm quả thể nấm phát triển',
   },
   {
     stage: 'PINNING',
-    label: '2. Hình thành mũ nấm (PINNING)',
+    label: '2. Hình thành mũ nấm',
     desc: 'Đầu đinh ghim, mũ nấm non li ti bắt đầu xuất hiện',
   },
   {
     stage: 'YOUNG_FRUITING',
-    label: '3. Thể quả non (YOUNG_FRUITING)',
+    label: '3. Thể quả non',
     desc: 'Quả thể nấm tăng trưởng nhanh, cuống dài ra',
   },
   {
     stage: 'MATURATION',
-    label: '4. Trưởng thành (MATURATION)',
+    label: '4. Trưởng thành',
     desc: 'Mũ nấm căng rộng, viền mỏng, sẵn sàng cho thu hoạch',
   },
 ];
 
 const CONDITION_PRESETS = [
-  { label: 'Bình thường (NORMAL)', value: 'NORMAL' },
+  { label: 'Bình thường', value: 'Bình thường' },
   { label: 'Phát triển tốt', value: 'Phát triển đồng đều, nụ khỏe mạnh' },
   { label: 'Chậm lớn', value: 'Tốc độ phát triển chậm hơn thông thường' },
   { label: 'Cần lưu ý ẩm độ', value: 'Độ ẩm chưa tối ưu, cần theo dõi phun sương' },
@@ -411,7 +411,7 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
 
     // Backend rule: Cannot move backwards if already reached MATURATION
     if (baselineStage === 'MATURATION' && selectedStage !== 'MATURATION') {
-      setErrorText('Phiên đã đạt giai đoạn Trưởng thành (MATURATION), không thể chuyển ngược về giai đoạn trước.');
+      setErrorText('Phiên đã đạt giai đoạn Trưởng thành, không thể chuyển ngược về giai đoạn trước.');
       return;
     }
 
@@ -445,7 +445,7 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
 
       Alert.alert(
         'Cập nhật thành công',
-        'Ghi nhận sinh trưởng mới đã được lưu. Lưu ý: Hệ thống đã đặt lại trạng thái sẵn sàng thu hoạch (harvest_status = NOT_READY) và cần được đánh giá lại trước khi thu hoạch.'
+        'Ghi nhận sinh trưởng mới đã được lưu. Lưu ý: Hệ thống đã đặt lại trạng thái về "Chưa sẵn sàng thu hoạch" và cần được đánh giá lại trước khi thu hoạch.'
       );
 
       await onSuccess();
@@ -504,7 +504,7 @@ export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({
                     Quy tắc nghiệp vụ hệ thống
                   </AppText>
                   <AppText variant="caption" color={theme.colors.info.dark} style={{ marginTop: 2 }}>
-                    Mỗi lần ghi nhận sinh trưởng mới, trạng thái sẵn sàng thu hoạch sẽ tự động đặt lại (NOT_READY) để đảm bảo chất lượng nấm được đánh giá mới nhất.
+                    Mỗi lần ghi nhận sinh trưởng mới, trạng thái sẵn sàng thu hoạch sẽ tự động đặt lại về Chưa sẵn sàng để đảm bảo chất lượng nấm được đánh giá mới nhất.
                   </AppText>
                 </View>
               </View>

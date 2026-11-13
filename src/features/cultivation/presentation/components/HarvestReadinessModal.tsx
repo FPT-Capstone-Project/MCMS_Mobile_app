@@ -30,6 +30,60 @@ interface HarvestReadinessModalProps {
   onSuccess: () => Promise<void> | void;
 }
 
+const formatSessionStatusInReadiness = (status?: string | null): string => {
+  if (!status) return 'Chưa rõ';
+  switch (status) {
+    case 'PENDING':
+      return 'Chờ xử lý';
+    case 'SPAWN_RESTING':
+      return 'Đang ủ tơ';
+    case 'READY_FOR_CULTIVATION':
+      return 'Sẵn sàng trồng';
+    case 'CULTIVATING':
+      return 'Đang nuôi trồng';
+    case 'HARVESTING':
+      return 'Đang thu hoạch';
+    case 'COMPLETED':
+      return 'Hoàn thành';
+    case 'CANCELLED':
+      return 'Đã hủy';
+    default:
+      return status;
+  }
+};
+
+const formatStageInReadiness = (stage?: string | null): string => {
+  if (!stage) return 'Chưa ghi nhận';
+  switch (stage) {
+    case 'SPAWN_RESTING':
+      return 'Đang ủ tơ';
+    case 'MYCELIAL_DEVELOPMENT':
+      return 'Phát triển tơ';
+    case 'FRUITING_INITIATION':
+      return 'Bật mầm';
+    case 'PINNING':
+      return 'Ghim nụ';
+    case 'YOUNG_FRUITING':
+      return 'Nấm non';
+    case 'MATURATION':
+      return 'Trưởng thành';
+    default:
+      return stage;
+  }
+};
+
+const formatHarvestStatusInReadiness = (status?: string | null): string => {
+  if (!status) return 'Chưa đánh giá';
+  switch (status) {
+    case 'HARVEST_READY':
+      return 'Sẵn sàng thu hoạch';
+    case 'NOT_READY':
+      return 'Chưa sẵn sàng';
+    default:
+      return status;
+  }
+};
+
 export const HarvestReadinessModal: React.FC<HarvestReadinessModalProps> = ({
   visible,
   onClose,
@@ -70,7 +124,7 @@ const HarvestReadinessModalContent: React.FC<{
     if (harvestReady && !isMaturation) {
       Alert.alert(
         'Cảnh báo giai đoạn',
-        'Backend yêu cầu phiên phải đạt giai đoạn Trưởng thành (MATURATION) để được xác nhận Sẵn sàng thu hoạch. Bạn có chắc chắn muốn gửi không?',
+        'Hệ thống yêu cầu phiên phải đạt giai đoạn Trưởng thành để được xác nhận Sẵn sàng thu hoạch. Bạn có chắc chắn muốn gửi không?',
         [
           { text: 'Kiểm tra lại', style: 'cancel' },
           { text: 'Vẫn gửi', onPress: () => doSubmit() },
@@ -153,10 +207,10 @@ const HarvestReadinessModalContent: React.FC<{
                     Trạng thái hiện tại:
                   </AppText>
                   <AppText variant="caption" color={theme.colors.text.secondary}>
-                    • Vòng đời: <AppText variant="caption" weight="bold">{session.status}</AppText>
+                    • Vòng đời: <AppText variant="caption" weight="bold">{formatSessionStatusInReadiness(session.status)}</AppText>
                   </AppText>
                   <AppText variant="caption" color={theme.colors.text.secondary}>
-                    • Giai đoạn sinh trưởng: <AppText variant="caption" weight="bold" color={isMaturation ? theme.colors.success.dark : theme.colors.warning.dark}>{currentStage || 'Chưa ghi nhận'}</AppText>
+                    • Giai đoạn sinh trưởng: <AppText variant="caption" weight="bold" color={isMaturation ? theme.colors.success.dark : theme.colors.warning.dark}>{formatStageInReadiness(currentStage)}</AppText>
                   </AppText>
                   {session.progress_percent != null && (
                     <AppText variant="caption" color={theme.colors.text.secondary}>
@@ -165,7 +219,7 @@ const HarvestReadinessModalContent: React.FC<{
                   )}
                   {session.harvest_status && (
                     <AppText variant="caption" color={theme.colors.text.secondary}>
-                      • Trạng thái thu hoạch: <AppText variant="caption" weight="bold">{session.harvest_status}</AppText>
+                      • Trạng thái thu hoạch: <AppText variant="caption" weight="bold">{formatHarvestStatusInReadiness(session.harvest_status)}</AppText>
                     </AppText>
                   )}
                 </View>
@@ -178,10 +232,10 @@ const HarvestReadinessModalContent: React.FC<{
                 <Ionicons name="warning-outline" size={20} color={theme.colors.warning.dark} />
                 <View style={{ flex: 1 }}>
                   <AppText variant="caption" weight="bold" color={theme.colors.warning.dark}>
-                    Chưa đạt giai đoạn Trưởng thành (MATURATION)
+                    Chưa đạt giai đoạn Trưởng thành
                   </AppText>
                   <AppText variant="caption" color={theme.colors.warning.dark}>
-                    Hệ thống backend yêu cầu phiên phải đạt giai đoạn MATURATION mới được xác nhận đủ điều kiện thu hoạch. Nếu nấm đã sẵn sàng, hãy cập nhật tiến độ sinh trưởng lên MATURATION trước.
+                    Hệ thống yêu cầu phiên phải đạt giai đoạn Trưởng thành mới được xác nhận đủ điều kiện thu hoạch. Nếu nấm đã sẵn sàng, hãy cập nhật tiến độ sinh trưởng lên Trưởng thành trước.
                   </AppText>
                 </View>
               </View>
@@ -190,7 +244,7 @@ const HarvestReadinessModalContent: React.FC<{
                 <Ionicons name="checkmark-circle-outline" size={20} color={theme.colors.success.dark} />
                 <View style={{ flex: 1 }}>
                   <AppText variant="caption" weight="bold" color={theme.colors.success.dark}>
-                    Đã đạt giai đoạn Trưởng thành (MATURATION)
+                    Đã đạt giai đoạn Trưởng thành
                   </AppText>
                   <AppText variant="caption" color={theme.colors.success.dark}>
                     Phiên đủ điều kiện sinh trưởng để tiến hành đánh giá sẵn sàng thu hoạch.
@@ -222,7 +276,7 @@ const HarvestReadinessModalContent: React.FC<{
                       weight="bold"
                       color={harvestReady ? theme.colors.success.dark : theme.colors.text.primary}
                     >
-                      SẴN SÀNG THU HOẠCH (HARVEST_READY)
+                      SẴN SÀNG THU HOẠCH
                     </AppText>
                     <AppText variant="caption" color={theme.colors.text.secondary}>
                       Thể quả nấm đã phát triển hoàn chỉnh, tán mũ mở rộng đều, không có dấu hiệu bệnh hại hoặc sự cố nghiêm trọng. Thông báo khách hàng chuẩn bị thu hoạch.
@@ -248,7 +302,7 @@ const HarvestReadinessModalContent: React.FC<{
                       weight="bold"
                       color={!harvestReady ? theme.colors.warning.dark : theme.colors.text.primary}
                     >
-                      CHƯA SẴN SÀNG (NOT_READY)
+                      CHƯA SẴN SÀNG
                     </AppText>
                     <AppText variant="caption" color={theme.colors.text.secondary}>
                       Cần thêm thời gian nuôi trồng hoặc khắc phục các yếu tố môi trường trước khi thu hoạch.

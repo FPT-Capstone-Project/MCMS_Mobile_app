@@ -568,7 +568,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                   Khay trống và đủ điều kiện
                 </AppText>
                 <AppText variant="caption" color={theme.colors.text.secondary} align="center">
-                  Khay đã sẵn sàng để gán cho phiên trồng mới đạt chuẩn (READY_FOR_CULTIVATION).
+                  Khay đã sẵn sàng để gán cho phiên trồng mới đạt chuẩn.
                 </AppText>
               </AppCard>
             ) : null}

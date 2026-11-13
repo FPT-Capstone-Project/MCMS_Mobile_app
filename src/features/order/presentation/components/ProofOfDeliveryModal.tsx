@@ -219,7 +219,7 @@ export const ProofOfDeliveryModal: React.FC<ProofOfDeliveryModalProps> = ({
               <View style={styles.sectionTitleRow}>
                 <Ionicons name="image-outline" size={16} color={theme.colors.primary[600]} />
                 <AppText variant="bodySmallMedium" weight="bold">
-                  Hình ảnh xác nhận giao hàng (POD)
+                  Hình ảnh xác nhận giao hàng
                 </AppText>
                 <View style={styles.requiredBadge}>
                   <AppText variant="overline" color={theme.colors.error.main} weight="bold">

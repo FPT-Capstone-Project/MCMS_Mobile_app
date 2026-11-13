@@ -98,16 +98,16 @@ const SpawnInspectionHistoryModalContent: React.FC<{
   const renderConditionBadge = (condition: string) => {
     let bg = 'rgba(34, 197, 94, 0.15)';
     let text: string = theme.colors.success.dark;
-    let label = 'ĐẠT CHUẨN (NORMAL)';
+    let label = 'Đạt chuẩn';
 
     if (condition === 'WARNING') {
       bg = 'rgba(245, 158, 11, 0.15)';
       text = theme.colors.warning.dark;
-      label = 'CẢNH BÁO (WARNING)';
+      label = 'Cảnh báo';
     } else if (condition === 'ABNORMAL') {
       bg = 'rgba(239, 68, 68, 0.15)';
       text = theme.colors.error.dark;
-      label = 'BẤT THƯỜNG (ABNORMAL)';
+      label = 'Bất thường';
     }
 
     return (

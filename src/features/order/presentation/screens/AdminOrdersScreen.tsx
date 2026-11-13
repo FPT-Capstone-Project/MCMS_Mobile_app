@@ -73,8 +73,8 @@ type AdminTab = 'rentals' | 'orders';
 
 const RENTAL_STATUS_FILTERS = [
   { label: 'Tất cả', value: 'ALL' },
-  { label: 'Chờ xử lý (PENDING)', value: 'PENDING' },
-  { label: 'Ủ tơ (SPAWN_RESTING)', value: 'SPAWN_RESTING' },
+  { label: 'Chờ xử lý', value: 'PENDING' },
+  { label: 'Ủ tơ', value: 'SPAWN_RESTING' },
   { label: 'Phát triển tơ', value: 'MYCELIAL_DEVELOPMENT' },
   { label: 'Sẵn sàng trồng', value: 'READY_FOR_CULTIVATION' },
   { label: 'Đang trồng', value: 'CULTIVATING' },
@@ -258,9 +258,9 @@ export const AdminOrdersScreen: React.FC = () => {
 
       let msg = '';
       if (targetStage === 'SPAWN_RESTING') {
-        msg = `Phiên #${session.session_id} đã bắt đầu giai đoạn Ủ TƠ / HỒI SỨC PHÔI (SPAWN_RESTING).`;
+        msg = `Phiên #${session.session_id} đã bắt đầu giai đoạn ủ tơ / hồi sức phôi.`;
       } else if (targetStage === 'READY_FOR_CULTIVATION') {
-        msg = `Phiên #${session.session_id} đã chuyển sang SẴN SÀNG TRỒNG (READY_FOR_CULTIVATION). Bạn có thể xếp khay vào tầng ngay bây giờ!`;
+        msg = `Phiên #${session.session_id} đã chuyển sang Sẵn sàng trồng. Bạn có thể xếp khay vào tầng ngay bây giờ!`;
       }
 
       Alert.alert('Chuyển giai đoạn thành công', msg);
@@ -270,7 +270,7 @@ export const AdminOrdersScreen: React.FC = () => {
       let friendlyText = 'Không thể chuyển giai đoạn phiên.';
       if (errText.includes('Stage transition requirements') || errText.includes('409') || errText.includes('NORMAL')) {
         friendlyText =
-          'Chưa đạt điều kiện: Đợt kiểm tra phôi gần nhất phải đạt chuẩn (NORMAL) và kiểm tra đủ toàn bộ số bịch phôi trước khi chuyển sang Sẵn sàng trồng.';
+          'Chưa đạt điều kiện: Đợt kiểm tra phôi gần nhất phải đạt chuẩn và kiểm tra đủ toàn bộ số bịch phôi trước khi chuyển sang Sẵn sàng trồng.';
       } else if (errText) {
         friendlyText = errText;
       }
@@ -344,18 +344,50 @@ export const AdminOrdersScreen: React.FC = () => {
     }
   }, [activeTab, sessions, orders]);
 
+  const formatGrowthStatus = (status?: string | null): string => {
+    if (!status) return 'Chưa ghi nhận';
+    const map: Record<string, string> = {
+      SPAWN_RESTING: 'Đang ủ tơ',
+      MYCELIAL_DEVELOPMENT: 'Phát triển tơ',
+      FRUITING_INITIATION: 'Bật mầm',
+      PINNING: 'Ghim nụ',
+      YOUNG_FRUITING: 'Nấm non',
+      MATURATION: 'Trưởng thành',
+      READY_FOR_CULTIVATION: 'Sẵn sàng trồng',
+      CULTIVATING: 'Đang trồng',
+      HARVEST_READY: 'Sẵn sàng thu hoạch',
+      HARVESTING: 'Đang thu hoạch',
+      COMPLETED: 'Hoàn thành',
+      CANCELLED: 'Đã hủy',
+    };
+    return map[status] || status;
+  };
+
+  const formatHarvestStatus = (status?: string | null): string => {
+    if (!status) return '';
+    const map: Record<string, string> = {
+      NOT_READY: 'Chưa sẵn sàng',
+      HARVEST_READY: 'Sẵn sàng thu hoạch',
+      READY: 'Sẵn sàng',
+      HARVESTED: 'Đã thu hoạch',
+      IN_PROGRESS: 'Đang thu hoạch',
+      COMPLETED: 'Đã hoàn thành',
+    };
+    return map[status] || status;
+  };
+
   const renderSessionBadge = (status: string) => {
     switch (status) {
       case 'PENDING':
-        return <StatusBadge variant="warning" label="Chờ ủ tơ (PENDING)" />;
+        return <StatusBadge variant="warning" label="Chờ ủ tơ" />;
       case 'SPAWN_RESTING':
-        return <StatusBadge variant="info" label="Đang ủ tơ (SPAWN_RESTING)" />;
+        return <StatusBadge variant="info" label="Đang ủ tơ" />;
       case 'MYCELIAL_DEVELOPMENT':
         return <StatusBadge variant="info" label="Phát triển tơ nấm" />;
       case 'READY_FOR_CULTIVATION':
-        return <StatusBadge variant="warning" label="Sẵn sàng trồng (CHỜ GÁN KHAY)" />;
+        return <StatusBadge variant="warning" label="Sẵn sàng trồng" />;
       case 'CULTIVATING':
-        return <StatusBadge variant="success" label="Đang trồng (CULTIVATING)" />;
+        return <StatusBadge variant="success" label="Đang trồng" />;
       case 'HARVEST_READY':
         return <StatusBadge variant="info" label="Sẵn sàng thu hoạch" />;
       case 'HARVESTING':
@@ -700,7 +732,7 @@ export const AdminOrdersScreen: React.FC = () => {
                       <AppText variant="caption" color={theme.colors.primary[800]} style={{ flex: 1 }}>
                         Sinh trưởng:{' '}
                         <AppText variant="caption" weight="bold">
-                          {session.growth_status || 'Chưa ghi nhận'}
+                          {formatGrowthStatus(session.growth_status)}
                         </AppText>
                         {session.progress_percent != null ? ` (${session.progress_percent}%)` : ''}
                       </AppText>
@@ -717,7 +749,7 @@ export const AdminOrdersScreen: React.FC = () => {
                             weight="bold"
                             color={session.harvest_status === 'HARVEST_READY' ? theme.colors.success.dark : theme.colors.warning.dark}
                           >
-                            {session.harvest_status}
+                            {formatHarvestStatus(session.harvest_status)}
                           </AppText>
                         </View>
                       )}
@@ -776,7 +808,7 @@ export const AdminOrdersScreen: React.FC = () => {
                           />
                         </View>
                         <AppButton
-                          title={isActionLoading ? 'Đang xác nhận...' : 'Xác nhận sẵn sàng trồng (READY_FOR_CULTIVATION)'}
+                          title={isActionLoading ? 'Đang xác nhận...' : 'Xác nhận sẵn sàng trồng'}
                           variant="secondary"
                           size="sm"
                           leftIcon={<Ionicons name="checkmark-done" size={16} color={theme.colors.success.dark} />}
@@ -893,7 +925,7 @@ export const AdminOrdersScreen: React.FC = () => {
 
                         {session.harvest_status === 'HARVEST_READY' && (
                           <AppButton
-                            title="Quản lý thu hoạch (HARVEST)"
+                            title="Quản lý thu hoạch"
                             variant="secondary"
                             size="sm"
                             leftIcon={<Ionicons name="leaf" size={16} color={theme.colors.success.dark} />}
@@ -1011,7 +1043,7 @@ export const AdminOrdersScreen: React.FC = () => {
                   </View>
                   <StatusBadge
                     variant={order.payment_status === 'PAID' ? 'success' : 'warning'}
-                    label={order.payment_status === 'PAID' ? 'Đã thanh toán (PayOS)' : 'Chờ thanh toán'}
+                    label={order.payment_status === 'PAID' ? 'Đã thanh toán' : 'Chờ thanh toán'}
                   />
                 </View>
 

@@ -94,7 +94,7 @@ export const ShipperDeliveriesScreen: React.FC = () => {
   const handleLogoutPress = () => {
     Alert.alert(
       'Đăng xuất',
-      'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản Giao hàng (Shipper)?',
+      'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản giao hàng?',
       [
         {
           text: 'Hủy',
@@ -263,7 +263,7 @@ export const ShipperDeliveriesScreen: React.FC = () => {
         <View style={styles.shipperBadge}>
           <Ionicons name="shield-checkmark" size={18} color={theme.colors.primary[600]} />
           <AppText variant="captionMedium" color={theme.colors.primary[700]} weight="bold">
-            Tài khoản Nhân viên Giao hàng: {user?.fullName || 'Lê Khôi (Shipper)'}
+            Tài khoản Nhân viên Giao hàng: {user?.fullName || 'Lê Khôi'}
           </AppText>
         </View>
         <AppText variant="overline" color={theme.colors.text.muted}>
@@ -463,7 +463,7 @@ export const ShipperDeliveriesScreen: React.FC = () => {
                       <View style={styles.podHeaderLeft}>
                         <Ionicons name="camera" size={14} color={theme.colors.primary[600]} />
                         <AppText variant="captionMedium" weight="bold" color={theme.colors.primary[700]}>
-                          Ảnh xác nhận đã giao hàng (POD)
+                          Ảnh xác nhận đã giao hàng
                         </AppText>
                       </View>
                       <Pressable

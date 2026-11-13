@@ -62,7 +62,7 @@ const notificationIcon = (
 function formatDeviceType(type?: string): string {
   switch (type) {
     case 'MASTER':
-      return 'Thiết bị trung tâm (Master)';
+      return 'Thiết bị trung tâm';
     case 'NODE':
       return 'Node cảm biến tầng';
     case 'SENSOR':
@@ -837,7 +837,7 @@ export default function NotificationsScreen() {
                               style={{ flex: 1 }}
                             >
                               {isAdmin
-                                ? 'Quyền Quản trị viên (Admin): Theo dõi tiến độ sự cố. Xác nhận sửa chữa do Kỹ thuật viên (Farm Operator) thực hiện.'
+                                ? 'Quyền Quản trị viên: Theo dõi tiến độ sự cố. Xác nhận sửa chữa do Kỹ thuật viên nông trại thực hiện.'
                                 : 'Thông báo theo dõi sự cố thiết bị tại trang trại.'}
                             </AppText>
                           </View>

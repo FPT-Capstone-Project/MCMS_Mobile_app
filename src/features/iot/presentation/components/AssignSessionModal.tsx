@@ -72,7 +72,7 @@ const AssignSessionModalContent: React.FC<AssignSessionModalProps> = ({
                 Chọn phiên cần gán khay
               </AppText>
               <AppText variant="caption" color={theme.colors.text.secondary}>
-                Danh sách phiên đang ở trạng thái Sẵn sàng trồng (READY_FOR_CULTIVATION)
+                Danh sách phiên đang ở trạng thái Sẵn sàng trồng
               </AppText>
             </View>
             <AppIconButton
@@ -101,7 +101,7 @@ const AssignSessionModalContent: React.FC<AssignSessionModalProps> = ({
                     Chưa có phiên nào sẵn sàng gán khay
                   </AppText>
                   <AppText variant="caption" color={theme.colors.text.muted} align="center" style={{ marginTop: 4, paddingHorizontal: 16 }}>
-                    Phiên cần hoàn thành giai đoạn ủ tơ và kiểm tra phôi đạt chuẩn (NORMAL) trước khi chuyển sang Sẵn sàng trồng.
+                    Phiên cần hoàn thành giai đoạn ủ tơ và kiểm tra phôi đạt chuẩn trước khi chuyển sang Sẵn sàng trồng.
                   </AppText>
                   <AppButton
                     title="Đến Quản lý phiên nuôi trồng"

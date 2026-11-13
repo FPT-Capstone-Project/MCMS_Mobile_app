@@ -31,6 +31,56 @@ interface HarvestActionModalProps {
   onSuccess: () => Promise<void> | void;
 }
 
+const formatHarvestActionStatus = (status?: string | null): string => {
+  if (!status) return 'Chưa có';
+  switch (status) {
+    case 'PLANNED':
+      return 'Đã lên kế hoạch';
+    case 'IN_PROGRESS':
+      return 'Đang thu hoạch';
+    case 'COMPLETED':
+      return 'Đã hoàn thành';
+    case 'CANCELLED':
+      return 'Đã hủy';
+    default:
+      return status;
+  }
+};
+
+const formatSessionStatusInHarvest = (status?: string | null): string => {
+  if (!status) return 'Chưa rõ';
+  switch (status) {
+    case 'PENDING':
+      return 'Chờ xử lý';
+    case 'SPAWN_RESTING':
+      return 'Đang ủ tơ';
+    case 'READY_FOR_CULTIVATION':
+      return 'Sẵn sàng trồng';
+    case 'CULTIVATING':
+      return 'Đang nuôi trồng';
+    case 'HARVESTING':
+      return 'Đang thu hoạch';
+    case 'COMPLETED':
+      return 'Hoàn thành';
+    case 'CANCELLED':
+      return 'Đã hủy';
+    default:
+      return status;
+  }
+};
+
+const formatHarvestStatusInHarvest = (status?: string | null): string => {
+  if (!status) return 'Chưa đánh giá';
+  switch (status) {
+    case 'HARVEST_READY':
+      return 'Sẵn sàng thu hoạch';
+    case 'NOT_READY':
+      return 'Chưa sẵn sàng';
+    default:
+      return status;
+  }
+};
+
 export const HarvestActionModal: React.FC<HarvestActionModalProps> = ({
   visible,
   onClose,
@@ -154,7 +204,7 @@ const HarvestActionModalContent: React.FC<{
       await iotRepository.startHarvest(harvestId);
       Alert.alert(
         'Bắt đầu thu hoạch',
-        `Đợt thu hoạch #${harvestId} đã bắt đầu (IN_PROGRESS). Phiên nuôi trồng đã chuyển sang trạng thái ĐANG THU HOẠCH.`
+        `Đợt thu hoạch #${harvestId} đã bắt đầu. Phiên nuôi trồng đã chuyển sang trạng thái Đang thu hoạch.`
       );
       await fetchHarvestInfo();
       await onSuccess();
@@ -246,7 +296,7 @@ const HarvestActionModalContent: React.FC<{
               await iotRepository.completeHarvest(harvestId);
               Alert.alert(
                 'Hoàn thành thu hoạch',
-                `Đợt thu hoạch #${harvestId} đã HOÀN THÀNH (COMPLETED). Vui lòng thực hiện thủ tục bàn giao nông sản cho khách.`
+                `Đợt thu hoạch #${harvestId} đã hoàn thành. Vui lòng thực hiện thủ tục bàn giao nông sản cho khách.`
               );
               await fetchHarvestInfo();
               await onSuccess();
@@ -327,10 +377,10 @@ const HarvestActionModalContent: React.FC<{
                         • Khách hàng: <AppText variant="caption" weight="bold">{session.customer_name || 'Khách hàng SmartMush'}</AppText>
                       </AppText>
                       <AppText variant="caption" color={theme.colors.text.secondary}>
-                        • Trạng thái phiên: <AppText variant="caption" weight="bold">{session.status}</AppText>
+                        • Trạng thái phiên: <AppText variant="caption" weight="bold">{formatSessionStatusInHarvest(session.status)}</AppText>
                       </AppText>
                       <AppText variant="caption" color={theme.colors.text.secondary}>
-                        • Đánh giá thu hoạch: <AppText variant="caption" weight="bold" color={theme.colors.success.dark}>{session.harvest_status || (session.harvest_ready ? 'HARVEST_READY' : 'NOT_READY')}</AppText>
+                        • Đánh giá thu hoạch: <AppText variant="caption" weight="bold" color={theme.colors.success.dark}>{formatHarvestStatusInHarvest(session.harvest_status || (session.harvest_ready ? 'HARVEST_READY' : 'NOT_READY'))}</AppText>
                       </AppText>
                     </View>
                   </View>
@@ -356,7 +406,7 @@ const HarvestActionModalContent: React.FC<{
                         </AppText>
                       </View>
                       <AppText variant="bodySmall" weight="bold">
-                        Lập kế hoạch thu hoạch (PLANNED)
+                        Lập kế hoạch thu hoạch
                       </AppText>
                     </View>
 
@@ -385,7 +435,7 @@ const HarvestActionModalContent: React.FC<{
                           Đợt thu hoạch #{harvest.harvest_id || (harvest as any).id}
                         </AppText>
                         <AppText variant="caption" color={theme.colors.text.muted}>
-                          Phương thức nhận: {harvest.harvest_method === 'PICKUP' ? 'Khách tự hái tại farm (PICKUP)' : 'Giao hàng tận nơi (DELIVERY)'}
+                          Phương thức nhận: {harvest.harvest_method === 'PICKUP' ? 'Khách tự hái tại nông trại' : 'Giao hàng tận nơi'}
                         </AppText>
                         {harvest.scheduled_at && (
                           <AppText variant="caption" color={theme.colors.text.muted}>
@@ -414,7 +464,7 @@ const HarvestActionModalContent: React.FC<{
                               : theme.colors.success.dark
                           }
                         >
-                          {harvest.status}
+                          {formatHarvestActionStatus(harvest.status)}
                         </AppText>
                       </View>
                     </View>
@@ -425,7 +475,7 @@ const HarvestActionModalContent: React.FC<{
                     {harvest.status === 'PLANNED' && (
                       <View style={styles.actionSection}>
                         <AppText variant="caption" color={theme.colors.text.secondary}>
-                          Bắt đầu quy trình thu hoạch sẽ chuyển trạng thái phiên nuôi trồng sang ĐANG THU HOẠCH (HARVESTING).
+                          Bắt đầu quy trình thu hoạch sẽ chuyển trạng thái phiên nuôi trồng sang Đang thu hoạch.
                         </AppText>
                         <AppButton
                           title={actionLoading ? 'Đang khởi động...' : 'Bắt đầu thu hoạch ngay'}
@@ -575,7 +625,7 @@ const HarvestActionModalContent: React.FC<{
                             Sau khi đã lưu đủ sản lượng, bấm nút bên dưới để hoàn thành đợt thu hoạch.
                           </AppText>
                           <AppButton
-                            title={actionLoading ? 'Đang hoàn tất...' : 'Hoàn thành thu hoạch (COMPLETED)'}
+                            title={actionLoading ? 'Đang hoàn tất...' : 'Hoàn thành thu hoạch'}
                             variant="primary"
                             size="md"
                             onPress={handleCompleteHarvest}

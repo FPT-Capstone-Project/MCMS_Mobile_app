@@ -152,7 +152,7 @@ export const FloorLogsTimeline: React.FC<FloorLogsTimelineProps> = ({
                     </AppText>
                     {log.run_id != null && (
                       <AppText variant="caption" color={theme.colors.text.muted} style={{ fontSize: 10 }}>
-                        Phiên chạy (Run ID): #{log.run_id}
+                        Mã phiên chạy: #{log.run_id}
                       </AppText>
                     )}
                     {log.floor_id != null && (

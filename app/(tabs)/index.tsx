@@ -340,7 +340,7 @@ export default function HomeScreen() {
               <View style={[styles.ctaBadge, { backgroundColor: 'rgba(59, 130, 246, 0.3)' }]}>
                 <Ionicons name="shield-checkmark" size={16} color="#FFFFFF" />
                 <AppText variant="overline" color="#FFFFFF">
-                  {isAdmin ? 'Quản trị viên (ADMIN)' : 'Kỹ thuật viên vận hành (FARM OPERATOR)'}
+                  {isAdmin ? 'Quản trị viên' : 'Kỹ thuật viên vận hành'}
                 </AppText>
               </View>
               <AppText variant="caption" color="rgba(255, 255, 255, 0.85)">
@@ -350,7 +350,7 @@ export default function HomeScreen() {
 
             <View style={styles.ctaContent}>
               <AppText variant="h2" weight="bold" color="#FFFFFF">
-                Điều hành IoT & Hạ tầng (Admin & Farm Operator)
+                Điều hành IoT & Hạ tầng
               </AppText>
               <AppText variant="bodySmall" color="rgba(255, 255, 255, 0.9)" style={styles.ctaSubtitle}>
                 Điều khiển rơ-le 8 kênh SSR cho master01 hoặc các Master khác, giám sát cảm biến và cấu hình tự động.

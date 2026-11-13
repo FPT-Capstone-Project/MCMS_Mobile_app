@@ -249,7 +249,7 @@ const CreateFloorModalContent: React.FC<CreateFloorModalProps> = ({
             <View style={styles.inputsGrid}>
               <View style={styles.inputCol}>
                 <AppInput
-                  label="Số hàng (Rows)"
+                  label="Số hàng"
                   value={totalRows}
                   onChangeText={setTotalRows}
                   placeholder="VD: 3"
@@ -259,7 +259,7 @@ const CreateFloorModalContent: React.FC<CreateFloorModalProps> = ({
               </View>
               <View style={styles.inputCol}>
                 <AppInput
-                  label="Số cột (Columns)"
+                  label="Số cột"
                   value={totalColumns}
                   onChangeText={setTotalColumns}
                   placeholder="VD: 4"

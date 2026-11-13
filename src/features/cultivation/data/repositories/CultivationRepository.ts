@@ -1,7 +1,9 @@
+import { Platform } from 'react-native';
 import { axiosClient } from '../../../../core/api/axiosClient';
 import { API_ENDPOINTS } from '../../../../core/api/endpoints';
 import { AppError } from '../../../../core/errors/appError';
 import { handleApiError } from '../../../../core/errors/errorHandler';
+import { logApiDebug } from '../../../../core/utils';
 import {
   CreateDailyTrayInspectionRequest,
   CreateMushroomConditionRequest,
@@ -342,17 +344,29 @@ export class CultivationRepository {
   async uploadSpawnInspectionImage(
     inspectionId: number | string,
     imageUri: string,
-    caption?: string
+    caption?: string,
+    fileMetadata?: { name?: string; type?: string; size?: number }
   ): Promise<any> {
+    const url = API_ENDPOINTS.FARM.SPAWN_IMAGES(inspectionId);
     try {
       const formData = new FormData();
-      const filename = imageUri.split('/').pop() || `spawn_${Date.now()}.jpg`;
-      const match = /\.(\w+)$/.exec(filename);
+      const rawName = fileMetadata?.name || imageUri.split('/').pop() || `spawn_${Date.now()}.jpg`;
+      const match = /\.(\w+)$/.exec(rawName);
       const ext = match ? match[1].toLowerCase() : 'jpg';
-      const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
+      const filename = rawName.includes('.') ? rawName : `${rawName}.${ext}`;
+      const mimeType = fileMetadata?.type || (ext === 'png' ? 'image/png' : 'image/jpeg');
+
+      // Enforce max size: 5 MB (5 * 1024 * 1024 bytes)
+      if (fileMetadata?.size && fileMetadata.size > 5 * 1024 * 1024) {
+        throw new AppError(
+          `Ảnh "${filename}" vượt quá dung lượng tối đa 5 MB (${(fileMetadata.size / (1024 * 1024)).toFixed(1)} MB). Vui lòng chọn ảnh nhỏ hơn.`,
+          'FILE_TOO_LARGE',
+          400
+        );
+      }
 
       formData.append('image', {
-        uri: imageUri,
+        uri: Platform.OS === 'android' ? imageUri : imageUri.replace('file://', ''),
         name: filename,
         type: mimeType,
       } as any);
@@ -361,17 +375,49 @@ export class CultivationRepository {
         formData.append('caption', caption.trim().slice(0, 500));
       }
 
+      logApiDebug({
+        tag: 'SPAWN_INSPECTION_IMAGE_UPLOAD_REQ',
+        method: 'POST',
+        url,
+        fileMetadata: {
+          name: filename,
+          type: mimeType,
+          size: fileMetadata?.size,
+          uri: imageUri,
+        },
+        payload: { caption: caption?.trim() || '' },
+      });
+
       const response = await axiosClient.post(
-        API_ENDPOINTS.FARM.SPAWN_IMAGES(inspectionId),
+        url,
         formData,
         {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
+          // Do NOT hardcode Content-Type: multipart/form-data.
+          // Axios interceptor strips Content-Type for FormData, allowing React Native
+          // to set multipart/form-data with the correct boundary parameter.
+          transformRequest: (data) => data,
         }
       );
+
+      logApiDebug({
+        tag: 'SPAWN_INSPECTION_IMAGE_UPLOAD_RES',
+        method: 'POST',
+        url,
+        status: response.status,
+        responseBody: response.data,
+      });
+
       return response.data?.data ?? response.data;
-    } catch (error) {
+    } catch (error: any) {
+      logApiDebug({
+        tag: 'SPAWN_INSPECTION_IMAGE_UPLOAD_ERROR',
+        method: 'POST',
+        url,
+        status: error?.statusCode || error?.response?.status,
+        responseBody: error?.response?.data || error?.details,
+        error: error?.message,
+        stack: error?.stack,
+      });
       throw error instanceof AppError ? error : handleApiError(error);
     }
   }

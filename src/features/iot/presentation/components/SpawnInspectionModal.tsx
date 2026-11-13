@@ -29,6 +29,9 @@ import {
 
 interface SelectedImageItem {
   uri: string;
+  name?: string;
+  type?: string;
+  size?: number;
   caption?: string;
   uploaded?: boolean;
 }
@@ -64,8 +67,12 @@ const SpawnInspectionModalContent: React.FC<{
   onClose: () => void;
   onSuccess: () => void;
 }> = ({ visible, session, onClose, onSuccess }) => {
+  const spawnQuantityFromBackend =
+    session.spawn_quantity != null && session.spawn_quantity > 0
+      ? session.spawn_quantity
+      : undefined;
   const requiredTrays = session.required_trays || session.tray_count || 1;
-  const expectedSpawnBags = requiredTrays * 3;
+  const expectedSpawnBags = spawnQuantityFromBackend ?? requiredTrays * 3;
 
   const [totalChecked, setTotalChecked] = useState(String(expectedSpawnBags));
   const [normalQuantity, setNormalQuantity] = useState(String(expectedSpawnBags));
@@ -137,7 +144,23 @@ const SpawnInspectionModalContent: React.FC<{
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setImages((prev) => [...prev, { uri: result.assets[0].uri }]);
+        const asset = result.assets[0];
+        if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+          Alert.alert(
+            'Ảnh quá lớn',
+            `Ảnh chụp có kích thước ${(asset.fileSize / (1024 * 1024)).toFixed(1)} MB vượt quá giới hạn 5 MB. Vui lòng chụp lại.`
+          );
+          return;
+        }
+        setImages((prev) => [
+          ...prev,
+          {
+            uri: asset.uri,
+            name: asset.fileName || `spawn_cam_${Date.now()}.jpg`,
+            type: asset.mimeType || 'image/jpeg',
+            size: asset.fileSize,
+          },
+        ]);
       }
     } catch {
       Alert.alert('Lỗi chụp ảnh', 'Không thể khởi động camera. Vui lòng thử lại.');
@@ -159,8 +182,31 @@ const SpawnInspectionModalContent: React.FC<{
       });
 
       if (!result.canceled && result.assets) {
-        const newImages = result.assets.map((asset) => ({ uri: asset.uri }));
-        setImages((prev) => [...prev, ...newImages]);
+        const validAssets: SelectedImageItem[] = [];
+        let hasOversized = false;
+        result.assets.forEach((asset, idx) => {
+          if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+            hasOversized = true;
+          } else {
+            validAssets.push({
+              uri: asset.uri,
+              name: asset.fileName || `spawn_gallery_${Date.now()}_${idx}.jpg`,
+              type: asset.mimeType || 'image/jpeg',
+              size: asset.fileSize,
+            });
+          }
+        });
+
+        if (hasOversized) {
+          Alert.alert(
+            'Ảnh quá dung lượng',
+            'Một số ảnh đã chọn vượt quá giới hạn 5 MB và đã được tự động bỏ qua.'
+          );
+        }
+
+        if (validAssets.length > 0) {
+          setImages((prev) => [...prev, ...validAssets]);
+        }
       }
     } catch {
       Alert.alert('Lỗi chọn ảnh', 'Không thể mở thư viện ảnh.');
@@ -208,7 +254,12 @@ const SpawnInspectionModalContent: React.FC<{
         await cultivationRepository.uploadSpawnInspectionImage(
           inspectionId,
           item.uri,
-          item.caption
+          item.caption,
+          {
+            name: item.name,
+            type: item.type,
+            size: item.size,
+          }
         );
         setImages((prev) =>
           prev.map((img, idx) => (idx === index ? { ...img, uploaded: true } : img))
@@ -243,66 +294,86 @@ const SpawnInspectionModalContent: React.FC<{
     }
 
     setSubmitting(true);
-    setUploadProgressText('Đang ghi nhận kết quả kiểm tra phôi...');
 
-    try {
-      const payload: RecordSpawnInspectionRequest = {
-        totalChecked: total,
-        normalQuantity: normal,
-        warningQuantity: warning,
-        abnormalQuantity: abnormal,
-        condition,
-        replacementQuantity: replacement > 0 ? replacement : undefined,
-        notes: notes.trim() || undefined,
-      };
+    let inspectionId = createdInspectionId;
 
-      const result = await iotRepository.recordSpawnInspection(session.session_id, payload);
-      const inspectionId = Number(result.inspection_id || result.id);
+    // STEP 1: CREATE INSPECTION REPORT (If not already created in a previous attempt)
+    if (!inspectionId) {
+      setUploadProgressText('Đang ghi nhận kết quả kiểm tra phôi...');
+      try {
+        const payload: RecordSpawnInspectionRequest = {
+          totalChecked: total,
+          normalQuantity: normal,
+          warningQuantity: warning,
+          abnormalQuantity: abnormal,
+          condition,
+          replacementQuantity: replacement, // Always number (0 if no replacement)
+          notes: notes.trim(), // Always string ("" if blank)
+        };
 
-      if (!inspectionId) {
-        throw new Error('Không nhận được ID lần kiểm tra phôi từ máy chủ.');
-      }
+        const result = await iotRepository.recordSpawnInspection(session.session_id, payload);
+        const newId = Number(result.inspection_id || result.id);
 
-      setCreatedInspectionId(inspectionId);
-
-      // Upload photos if any
-      const unuploaded = images
-        .map((img, idx) => ({ item: img, index: idx }))
-        .filter(({ item }) => !item.uploaded);
-
-      if (unuploaded.length > 0) {
-        const failed = await uploadPhotosSequentially(inspectionId, unuploaded);
-        setFailedImageIndices(failed);
-
-        if (failed.length > 0) {
-          Alert.alert(
-            'Lưu kiểm tra thành công (cần tải lại ảnh)',
-            `Đã lưu kết quả kiểm tra phôi, nhưng còn ${failed.length} ảnh chưa tải lên thành công do gián đoạn mạng. Bạn có thể bấm "Thử lại tải ảnh" ngay bên dưới mà không làm trùng lặp báo cáo.`,
-            [{ text: 'Đã hiểu' }]
-          );
-          setSubmitting(false);
-          setUploadProgressText(null);
-          return;
+        if (!newId || isNaN(newId) || newId <= 0) {
+          throw new Error('Máy chủ không trả về mã inspection_id hợp lệ.');
         }
-      }
 
-      // Complete Success
-      setSubmitting(false);
-      setUploadProgressText(null);
-      Alert.alert(
-        'Đã lưu kết quả kiểm tra',
-        condition === 'NORMAL' && total >= expectedSpawnBags
-          ? 'Đợt kiểm tra đạt chuẩn (NORMAL) và đủ số lượng bịch phôi. Phiên đã đủ điều kiện để chuyển sang SẴN SÀNG TRỒNG (READY_FOR_CULTIVATION).'
-          : 'Kết quả kiểm tra phôi cùng hình ảnh minh chứng đã được lưu thành công vào lịch sử.',
-        [{ text: 'Đóng', onPress: onSuccess }]
-      );
-    } catch (err: any) {
-      setErrorMessage(
-        err?.message || 'Không thể lưu kết quả kiểm tra phôi. Vui lòng kiểm tra lại.'
-      );
-      setSubmitting(false);
-      setUploadProgressText(null);
+        inspectionId = newId;
+        setCreatedInspectionId(newId);
+      } catch (createErr: any) {
+        const msg = createErr?.message || 'Không thể tạo báo cáo kiểm tra phôi.';
+        setErrorMessage(`Lỗi tạo báo cáo kiểm tra: ${msg}`);
+        setSubmitting(false);
+        setUploadProgressText(null);
+        return;
+      }
     }
+
+    // STEP 2: UPLOAD IMAGES (If user has selected images)
+    const unuploaded = images
+      .map((img, idx) => ({ item: img, index: idx }))
+      .filter(({ item }) => !item.uploaded);
+
+    if (unuploaded.length > 0) {
+      const failed = await uploadPhotosSequentially(inspectionId, unuploaded);
+      setFailedImageIndices(failed);
+
+      if (failed.length > 0) {
+        setSubmitting(false);
+        setUploadProgressText(null);
+        setErrorMessage(
+          `Báo cáo #${inspectionId} đã tạo, nhưng có ${failed.length} ảnh chưa thể tải lên. Vui lòng bấm "Thử lại tải ảnh".`
+        );
+        Alert.alert(
+          'Đã lưu báo cáo kiểm tra (ảnh cần thử lại)',
+          `Kết quả kiểm tra phôi #${inspectionId} đã được ghi nhận trên hệ thống. Tuy nhiên, ${failed.length} ảnh chưa được tải lên thành công. Bạn có thể bấm "Thử lại tải ảnh" ngay bên dưới để tiếp tục mà không tạo trùng báo cáo.`,
+          [{ text: 'Đã hiểu' }]
+        );
+        return;
+      }
+    }
+
+    // STEP 3: SUCCESS FEEDBACK AND REFRESH
+    setSubmitting(false);
+    setUploadProgressText(null);
+    Alert.alert(
+      'Đã lưu kết quả kiểm tra',
+      condition === 'NORMAL' && total >= expectedSpawnBags
+        ? 'Đợt kiểm tra đạt chuẩn và đủ số lượng bịch phôi. Phiên đã đủ điều kiện để chuyển sang Sẵn sàng trồng.'
+        : 'Kết quả kiểm tra phôi cùng hình ảnh minh chứng đã được lưu thành công vào lịch sử.',
+      [
+        {
+          text: 'Đóng',
+          onPress: () => {
+            try {
+              onSuccess();
+            } catch {
+              onClose();
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Retry upload failed images only
@@ -325,9 +396,23 @@ const SpawnInspectionModalContent: React.FC<{
         Alert.alert(
           'Tải ảnh hoàn tất',
           'Tất cả hình ảnh kiểm tra phôi đã được tải lên thành công!',
-          [{ text: 'Đóng', onPress: onSuccess }]
+          [
+            {
+              text: 'Đóng',
+              onPress: () => {
+                try {
+                  onSuccess();
+                } catch {
+                  onClose();
+                }
+              },
+            },
+          ]
         );
       } else {
+        setErrorMessage(
+          `Còn ${stillFailed.length} ảnh chưa thể tải lên. Vui lòng bấm thử lại lần nữa.`
+        );
         Alert.alert(
           'Vẫn còn ảnh lỗi',
           `Còn ${stillFailed.length} ảnh chưa thể tải lên. Vui lòng bấm thử lại lần nữa.`
@@ -386,7 +471,9 @@ const SpawnInspectionModalContent: React.FC<{
                     Quy chuẩn phôi giống SmartMush:
                   </AppText>
                   <AppText variant="caption" color={theme.colors.primary[700]}>
-                    Mỗi khay tiêu chuẩn cần đúng 3 bịch phôi. Phiên này cần {requiredTrays} khay ({expectedSpawnBags} bịch phôi). Đợt kiểm tra phải đạt chuẩn NORMAL và kiểm tra đủ {expectedSpawnBags} bịch để được chuyển sang Sẵn sàng trồng.
+                    {spawnQuantityFromBackend != null
+                      ? `Phiên #${session.session_id} đã xuất đúng ${expectedSpawnBags} bịch phôi (${requiredTrays} khay). Đợt kiểm tra cần đạt chuẩn và kiểm tra đủ ${expectedSpawnBags} bịch để được chuyển sang Sẵn sàng trồng.`
+                      : `Mỗi khay tiêu chuẩn cần đúng 3 bịch phôi. Phiên này cần ${requiredTrays} khay (${expectedSpawnBags} bịch phôi). Đợt kiểm tra phải đạt chuẩn và kiểm tra đủ ${expectedSpawnBags} bịch để được chuyển sang Sẵn sàng trồng.`}
                   </AppText>
                 </View>
               </View>
@@ -447,7 +534,7 @@ const SpawnInspectionModalContent: React.FC<{
                 <View style={styles.badgeLabelRow}>
                   <View style={[styles.statusDot, { backgroundColor: theme.colors.success.main }]} />
                   <AppText variant="caption" weight="semibold" color={theme.colors.success.dark}>
-                    Đạt chuẩn (Normal)
+                    Đạt chuẩn
                   </AppText>
                 </View>
                 <TextInput
@@ -465,7 +552,7 @@ const SpawnInspectionModalContent: React.FC<{
                 <View style={styles.badgeLabelRow}>
                   <View style={[styles.statusDot, { backgroundColor: theme.colors.warning.main }]} />
                   <AppText variant="caption" weight="semibold" color={theme.colors.warning.dark}>
-                    Cảnh báo (Warning)
+                    Cảnh báo
                   </AppText>
                 </View>
                 <TextInput
@@ -483,7 +570,7 @@ const SpawnInspectionModalContent: React.FC<{
                 <View style={styles.badgeLabelRow}>
                   <View style={[styles.statusDot, { backgroundColor: theme.colors.error.main }]} />
                   <AppText variant="caption" weight="semibold" color={theme.colors.error.dark}>
-                    Lỗi / Hư (Abnormal)
+                    Bất thường
                   </AppText>
                 </View>
                 <TextInput

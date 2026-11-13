@@ -367,7 +367,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
       await loadFloorData();
       Alert.alert(
         'Đã lưu cấu hình',
-        'Cấu hình hồ sơ tầng (FLOOR) đã được lưu thành công. Hệ thống KHÔNG tự động bật thiết bị.'
+        'Cấu hình hồ sơ tầng đã được lưu thành công. Hệ thống KHÔNG tự động bật thiết bị.'
       );
     } catch (err: any) {
       Alert.alert('Lỗi lưu cấu hình', err?.message || 'Không thể lưu cấu hình tầng.');
@@ -446,7 +446,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
 
       Alert.alert(
         'Đã gán khay thành công',
-        `Đã gán ${assignedCount} khay cho Phiên #${assignedSessionId}. Phiên bắt đầu trồng (CULTIVATING).\n\nLưu ý: Hệ thống AUTO không tự bật; người vận hành cần chủ động bấm Khởi động AUTO khi sẵn sàng.`
+        `Đã gán ${assignedCount} khay cho Phiên #${assignedSessionId}. Phiên đã bắt đầu trồng.\n\nLưu ý: Hệ thống tự động không tự bật; người vận hành cần chủ động bấm Khởi động tự động khi sẵn sàng.`
       );
     } catch (err: any) {
       // 409 Conflict Handling
@@ -472,7 +472,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
     if (!floorId || !floor.total_rows || !floor.total_columns) {
       Alert.alert(
         'Chưa cài đặt số hàng & cột',
-        'Vui lòng cấu hình số hàng (total_rows) và số cột (total_columns) của tầng trước khi sinh khay tự động.'
+        'Vui lòng cấu hình số hàng và số cột của tầng trước khi sinh khay tự động.'
       );
       return;
     }

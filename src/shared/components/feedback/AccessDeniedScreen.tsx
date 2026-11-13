@@ -28,10 +28,10 @@ export const AccessDeniedScreen: React.FC<AccessDeniedScreenProps> = ({
   const router = useRouter();
 
   const roleLabelMap: Record<string, string> = {
-    CUSTOMER: 'Khách hàng (CUSTOMER)',
-    SHIPPER: 'Nhân viên giao hàng (SHIPPER)',
-    FARM_OPERATOR: 'Kỹ thuật viên nông trại (FARM_OPERATOR)',
-    ADMIN: 'Quản trị viên (ADMIN)',
+    CUSTOMER: 'Khách hàng',
+    SHIPPER: 'Nhân viên giao hàng',
+    FARM_OPERATOR: 'Kỹ thuật viên nông trại',
+    ADMIN: 'Quản trị viên',
   };
 
   const currentRoleDisplay = roleLabelMap[currentRole] || currentRole;
