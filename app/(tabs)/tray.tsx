@@ -24,8 +24,11 @@ import {
   CustomerDeviceLogItem,
   CustomerFloorRack,
   CustomerGrowthHistoryItem,
+  CustomerEnvironmentHistoryPoint,
   CustomerTrayCard,
   CustomerTrayDetails,
+  CustomerEnvironmentHistoryChart,
+  EnvironmentHistoryRange,
 } from '../../src/features/tray';
 import { trayRepository } from '../../src/features/tray/data/repositories/TrayRepository';
 import { CustomerDailyReport } from '../../src/features/tray/presentation/components/CustomerDailyReport';
@@ -69,6 +72,7 @@ function isSameDay(dateStr?: string | null): boolean {
 }
 
 function getGrowthStageLabel(stage: string): string {
+  const normalizedStage = stage.trim().toUpperCase();
   const labels: Record<string, string> = {
     UNKNOWN: 'Chưa cập nhật',
     SPAWN_PENDING: 'Đang chuẩn bị phôi',
@@ -76,15 +80,17 @@ function getGrowthStageLabel(stage: string): string {
     MYCELIAL_DEVELOPMENT: 'Đang phát triển tơ nấm',
     READY_FOR_CULTIVATION: 'Sẵn sàng nuôi trồng',
     FRUITING_INITIATION: 'Bắt đầu tạo quả thể',
-    PINNING: 'Ra nụ',
-    YOUNG_FRUITING: 'Nấm non',
+    PINNING: 'Ra nấm non',
+    YOUNG_FRUITING: 'Nấm non đang phát triển',
     MATURATION: 'Trưởng thành',
+    HARVEST_READY: 'Sẵn sàng thu hoạch',
   };
-  return labels[stage] ?? stage.replace(/_/g, ' ');
+  return labels[normalizedStage] ?? 'Giai đoạn đang được cập nhật';
 }
 
 function getCultivationStatusLabel(status?: string): string | null {
   if (!status) return null;
+  const normalizedStatus = status.trim().toUpperCase();
   const labels: Record<string, string> = {
     PENDING: 'Đang chuẩn bị phôi',
     SPAWN_RESTING: 'Đang ủ phôi',
@@ -96,7 +102,7 @@ function getCultivationStatusLabel(status?: string): string | null {
     COMPLETED: 'Đã hoàn tất',
     CANCELLED: 'Đã hủy',
   };
-  return labels[status] ?? status.replace(/_/g, ' ');
+  return labels[normalizedStatus] ?? 'Đang được cập nhật';
 }
 
 function getHarvestStatusLabel(cultivationStatus?: string, harvestStatus?: string | null): string {
@@ -176,6 +182,10 @@ export default function TrayScreen() {
   const [detailLoadState, setDetailLoadState] = useState<DetailLoadState>('loading');
   const [detailError, setDetailError] = useState<string | null>(null);
   const [sensorRefreshError, setSensorRefreshError] = useState<string | null>(null);
+  const [environmentPoints, setEnvironmentPoints] = useState<CustomerEnvironmentHistoryPoint[]>([]);
+  const [environmentRange, setEnvironmentRange] = useState<EnvironmentHistoryRange>(1);
+  const [environmentLoading, setEnvironmentLoading] = useState(false);
+  const [environmentError, setEnvironmentError] = useState<string | null>(null);
   const detailRequestId = useRef(0);
 
   // Staff Assign Trays workflow state
@@ -356,6 +366,9 @@ export default function TrayScreen() {
     setDetailTab('growth');
     setDetails(null);
     setDetailError(null);
+    setEnvironmentPoints([]);
+    setEnvironmentRange(1);
+    setEnvironmentError(null);
     setDetailLoadState('loading');
     try {
       if (!tray.sessionId) {
@@ -410,6 +423,57 @@ export default function TrayScreen() {
     }, 15_000);
     return () => clearInterval(intervalId);
   }, [selectedTray, detailTab, detailLoadState, details?.session_id, refreshSensorHistory]);
+
+  const refreshEnvironmentHistory = useCallback(async (
+    sessionId: number,
+    floorId: number,
+    rangeHours: EnvironmentHistoryRange,
+    requestId: number,
+    silent: boolean
+  ) => {
+    if (!silent) setEnvironmentLoading(true);
+    try {
+      const to = new Date();
+      const from = new Date(to.getTime() - rangeHours * 60 * 60 * 1000);
+      const points = await trayRepository.getCustomerEnvironmentHistory(
+        sessionId,
+        floorId,
+        from.toISOString(),
+        to.toISOString()
+      );
+      if (requestId !== detailRequestId.current) return;
+      setEnvironmentPoints(points);
+      setEnvironmentError(null);
+    } catch (error: unknown) {
+      if (requestId !== detailRequestId.current) return;
+      setEnvironmentError(getErrorMessage(error, 'Không thể tải lịch sử nhiệt độ và độ ẩm.'));
+    } finally {
+      if (requestId === detailRequestId.current) setEnvironmentLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const sessionId = selectedTray?.sessionId;
+    const floorId = selectedTray?.floorId;
+    if (
+      !sessionId || !floorId || detailTab !== 'devices' || detailLoadState !== 'ready' ||
+      details?.session_id !== sessionId
+    ) return;
+
+    const requestId = detailRequestId.current;
+    void refreshEnvironmentHistory(sessionId, floorId, environmentRange, requestId, false);
+    const intervalId = setInterval(() => {
+      void refreshEnvironmentHistory(sessionId, floorId, environmentRange, requestId, true);
+    }, 60_000);
+    return () => clearInterval(intervalId);
+  }, [
+    selectedTray,
+    detailTab,
+    detailLoadState,
+    details?.session_id,
+    environmentRange,
+    refreshEnvironmentHistory,
+  ]);
 
   const handleCloseDetails = () => {
     detailRequestId.current += 1;
@@ -1078,7 +1142,6 @@ export default function TrayScreen() {
                       cultivationStatus={details?.cultivation_status}
                       harvestStatus={details?.harvest_status}
                       currentStage={details?.current_stage}
-                      progressPercent={details?.progress_percent}
                     />
                     {selectedTray?.sessionId ? (
                       <CustomerDailyReport
@@ -1115,6 +1178,11 @@ export default function TrayScreen() {
                     logs={details?.device_logs ?? []}
                     readings={details?.sensor_readings ?? []}
                     refreshError={sensorRefreshError}
+                    environmentPoints={environmentPoints}
+                    environmentRange={environmentRange}
+                    onEnvironmentRangeChange={setEnvironmentRange}
+                    environmentLoading={environmentLoading}
+                    environmentError={environmentError}
                   />
                 )}
               </ScrollView>
@@ -1471,8 +1539,28 @@ const GrowthHistory: React.FC<{
   cultivationStatus?: string;
   harvestStatus?: string | null;
   currentStage?: string | null;
-  progressPercent?: number | null;
-}> = ({ history, cultivationStatus, harvestStatus, currentStage, progressPercent }) => {
+}> = ({ history, cultivationStatus, harvestStatus, currentStage }) => {
+  const stages = [
+    'FRUITING_INITIATION',
+    'PINNING',
+    'YOUNG_FRUITING',
+    'MATURATION',
+    'HARVEST_READY',
+  ];
+  const harvestReady = harvestStatus === 'HARVEST_READY' ||
+    cultivationStatus === 'HARVEST_READY' ||
+    cultivationStatus === 'HARVESTING' ||
+    cultivationStatus === 'COMPLETED';
+  const activeStage = harvestReady
+    ? 'HARVEST_READY'
+    : currentStage || history[history.length - 1]?.current_stage || 'FRUITING_INITIATION';
+  const normalizedStage = activeStage.trim().toUpperCase();
+  const activeStageIndex = cultivationStatus === 'COMPLETED'
+    ? stages.length - 1
+    : Math.max(0, stages.indexOf(normalizedStage));
+  const overallProgress = Math.round((activeStageIndex / (stages.length - 1)) * 100);
+  const latestUpdate = history[history.length - 1];
+
   return (
     <View style={styles.historyList}>
       <View style={styles.historyCard}>
@@ -1490,7 +1578,48 @@ const GrowthHistory: React.FC<{
         {currentStage ? (
           <AppText variant="caption" color={theme.colors.text.secondary}>
             Giai đoạn nấm: {getGrowthStageLabel(currentStage)}
-            {typeof progressPercent === 'number' ? ` · ${progressPercent}%` : ''}
+          </AppText>
+        ) : null}
+      </View>
+      <View style={styles.historyCard}>
+        <View style={styles.historyHeading}>
+          <AppText variant="bodyMedium" weight="bold" style={styles.historyTitle}>
+            {getGrowthStageLabel(activeStage)}
+          </AppText>
+          <AppText variant="captionMedium" weight="bold" color={theme.colors.primary[700]}>
+            {overallProgress}%
+          </AppText>
+        </View>
+        <View
+          accessibilityRole="progressbar"
+          accessibilityValue={{ min: 0, max: 100, now: overallProgress }}
+          style={styles.progressTrack}
+        >
+          <View style={styles.progressRail} />
+          <View style={[styles.progressFill, { width: `${overallProgress}%` }]} />
+          {stages.map((stage, index) => (
+            <View
+              key={stage}
+              accessibilityLabel={getGrowthStageLabel(stage)}
+              style={[
+                styles.progressDot,
+                index <= activeStageIndex ? styles.progressDotReached : styles.progressDotUpcoming,
+                index === activeStageIndex && styles.progressDotCurrent,
+                { left: `${(index / (stages.length - 1)) * 100}%` },
+              ]}
+            />
+          ))}
+        </View>
+        <View style={styles.progressLabels}>
+        </View>
+        {latestUpdate?.description ? (
+          <AppText variant="caption" color={theme.colors.text.secondary}>
+            {latestUpdate.description}
+          </AppText>
+        ) : null}
+        {latestUpdate ? (
+          <AppText variant="caption" color={theme.colors.text.muted}>
+            Cập nhật: {formatDateTime(latestUpdate.updated_at)}
           </AppText>
         ) : null}
       </View>
@@ -1498,7 +1627,7 @@ const GrowthHistory: React.FC<{
         <DetailEmptyState message="Chưa có nhật ký cập nhật giai đoạn nấm." />
       ) : null}
       {history.map((item) => (
-        <View key={item.progress_id} style={styles.historyCard}>
+        <View key={item.progress_id} style={styles.growthHistoryEntry}>
           <View style={styles.historyHeading}>
             <AppText variant="bodyMedium" weight="bold" style={styles.historyTitle}>
               {getGrowthStageLabel(item.current_stage)}
@@ -1532,11 +1661,32 @@ const DeviceHistory: React.FC<{
   logs: CustomerDeviceLogItem[];
   readings: CustomerTrayDetails['sensor_readings'];
   refreshError: string | null;
-}> = ({ logs, readings, refreshError }) => {
+  environmentPoints: CustomerEnvironmentHistoryPoint[];
+  environmentRange: EnvironmentHistoryRange;
+  onEnvironmentRangeChange: (range: EnvironmentHistoryRange) => void;
+  environmentLoading: boolean;
+  environmentError: string | null;
+}> = ({
+  logs,
+  readings,
+  refreshError,
+  environmentPoints,
+  environmentRange,
+  onEnvironmentRangeChange,
+  environmentLoading,
+  environmentError,
+}) => {
   const averages = getAverageSensorReadings(readings);
 
   return (
     <View style={styles.historyList}>
+      <CustomerEnvironmentHistoryChart
+        points={environmentPoints}
+        range={environmentRange}
+        onRangeChange={onEnvironmentRangeChange}
+        loading={environmentLoading}
+        error={environmentError}
+      />
       <View style={styles.sensorSection}>
         {refreshError ? (
           <AppText variant="caption" color={theme.colors.error.main}>
@@ -1743,7 +1893,7 @@ const styles = StyleSheet.create({
   },
   trayTile: {
     width: '31.5%',
-    minHeight: 165,
+    minHeight: 120,
     borderRadius: 12,
     padding: theme.spacing.xs,
     justifyContent: 'space-between',
@@ -1980,6 +2130,59 @@ const styles = StyleSheet.create({
   },
   historyTitle: {
     flex: 1,
+  },
+  growthHistoryEntry: {
+    display: 'none',
+  },
+  progressTrack: {
+    height: 18,
+    width: '100%',
+    justifyContent: 'center',
+    overflow: 'visible',
+  },
+  progressRail: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 6,
+    borderRadius: 8,
+    backgroundColor: theme.colors.neutral[200],
+  },
+  progressFill: {
+    position: 'absolute',
+    left: 0,
+    height: 6,
+    borderRadius: 8,
+    backgroundColor: theme.colors.primary[600],
+  },
+  progressDot: {
+    position: 'absolute',
+    top: 2,
+    width: 14,
+    height: 14,
+    marginLeft: -7,
+    borderRadius: 7,
+    borderWidth: 2,
+  },
+  progressDotReached: {
+    borderColor: theme.colors.primary[600],
+    backgroundColor: theme.colors.primary[600],
+  },
+  progressDotUpcoming: {
+    borderColor: theme.colors.neutral[400],
+    backgroundColor: '#FFFFFF',
+  },
+  progressDotCurrent: {
+    width: 18,
+    height: 18,
+    top: 0,
+    marginLeft: -9,
+    borderRadius: 9,
+    borderColor: theme.colors.primary[700],
+  },
+  progressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   deviceAction: {
     flexDirection: 'row',

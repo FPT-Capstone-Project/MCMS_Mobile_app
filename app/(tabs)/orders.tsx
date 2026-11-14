@@ -130,23 +130,21 @@ function normalizeMushroomName(name?: string) {
     .trim();
 }
 
-function getSessionProgressLabel(status: string, harvestStatus?: string | null): string {
-  if (status === 'CULTIVATING' && harvestStatus === 'HARVEST_READY') {
-    return 'Sẵn sàng thu hoạch';
-  }
-
+function getOrderSpawnProgressLabel(
+  session: CustomerCultivationStatus['sessions'][number]
+): string | null {
+  if (session.assigned_trays?.some((tray) => tray.status === 'ACTIVE')) return null;
   const labels: Record<string, string> = {
-    PENDING: 'Đang chuẩn bị phôi',
-    SPAWN_RESTING: 'Đang ủ phôi',
+    RECEIVED: 'Đã tiếp nhận phôi',
+    PENDING: 'Đã tiếp nhận phôi',
+    SPAWN_PENDING: 'Đã tiếp nhận phôi',
+    RESTING: 'Phôi đang nghỉ',
+    SPAWN_RESTING: 'Phôi đang nghỉ',
+    DEVELOPING: 'Đang phát triển tơ nấm',
     MYCELIAL_DEVELOPMENT: 'Đang phát triển tơ nấm',
-    READY_FOR_CULTIVATION: 'Sẵn sàng nuôi trồng',
-    CULTIVATING: 'Đang nuôi trồng',
-    HARVEST_READY: 'Sẵn sàng thu hoạch',
-    HARVESTING: 'Đang thu hoạch',
-    COMPLETED: 'Đã hoàn tất',
-    CANCELLED: 'Đã hủy',
+    READY_FOR_CULTIVATION: 'Sẵn sàng đưa lên khay',
   };
-  return labels[status] ?? status.replace(/_/g, ' ');
+  return labels[session.status.trim().toUpperCase()] ?? null;
 }
 
 type CustomerOrderFilter =
@@ -470,9 +468,10 @@ function CustomerOrdersContent() {
       const cultivation = cultivationByOrder[order.order_id];
       const labels = [...new Set(
         (cultivation?.data?.sessions ?? []).map((session) =>
-          getSessionProgressLabel(session.status, session.harvest_status)
-        )
+          getOrderSpawnProgressLabel(session)
+        ).filter((label): label is string => label !== null)
       )];
+      const hasSessions = Boolean(cultivation?.data?.sessions.length);
       badgeText = cultivation?.loading
         ? 'Đang tải tiến độ'
         : cultivation?.error
@@ -481,7 +480,9 @@ function CustomerOrdersContent() {
         ? labels[0]
         : labels.length > 1
         ? 'Đang ở nhiều giai đoạn'
-        : 'Đang chuẩn bị phôi';
+        : hasSessions
+        ? 'Đang nuôi trồng'
+        : 'Đã thanh toán';
       badgeColor = theme.colors.primary[600];
       badgeBg = theme.colors.primary[50];
     } else if (order.order_status === 'CONFIRMED') {
@@ -712,9 +713,13 @@ function CustomerOrdersContent() {
                   </View>
                 </View>
 
-                {cultivationByOrder[order.order_id]?.data?.sessions.length ? (
+                {cultivationByOrder[order.order_id]?.data?.sessions.some(
+                  (session) => getOrderSpawnProgressLabel(session) !== null
+                ) ? (
                   <View style={styles.orderProgressList}>
-                    {cultivationByOrder[order.order_id].data?.sessions.map((session) => (
+                    {cultivationByOrder[order.order_id].data?.sessions
+                      .filter((session) => getOrderSpawnProgressLabel(session) !== null)
+                      .map((session) => (
                       <AppText
                         key={session.session_id}
                         variant="caption"
@@ -723,7 +728,7 @@ function CustomerOrdersContent() {
                         {session.mushroom_name
                           ? `${session.mushroom_name}: `
                           : 'Tiến độ nuôi trồng: '}
-                        {getSessionProgressLabel(session.status, session.harvest_status)}
+                        {getOrderSpawnProgressLabel(session)}
                       </AppText>
                     ))}
                   </View>
