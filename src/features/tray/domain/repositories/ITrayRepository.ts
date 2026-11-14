@@ -1,4 +1,9 @@
-import { CustomerTrayDetails, Tray, TrayId } from '../entities/Tray';
+import {
+  CustomerEnvironmentHistoryPoint,
+  CustomerTrayDetails,
+  Tray,
+  TrayId,
+} from '../entities/Tray';
 
 /**
  * Tray Repository Interface (Domain Boundary)
@@ -28,4 +33,12 @@ export interface ITrayRepository {
    * Retrieves recent sensor readings for an owned cultivation session.
    */
   getCustomerSensorHistory(sessionId: number): Promise<CustomerTrayDetails['sensor_readings']>;
+
+  /** Retrieves summarized environment history for a customer's cultivation session. */
+  getCustomerEnvironmentHistory(
+    sessionId: number,
+    floorId: number,
+    from: string,
+    to: string
+  ): Promise<CustomerEnvironmentHistoryPoint[]>;
 }

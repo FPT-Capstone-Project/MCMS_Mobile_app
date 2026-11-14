@@ -7,6 +7,7 @@ import {
   CustomerTrayDetails,
   CustomerTrayCard,
   CustomerDeviceLogItem,
+  CustomerEnvironmentHistoryPoint,
   Tray,
   TrayId,
 } from '../../domain/entities/Tray';
@@ -120,7 +121,7 @@ export class TrayRepository implements ITrayRepository {
                   ? progressPercent
                   : null,
               condition: item.condition ?? null,
-              description: item.description ?? item.notes ?? null,
+              description: localizeGrowthDescription(item.description ?? item.notes),
               updated_at:
                 item.updated_at ||
                 item.created_at ||
@@ -161,6 +162,78 @@ export class TrayRepository implements ITrayRepository {
     }
   }
 
+  async getCustomerEnvironmentHistory(
+    sessionId: number,
+    floorId: number,
+    from: string,
+    to: string
+  ): Promise<CustomerEnvironmentHistoryPoint[]> {
+    const params = { from, to, page: 1, pageSize: 100 };
+    const [sessionResult, latestResult, floorResult] = await Promise.allSettled([
+      axiosClient.get<{ data?: CustomerEnvironmentHistoryPoint[] }>(
+        API_ENDPOINTS.ENVIRONMENT_HISTORY.SESSION(sessionId),
+        { params }
+      ),
+      axiosClient.get<{ data?: CustomerEnvironmentHistoryPoint | null }>(
+        API_ENDPOINTS.ENVIRONMENT_HISTORY.SESSION_LATEST(sessionId)
+      ),
+      axiosClient.get<{ data?: CustomerEnvironmentHistoryPoint[] }>(
+        API_ENDPOINTS.ENVIRONMENT_HISTORY.FLOOR(floorId),
+        { params }
+      ),
+    ]);
+
+    if (sessionResult.status === 'rejected') {
+      throw handleApiError(sessionResult.reason);
+    }
+
+    const records = new Map<string, CustomerEnvironmentHistoryPoint>();
+    const addRecord = (record: CustomerEnvironmentHistoryPoint) => {
+      if (Number(record.session_id) !== sessionId) return;
+      const timestamp = Date.parse(record.period_start);
+      if (!Number.isFinite(timestamp) || timestamp < Date.parse(from) || timestamp >= Date.parse(to)) {
+        return;
+      }
+      records.set(`${record.session_id}:${record.floor_id}:${record.period_start}`, record);
+    };
+
+    const sessionRecords = sessionResult.value.data?.data;
+    if (Array.isArray(sessionRecords)) sessionRecords.forEach(addRecord);
+
+    const floorRecords = floorResult.status === 'fulfilled' ? floorResult.value.data?.data : undefined;
+    if (Array.isArray(floorRecords)) floorRecords.forEach(addRecord);
+
+    const sessionPages = Number((sessionResult.value.data as any)?.pagination?.totalPages) || 1;
+    const floorPages = floorResult.status === 'fulfilled'
+      ? Number((floorResult.value.data as any)?.pagination?.totalPages) || 1
+      : 1;
+    const extraPages = Array.from({ length: Math.max(sessionPages, floorPages) - 1 }, (_, index) => index + 2);
+    const pagedResults = await Promise.allSettled(
+      extraPages.flatMap((page) => [
+        axiosClient.get<{ data?: CustomerEnvironmentHistoryPoint[] }>(
+          API_ENDPOINTS.ENVIRONMENT_HISTORY.SESSION(sessionId),
+          { params: { ...params, page } }
+        ),
+        axiosClient.get<{ data?: CustomerEnvironmentHistoryPoint[] }>(
+          API_ENDPOINTS.ENVIRONMENT_HISTORY.FLOOR(floorId),
+          { params: { ...params, page } }
+        ),
+      ])
+    );
+    for (const result of pagedResults) {
+      if (result.status === 'fulfilled' && Array.isArray(result.value.data?.data)) {
+        result.value.data.data.forEach(addRecord);
+      }
+    }
+
+    const latestRecord = latestResult.status === 'fulfilled' ? latestResult.value.data?.data : null;
+    if (latestRecord) addRecord(latestRecord);
+
+    return [...records.values()].sort(
+      (left, right) => Date.parse(left.period_start) - Date.parse(right.period_start)
+    );
+  }
+
   async getCustomerFloorRacks(): Promise<CustomerFloorRack[]> {
     const [floors, trays, orders] = await Promise.all([
       iotRepository.getFloors(),
@@ -178,7 +251,10 @@ export class TrayRepository implements ITrayRepository {
       activeOrders.map((order) => orderRepository.getCustomerCultivationStatus(order.order_id))
     );
 
-    const ownedTraySessions = new Map<number, { sessionId: number; orderId: number }>();
+    const ownedTraySessions = new Map<
+      number,
+      { sessionId: number; orderId: number; sessionTrayId?: number; mushroomName?: string }
+    >();
     for (const result of customerSessions) {
       for (const session of result.sessions) {
         if (!['CULTIVATING', 'HARVEST_READY', 'HARVESTING'].includes(session.status)) continue;
@@ -192,6 +268,8 @@ export class TrayRepository implements ITrayRepository {
             ownedTraySessions.set(assignedTray.tray_id, {
               sessionId: session.session_id,
               orderId: result.orderId,
+              sessionTrayId: Number((assignedTray as any).session_tray_id) || undefined,
+              mushroomName: session.mushroom_name || undefined,
             });
           }
         }
@@ -303,9 +381,15 @@ export class TrayRepository implements ITrayRepository {
           let activeSessionTrayId: number | undefined;
           let activeMushroomName: string | undefined;
 
-          // STRICT RULE: If tray is returned in available-trays API or physically AVAILABLE,
-          // it CANNOT be occupied by any session (past or released links are ignored).
-          if (isExplicitlyAvailable || isPhysicalAvailable) {
+          // Customer-owned active assignments take precedence over availability snapshots.
+          // The available-trays endpoint can be stale or use different occupancy rules;
+          // it must not hide a tray confirmed by the customer's own cultivation endpoint.
+          const ownedSession = ownedTraySessions.get(tray.tray_id);
+          if (ownedSession) {
+            activeSessionId = ownedSession.sessionId;
+            activeSessionTrayId = ownedSession.sessionTrayId;
+            activeMushroomName = ownedSession.mushroomName;
+          } else if (isExplicitlyAvailable || isPhysicalAvailable) {
             activeSessionId = undefined;
             activeSessionTrayId = undefined;
             activeMushroomName = undefined;
@@ -317,16 +401,9 @@ export class TrayRepository implements ITrayRepository {
               activeSessionTrayId = adminSessionTray.sessionTrayId;
               activeMushroomName = adminSessionTray.mushroomName;
             }
-          } else {
-            // For customer
-            const ownedSession = ownedTraySessions.get(tray.tray_id);
-            if (ownedSession) {
-              activeSessionId = ownedSession.sessionId;
-            }
           }
 
           const isCurrentlyActive = activeSessionId != null;
-          const ownedSession = ownedTraySessions.get(tray.tray_id);
           const hasOwnActiveCultivation =
             isCurrentlyActive && ownedSession?.sessionId === activeSessionId;
 
@@ -385,6 +462,36 @@ function toNullableNumber(value: number | string | null): number | null {
   if (value === null) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function localizeGrowthDescription(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const description = value.trim();
+  const stageChange = description.match(/^Spawn stage changed to ([A-Z_]+)$/i);
+  if (stageChange) {
+    const stageLabels: Record<string, string> = {
+      SPAWN_PENDING: 'chuẩn bị phôi',
+      SPAWN_RESTING: 'ủ phôi',
+      MYCELIAL_DEVELOPMENT: 'phát triển tơ nấm',
+      READY_FOR_CULTIVATION: 'sẵn sàng nuôi trồng',
+      FRUITING_INITIATION: 'bắt đầu tạo quả thể',
+      PINNING: 'ra nụ',
+      YOUNG_FRUITING: 'nấm non',
+      MATURATION: 'trưởng thành',
+    };
+    const stageLabel = stageLabels[stageChange[1].toUpperCase()];
+    if (stageLabel) return `Giai đoạn phôi đã chuyển sang ${stageLabel}.`;
+  }
+
+  const knownDescriptions: Record<string, string> = {
+    'Spawn allocated after payment; awaiting farm acceptance':
+      'Phôi đã được phân bổ sau khi thanh toán và đang chờ trang trại tiếp nhận.',
+    'Spawn has been placed on the assigned trays and fruiting initiation has started.':
+      'Phôi đã được đặt vào các khay được phân bổ và bắt đầu giai đoạn tạo quả thể.',
+    'Cultivation started after tray assignment':
+      'Quá trình nuôi trồng bắt đầu sau khi khay được phân bổ.',
+  };
+  return knownDescriptions[description] ?? description;
 }
 
 

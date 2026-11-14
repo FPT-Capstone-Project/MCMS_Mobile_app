@@ -99,6 +99,16 @@ export interface CustomerSensorReading {
   sensorId: number | string;
 }
 
+export interface CustomerEnvironmentHistoryPoint {
+  session_id: number;
+  floor_id: number;
+  period_start: string;
+  period_end: string;
+  growth_stage: string;
+  temperature_avg: number | string | null;
+  humidity_avg: number | string | null;
+}
+
 export interface CustomerTrayDetails {
   session_id: number;
   cultivation_status?: string;

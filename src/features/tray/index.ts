@@ -8,3 +8,4 @@ export * from './data/datasources/trayMockData';
 export * from './data/repositories/TrayRepository';
 export * from './presentation/components/RackVisualizer';
 export * from './presentation/components/TrayStatusLegend';
+export * from './presentation/components/CustomerEnvironmentHistoryChart';

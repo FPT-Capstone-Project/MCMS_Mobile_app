@@ -75,6 +75,12 @@ export const API_ENDPOINTS = {
     IOT_SENSOR_HISTORY: (sessionId: string | number) =>
       `/api/customer/sessions/${sessionId}/iot-history/sensors`,
   },
+  ENVIRONMENT_HISTORY: {
+    SESSION: (sessionId: string | number) => `/api/environment-history/sessions/${sessionId}`,
+    SESSION_LATEST: (sessionId: string | number) =>
+      `/api/environment-history/sessions/${sessionId}/latest`,
+    FLOOR: (floorId: string | number) => `/api/environment-history/floors/${floorId}`,
+  },
   EXPERT: {
     CONSULTATIONS: '/api/consultations',
     CONSULTATION: (consultationId: number | string) =>
