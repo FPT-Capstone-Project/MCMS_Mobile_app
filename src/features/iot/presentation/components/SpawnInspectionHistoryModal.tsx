@@ -1,3 +1,5 @@
+import { RequestExpertModal } from '../../../expert/presentation/RequestExpertModal';
+import type { ExpertRequestContext } from '../../../expert/domain/entities/expert-consultation';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -16,6 +18,7 @@ import {
 } from '../../domain/entities/Iot';
 import { iotRepository } from '../../data/repositories/IotRepository';
 import {
+  AppButton,
   AppCard,
   AppDivider,
   AppIconButton,
@@ -49,6 +52,7 @@ const SpawnInspectionHistoryModalContent: React.FC<{
   session: CultivationSessionAdmin;
   onClose: () => void;
 }> = ({ visible, session, onClose }) => {
+  const [expertContext, setExpertContext] = useState<ExpertRequestContext | null>(null);
   const [inspections, setInspections] = useState<SpawnInspection[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -122,6 +126,7 @@ const SpawnInspectionHistoryModalContent: React.FC<{
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
+        {expertContext && <RequestExpertModal context={expertContext} onClose={() => { setExpertContext(null); onClose(); }} />}
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={styles.sheetContainer}>
           <View style={styles.dragHandle} />
@@ -200,6 +205,12 @@ const SpawnInspectionHistoryModalContent: React.FC<{
                       {renderConditionBadge(item.condition)}
                     </View>
 
+                    {['SPAWN_RESTING', 'MYCELIAL_DEVELOPMENT'].includes(session.status) && !!(item.inspection_id || item.id) && (
+                      <AppButton title="Nhờ chuyên gia" variant="outline" size="sm" onPress={() => setExpertContext({
+                        sessionId: session.session_id, spawnInspectionId: item.inspection_id || item.id,
+                        label: `Kiểm tra phôi #${item.inspection_id || item.id}`,
+                      })} />
+                    )}
                     <AppDivider spacing="xs" />
 
                     <View style={styles.countsRow}>

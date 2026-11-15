@@ -277,8 +277,8 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
       <AppHeader
-        title="Chăm sóc & Tự động hóa"
-        subtitle="Quản lý vi khí hậu & tự động hóa theo tầng"
+        title="Tự động hóa"
+        subtitle="Chọn phòng và tầng để điều khiển chăm sóc"
         showBack
         onBack={handleBack}
       />
@@ -291,7 +291,7 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
         {/* Room Picker Section */}
         <View style={styles.sectionWrap}>
           <AppText variant="label" color={theme.colors.text.muted}>
-            PHÒNG NUÔI TRỒNG
+            Phòng nuôi trồng
           </AppText>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.roomPillsRow}>
@@ -303,11 +303,7 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
                   onPress={() => setSelectedRoomId(room.room_id)}
                   style={[styles.roomPill, isSelected && styles.roomPillActive]}
                 >
-                  <Ionicons
-                    name="business-outline"
-                    size={16}
-                    color={isSelected ? '#FFFFFF' : theme.colors.text.secondary}
-                  />
+
                   <AppText
                     variant="caption"
                     weight={isSelected ? 'bold' : 'normal'}
@@ -350,7 +346,7 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
         {/* Floors Section Header */}
         <View style={styles.sectionTitleRow}>
           <AppText variant="label" color={theme.colors.text.muted}>
-            DANH SÁCH TẦNG ({activeRoomFloors.length})
+            Các tầng ({activeRoomFloors.length})
           </AppText>
 
           {canManage && selectedRoomId && (
@@ -424,7 +420,7 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
                     {/* Top Floor Header */}
                     <View style={styles.floorCardHeader}>
                       <View style={styles.floorTitleRow}>
-                        <Ionicons name="layers" size={20} color={theme.colors.primary[600]} />
+
                         <AppText variant="title" weight="bold">
                           {floor.floor_name}
                         </AppText>
@@ -433,16 +429,16 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
                       {/* Status Badges */}
                       {isDryRun && isRunning ? (
                         <View style={styles.dryRunBadge}>
-                          <Ionicons name="flask" size={11} color="#FFFFFF" />
+
                           <AppText variant="caption" weight="bold" color="#FFFFFF" style={styles.badgeTextSmall}>
-                            MÔ PHỎNG
+                            Mô phỏng
                           </AppText>
                         </View>
                       ) : isRunning ? (
                         <View style={styles.runningBadge}>
-                          <Ionicons name="play" size={11} color="#FFFFFF" />
+
                           <AppText variant="caption" weight="bold" color="#FFFFFF" style={styles.badgeTextSmall}>
-                            ĐANG CHẠY
+                            Đang chạy
                           </AppText>
                         </View>
                       ) : isFault ? (
@@ -454,15 +450,15 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
                         </View>
                       ) : isOffPending ? (
                         <View style={styles.offPendingBadge}>
-                          <Ionicons name="time" size={11} color="#FFFFFF" />
+
                           <AppText variant="caption" weight="bold" color="#FFFFFF" style={styles.badgeTextSmall}>
-                            CHỜ TẮT
+                            Chờ tắt
                           </AppText>
                         </View>
                       ) : (
                         <View style={styles.stoppedBadge}>
                           <AppText variant="caption" weight="semibold" color={theme.colors.text.secondary} style={styles.badgeTextSmall}>
-                            THỦ CÔNG
+                            Thủ công
                           </AppText>
                         </View>
                       )}
@@ -470,14 +466,14 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
 
                     {/* Hardware info */}
                     <AppText variant="caption" color={theme.colors.text.secondary} style={styles.hardwareText}>
-                      Tầng {floor.floor_number} • Master #{floor.master_id} • Node {floor.node_address} • SSR #{floor.misting_ssr_channel}
+                      Tầng {floor.floor_number} · {floor.total_rows || 0} hàng × {floor.total_columns || 0} cột
                     </AppText>
 
                     {/* Climate Telemetry & Tray count */}
                     <View style={styles.metricsRow}>
                       {/* Climate */}
                       <View style={styles.metricSnippet}>
-                        <Ionicons name="pulse" size={14} color={theme.colors.primary[600]} />
+
                         {env?.averageTemperature != null && env?.averageHumidity != null && env.healthy ? (
                           <AppText variant="caption" weight="semibold">
                             {Number(env.averageTemperature).toFixed(1)}°C • {Number(env.averageHumidity).toFixed(1)}%
@@ -495,7 +491,7 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
 
                       {/* Tray counts */}
                       <View style={styles.metricSnippet}>
-                        <Ionicons name="cube-outline" size={14} color={theme.colors.text.secondary} />
+
                         {counts ? (
                           <AppText variant="caption" color={theme.colors.text.secondary}>
                             {counts.total} khay (Đang trồng: <AppText variant="caption" weight="bold" color={theme.colors.success.dark}>{counts.cultivating}</AppText> • Khay trống: <AppText variant="caption" weight="bold" color={theme.colors.primary[700]}>{counts.availableForAssign}</AppText>)
@@ -557,7 +553,7 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
                       style={styles.cardActionBtn}
                       onPress={() => onSelectFloor(floor, 'overview')}
                     >
-                      <Ionicons name="speedometer-outline" size={13} color={theme.colors.primary[700]} />
+
                       <AppText variant="caption" weight="semibold" color={theme.colors.primary[700]} style={{ marginLeft: 3 }}>
                         Tổng quan
                       </AppText>
@@ -567,7 +563,7 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
                       style={styles.cardActionBtn}
                       onPress={() => onSelectFloor(floor, 'trays')}
                     >
-                      <Ionicons name="cube-outline" size={13} color={theme.colors.primary[700]} />
+
                       <AppText variant="caption" weight="semibold" color={theme.colors.primary[700]} style={{ marginLeft: 3 }}>
                         Khay ({counts?.total || 0})
                       </AppText>
@@ -577,7 +573,7 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
                       style={styles.cardActionBtn}
                       onPress={() => onSelectFloor(floor, 'logs')}
                     >
-                      <Ionicons name="newspaper-outline" size={13} color={theme.colors.primary[700]} />
+
                       <AppText variant="caption" weight="semibold" color={theme.colors.primary[700]} style={{ marginLeft: 3 }}>
                         Nhật ký
                       </AppText>
@@ -641,13 +637,15 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   roomPill: {
+    minHeight: 44,
+    justifyContent: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.xs,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: 7,
     backgroundColor: '#FFFFFF',
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.sm,
     borderWidth: 1,
     borderColor: theme.colors.border.light,
   },
@@ -669,7 +667,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(34, 197, 94, 0.1)',
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.sm,
   },
   sectionTitleRow: {
     flexDirection: 'row',
@@ -682,7 +680,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.sm,
     backgroundColor: theme.colors.primary[50],
   },
   floorsList: {
@@ -690,13 +688,15 @@ const styles = StyleSheet.create({
   },
   floorCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.md,
-    gap: 6,
+    gap: 12,
     borderWidth: 1,
     borderColor: theme.colors.border.light,
   },
   floorCardHeader: {
+    flexWrap: 'wrap',
+    gap: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -716,7 +716,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0284C7',
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.sm,
   },
   runningBadge: {
     flexDirection: 'row',
@@ -724,7 +724,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.success.main,
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.sm,
   },
   faultBadge: {
     flexDirection: 'row',
@@ -732,7 +732,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.error.main,
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.sm,
   },
   offPendingBadge: {
     flexDirection: 'row',
@@ -740,20 +740,21 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.warning.main,
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.sm,
   },
   stoppedBadge: {
     backgroundColor: theme.colors.neutral[200],
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.sm,
   },
   hardwareText: {
     marginTop: 1,
   },
   metricsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    gap: 10,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     backgroundColor: theme.colors.neutral[50],
     paddingHorizontal: theme.spacing.sm,
@@ -805,6 +806,9 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   cardActionBtn: {
+    flex: 1,
+    minHeight: 44,
+    justifyContent: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.primary[50],
@@ -813,6 +817,10 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   cardActionBtnIcon: {
+    minHeight: 44,
+    minWidth: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginLeft: 'auto',
     padding: 4,
   },

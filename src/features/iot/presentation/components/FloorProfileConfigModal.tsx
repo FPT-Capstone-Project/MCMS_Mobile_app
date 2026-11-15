@@ -409,7 +409,7 @@ const FloorProfileConfigModalContent: React.FC<FloorProfileConfigModalProps> = (
             {/* GROUP 1: LOẠI NẤM */}
             <AppCard elevation="xs" style={styles.groupCard}>
               <View style={styles.groupHeaderRow}>
-                <Ionicons name="leaf" size={18} color={theme.colors.primary[600]} />
+
                 <AppText variant="label" weight="bold">
                   1. LOẠI NẤM ĐƯỢC CHĂM SÓC TRÊN TẦNG ({selectedMushroomIds.length})
                 </AppText>
@@ -532,7 +532,7 @@ const FloorProfileConfigModalContent: React.FC<FloorProfileConfigModalProps> = (
             {/* GROUP 2: ĐIỀU KIỆN CHĂM SÓC */}
             <AppCard elevation="xs" style={styles.groupCard}>
               <View style={styles.groupHeaderRow}>
-                <Ionicons name="water" size={18} color="#0EA5E9" />
+
                 <AppText variant="label" weight="bold">
                   2. ĐIỀU KIỆN ĐỘ ẨM & LÀM MÁT
                 </AppText>
@@ -545,7 +545,7 @@ const FloorProfileConfigModalContent: React.FC<FloorProfileConfigModalProps> = (
               <View style={styles.inputsGrid}>
                 <View style={styles.inputCol}>
                   <AppInput
-                    label="Độ ẩm Min (%)"
+                    label="Độ ẩm thấp nhất (%)"
                     value={humMin}
                     onChangeText={(v) => {
                       setHumMin(v);
@@ -557,7 +557,7 @@ const FloorProfileConfigModalContent: React.FC<FloorProfileConfigModalProps> = (
                 </View>
                 <View style={styles.inputCol}>
                   <AppInput
-                    label="Độ ẩm Max (%)"
+                    label="Độ ẩm cao nhất (%)"
                     value={humMax}
                     onChangeText={(v) => {
                       setHumMax(v);
@@ -626,7 +626,7 @@ const FloorProfileConfigModalContent: React.FC<FloorProfileConfigModalProps> = (
                   <View style={styles.inputsGrid}>
                     <View style={styles.inputCol}>
                       <AppInput
-                        label="Nhiệt độ Min (°C)"
+                        label="Nhiệt độ thấp nhất (°C)"
                         value={tempMin}
                         onChangeText={(v) => {
                           setTempMin(v);
@@ -638,7 +638,7 @@ const FloorProfileConfigModalContent: React.FC<FloorProfileConfigModalProps> = (
                     </View>
                     <View style={styles.inputCol}>
                       <AppInput
-                        label="Nhiệt độ Max (°C)"
+                        label="Nhiệt độ cao nhất (°C)"
                         value={tempMax}
                         onChangeText={(v) => {
                           setTempMax(v);
@@ -699,7 +699,7 @@ const FloorProfileConfigModalContent: React.FC<FloorProfileConfigModalProps> = (
                 style={styles.expandableHeaderRow}
               >
                 <View style={styles.groupHeaderRow}>
-                  <Ionicons name="timer" size={18} color="#F59E0B" />
+
                   <AppText variant="label" weight="bold">
                     3. NHỊP PHUN & GIỚI HẠN AN TOÀN
                   </AppText>
@@ -834,7 +834,7 @@ const FloorProfileConfigModalContent: React.FC<FloorProfileConfigModalProps> = (
             {/* GROUP 4: DUYỆT CẤU HÌNH */}
             <AppCard elevation="xs" style={styles.groupCard}>
               <View style={styles.groupHeaderRow}>
-                <Ionicons name="shield-checkmark" size={18} color={theme.colors.success.dark} />
+
                 <AppText variant="label" weight="bold">
                   4. PHÊ DUYỆT & ĐẶT TÊN CẤU HÌNH
                 </AppText>

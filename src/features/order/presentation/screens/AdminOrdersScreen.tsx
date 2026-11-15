@@ -1,3 +1,4 @@
+import { SESSION_FILTERS, GROWTH_FILTERS, sessionGroup, growthStage, compareSessions, statusLabel } from '../../../cultivation/domain/sessionWorkflow';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -71,21 +72,13 @@ const StatusBadge: React.FC<{
 
 type AdminTab = 'rentals' | 'orders';
 
-const RENTAL_STATUS_FILTERS = [
-  { label: 'Tất cả', value: 'ALL' },
-  { label: 'Chờ xử lý', value: 'PENDING' },
-  { label: 'Ủ tơ', value: 'SPAWN_RESTING' },
-  { label: 'Phát triển tơ', value: 'MYCELIAL_DEVELOPMENT' },
-  { label: 'Sẵn sàng trồng', value: 'READY_FOR_CULTIVATION' },
-  { label: 'Đang trồng', value: 'CULTIVATING' },
-  { label: 'Sẵn sàng thu hoạch', value: 'HARVEST_READY' },
-  { label: 'Hoàn thành', value: 'COMPLETED' },
-];
+const RENTAL_STATUS_FILTERS = SESSION_FILTERS;
 
 const ORDER_STATUS_FILTERS = [
   { label: 'Tất cả', value: 'ALL' },
   { label: 'Chờ xử lý', value: 'PENDING' },
   { label: 'Đã thanh toán', value: 'PAID' },
+  { label: 'Đã xác nhận', value: 'CONFIRMED' },
   { label: 'Đang xử lý', value: 'PROCESSING' },
   { label: 'Hoàn thành', value: 'COMPLETED' },
   { label: 'Đã hủy', value: 'CANCELLED' },
@@ -102,6 +95,7 @@ export const AdminOrdersScreen: React.FC = () => {
 
   // Status Filters
   const [rentalFilter, setRentalFilter] = useState('ALL');
+  const [growthFilter, setGrowthFilter] = useState('ALL');
   const [orderFilter, setOrderFilter] = useState('ALL');
 
   // Data states
@@ -152,65 +146,15 @@ export const AdminOrdersScreen: React.FC = () => {
     try {
       if (activeTab === 'rentals') {
         // Fetch sessions from GET /api/farm/sessions
-        const sessRes = await iotRepository.getAdminCultivationSessions(
-          rentalFilter === 'ALL' ? undefined : rentalFilter
-        );
+        const sessRes = await iotRepository.getAdminCultivationSessions();
         setSessions(sessRes);
       } else {
-        // Fetch orders: try customer orders first
-        try {
-          const directOrders = await orderRepository.getCustomerOrders(
-            orderFilter === 'ALL' ? undefined : orderFilter
-          );
-          if (directOrders.length > 0) {
-            setOrders(directOrders);
-            return;
-          }
-        } catch {
-          // Fall through to farm session orders
-        }
-
-        // If no personal customer orders (e.g. current user is Admin/Operator),
-        // synthesize orders from the farm cultivation sessions list (orders #7, #13, etc.)
-        const farmSessions = await iotRepository.getAdminCultivationSessions();
-        const ordersMap = new Map<number, CustomerOrder>();
-
-        farmSessions.forEach((sess) => {
-          if (!sess.order_id) return;
-          if (!ordersMap.has(sess.order_id)) {
-            ordersMap.set(sess.order_id, {
-              order_id: sess.order_id,
-              user_id: 1,
-              order_status:
-                sess.status === 'COMPLETED'
-                  ? 'COMPLETED'
-                  : sess.status === 'CANCELLED'
-                  ? 'CANCELLED'
-                  : 'PROCESSING',
-              payment_status: 'PAID',
-              total_amount: (sess.required_trays || sess.tray_quantity || 1) * 350000,
-              created_at: sess.created_at || new Date().toISOString(),
-              updated_at: sess.updated_at || new Date().toISOString(),
-              items: [
-                {
-                  order_item_id: sess.session_id,
-                  mushroom_name: sess.mushroom_name || 'Nấm giống',
-                  package_name: `Gói thuê khay (${sess.required_trays || sess.tray_quantity || 1} khay)`,
-                  quantity: sess.required_trays || sess.tray_quantity || 1,
-                  price: 350000,
-                  total_price: (sess.required_trays || sess.tray_quantity || 1) * 350000,
-                },
-              ],
-            });
-          }
-        });
-
-        const derivedOrders = Array.from(ordersMap.values());
-        if (orderFilter !== 'ALL') {
-          setOrders(derivedOrders.filter((o) => o.order_status === orderFilter));
-        } else {
-          setOrders(derivedOrders);
-        }
+        const [adminOrders, farmSessions] = await Promise.all([
+          orderRepository.getAdminOrders(),
+          iotRepository.getAdminCultivationSessions(),
+        ]);
+        setOrders(adminOrders);
+        setSessions(farmSessions);
       }
     } catch (err: any) {
       setErrorMessage(
@@ -220,7 +164,7 @@ export const AdminOrdersScreen: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeTab, rentalFilter, orderFilter]);
+  }, [activeTab]);
 
   useEffect(() => {
     let isMounted = true;
@@ -283,49 +227,47 @@ export const AdminOrdersScreen: React.FC = () => {
   // Filter sessions by search query
   const filteredSessions = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return sessions;
     return sessions.filter((s) => {
+      if (rentalFilter !== 'ALL' && sessionGroup(s) !== rentalFilter) return false;
+      if (rentalFilter === 'CULTIVATING' && growthFilter !== 'ALL' && growthStage(s) !== growthFilter) return false;
+      if (!q) return true;
       const matchId = String(s.session_id).includes(q) || String(s.order_id || '').includes(q);
       const matchCustomer =
         (s.customer_name && s.customer_name.toLowerCase().includes(q)) ||
         (s.customer_email && s.customer_email.toLowerCase().includes(q));
       const matchMushroom = s.mushroom_name && s.mushroom_name.toLowerCase().includes(q);
       return matchId || matchCustomer || matchMushroom;
-    });
-  }, [sessions, searchQuery]);
+    }).sort(compareSessions);
+  }, [sessions, searchQuery, rentalFilter, growthFilter]);
 
   // Filter orders by search query
   const filteredOrders = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return orders;
     return orders.filter(
-      (o) =>
+      (o) => (orderFilter === 'ALL' || (orderFilter === 'PAID' ? o.payment_status === 'PAID' : o.order_status === orderFilter)) && (!q ||
         String(o.order_id).includes(q) ||
+        o.package_name?.toLowerCase().includes(q) ||
+        o.mushroom_name?.toLowerCase().includes(q) ||
         (o.items &&
           o.items.some(
             (item) =>
               (item.mushroom_name && item.mushroom_name.toLowerCase().includes(q)) ||
               (item.package_name && item.package_name.toLowerCase().includes(q))
-          ))
+          )))
     );
-  }, [orders, searchQuery]);
+  }, [orders, searchQuery, orderFilter]);
 
   // Statistics calculation
   const stats = useMemo(() => {
     if (activeTab === 'rentals') {
-      const pendingCount = sessions.filter((s) => s.status === 'PENDING').length;
-      const restingCount = sessions.filter(
-        (s) => s.status === 'SPAWN_RESTING' || s.status === 'MYCELIAL_DEVELOPMENT'
-      ).length;
-      const readyCount = sessions.filter((s) => s.status === 'READY_FOR_CULTIVATION').length;
-      const cultivatingCount = sessions.filter((s) => s.status === 'CULTIVATING').length;
+      const cultivatingCount = sessions.filter((s) => sessionGroup(s) === 'CULTIVATING').length;
 
       return {
         total: sessions.length,
-        highlight1: readyCount,
-        highlight1Label: 'Sẵn sàng trồng',
-        highlight2: restingCount + pendingCount,
-        highlight2Label: 'Đang ủ/kiểm tra',
+        highlight1: sessions.filter(s => sessionGroup(s) === 'HARVEST_READY').length,
+        highlight1Label: 'Sẵn sàng thu hoạch',
+        highlight2: cultivatingCount,
+        highlight2Label: 'Đang trồng',
         highlight3: cultivatingCount,
         highlight3Label: 'Đang trồng',
       };
@@ -344,48 +286,20 @@ export const AdminOrdersScreen: React.FC = () => {
     }
   }, [activeTab, sessions, orders]);
 
-  const formatGrowthStatus = (status?: string | null): string => {
-    if (!status) return 'Chưa ghi nhận';
-    const map: Record<string, string> = {
-      SPAWN_RESTING: 'Đang ủ tơ',
-      MYCELIAL_DEVELOPMENT: 'Phát triển tơ',
-      FRUITING_INITIATION: 'Bật mầm',
-      PINNING: 'Ghim nụ',
-      YOUNG_FRUITING: 'Nấm non',
-      MATURATION: 'Trưởng thành',
-      READY_FOR_CULTIVATION: 'Sẵn sàng trồng',
-      CULTIVATING: 'Đang trồng',
-      HARVEST_READY: 'Sẵn sàng thu hoạch',
-      HARVESTING: 'Đang thu hoạch',
-      COMPLETED: 'Hoàn thành',
-      CANCELLED: 'Đã hủy',
-    };
-    return map[status] || status;
-  };
-
-  const formatHarvestStatus = (status?: string | null): string => {
-    if (!status) return '';
-    const map: Record<string, string> = {
-      NOT_READY: 'Chưa sẵn sàng',
-      HARVEST_READY: 'Sẵn sàng thu hoạch',
-      READY: 'Sẵn sàng',
-      HARVESTED: 'Đã thu hoạch',
-      IN_PROGRESS: 'Đang thu hoạch',
-      COMPLETED: 'Đã hoàn thành',
-    };
-    return map[status] || status;
-  };
+  const formatGrowthStatus = statusLabel;
+  const formatHarvestStatus = statusLabel;
 
   const renderSessionBadge = (status: string) => {
     switch (status) {
       case 'PENDING':
-        return <StatusBadge variant="warning" label="Chờ ủ tơ" />;
+        return <StatusBadge variant="warning" label="Chưa ủ tơ" />;
+      case 'INCUBATING':
       case 'SPAWN_RESTING':
         return <StatusBadge variant="info" label="Đang ủ tơ" />;
       case 'MYCELIAL_DEVELOPMENT':
         return <StatusBadge variant="info" label="Phát triển tơ nấm" />;
       case 'READY_FOR_CULTIVATION':
-        return <StatusBadge variant="warning" label="Sẵn sàng trồng" />;
+        return <StatusBadge variant="warning" label="Chờ gán khay" />;
       case 'CULTIVATING':
         return <StatusBadge variant="success" label="Đang trồng" />;
       case 'HARVEST_READY':
@@ -397,7 +311,7 @@ export const AdminOrdersScreen: React.FC = () => {
       case 'CANCELLED':
         return <StatusBadge variant="error" label="Đã hủy" />;
       default:
-        return <StatusBadge variant="neutral" label={status} />;
+        return <StatusBadge variant="neutral" label={statusLabel(status)} />;
     }
   };
 
@@ -408,13 +322,13 @@ export const AdminOrdersScreen: React.FC = () => {
       case 'PAID':
         return <StatusBadge variant="success" label="Đã thanh toán" />;
       case 'PROCESSING':
-        return <StatusBadge variant="info" label="Đang canh tác" />;
+        return <StatusBadge variant="info" label="Đang xử lý" />;
       case 'COMPLETED':
         return <StatusBadge variant="neutral" label="Hoàn thành" />;
       case 'CANCELLED':
         return <StatusBadge variant="error" label="Đã hủy" />;
       default:
-        return <StatusBadge variant="neutral" label={status} />;
+        return <StatusBadge variant="neutral" label={statusLabel(status)} />;
     }
   };
 
@@ -471,7 +385,7 @@ export const AdminOrdersScreen: React.FC = () => {
             weight={activeTab === 'orders' ? 'bold' : 'normal'}
             color={activeTab === 'orders' ? '#FFFFFF' : theme.colors.text.secondary}
           >
-            Đơn hàng nông sản ({orders.length})
+            Đơn hàng ({orders.length})
           </AppText>
         </Pressable>
       </View>
@@ -540,6 +454,7 @@ export const AdminOrdersScreen: React.FC = () => {
                 onPress={() => {
                   if (activeTab === 'rentals') {
                     setRentalFilter(filter.value);
+                    setGrowthFilter('ALL');
                   } else {
                     setOrderFilter(filter.value);
                   }
@@ -550,13 +465,28 @@ export const AdminOrdersScreen: React.FC = () => {
                   weight={isSelected ? 'bold' : 'normal'}
                   color={isSelected ? theme.colors.primary[600] : theme.colors.text.secondary}
                 >
-                  {filter.label}
+                  {filter.label}{activeTab === 'rentals' ? ` (${filter.value === 'ALL' ? sessions.length : sessions.filter(s => sessionGroup(s) === filter.value).length})` : ''}
                 </AppText>
               </Pressable>
             );
           })}
         </ScrollView>
       </View>
+
+      {activeTab === 'rentals' && rentalFilter === 'CULTIVATING' && (
+        <View style={styles.chipsScrollWrapper}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContent}>
+            {GROWTH_FILTERS.map(filter => (
+              <Pressable key={filter.value} accessibilityRole="button"
+                accessibilityState={{ selected: growthFilter === filter.value }}
+                style={[styles.filterChip, growthFilter === filter.value && styles.filterChipActive]}
+                onPress={() => setGrowthFilter(filter.value)}>
+                <AppText variant="caption">{filter.label}</AppText>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       <AppDivider spacing="none" />
 
@@ -609,7 +539,7 @@ export const AdminOrdersScreen: React.FC = () => {
               </AppText>
             </View>
           ) : (
-            filteredSessions.map((session) => {
+            filteredSessions.map((session, index) => {
               const reqTrays = session.required_trays || session.tray_quantity || 1;
               const expectedBags =
                 session.spawn_quantity != null && session.spawn_quantity > 0
@@ -618,7 +548,13 @@ export const AdminOrdersScreen: React.FC = () => {
               const isActionLoading = actionLoadingSessionId === session.session_id;
 
               return (
-                <AppCard key={session.session_id} elevation="xs" style={styles.card}>
+                <React.Fragment key={session.session_id}>
+                {rentalFilter === 'ALL' && (index === 0 || sessionGroup(filteredSessions[index - 1]) !== sessionGroup(session)) && (
+                  <AppText variant="bodySmall" weight="bold" style={{ marginTop: 8 }}>
+                    {statusLabel(sessionGroup(session))} · {filteredSessions.filter(s => sessionGroup(s) === sessionGroup(session)).length}
+                  </AppText>
+                )}
+                <AppCard elevation="xs" style={styles.card}>
                   {/* Card Header: Session ID & Status (Pressable to open detail) */}
                   <Pressable
                     onPress={() => {
@@ -645,7 +581,7 @@ export const AdminOrdersScreen: React.FC = () => {
                           )}
                         </View>
                       </View>
-                      {renderSessionBadge(session.status)}
+                      {renderSessionBadge(sessionGroup(session))}
                     </View>
                   </Pressable>
 
@@ -795,7 +731,7 @@ export const AdminOrdersScreen: React.FC = () => {
                     {(session.status === 'SPAWN_RESTING' || session.status === 'MYCELIAL_DEVELOPMENT') && (
                       <View style={styles.spawnWorkflowRow}>
                         <View style={styles.spawnActionsSubrow}>
-                          <AppButton
+                          <AppButton style={styles.pairedAction} textStyle={{ flexShrink: 1 }}
                             title="Kiểm tra phôi"
                             variant="primary"
                             size="sm"
@@ -805,7 +741,7 @@ export const AdminOrdersScreen: React.FC = () => {
                               setInspectionModalVisible(true);
                             }}
                           />
-                          <AppButton
+                          <AppButton style={styles.pairedAction} textStyle={{ flexShrink: 1 }}
                             title="Lịch sử kiểm tra"
                             variant="outline"
                             size="sm"
@@ -872,7 +808,7 @@ export const AdminOrdersScreen: React.FC = () => {
                       <View style={styles.actionCol}>
                         {/* Daily Tray Report Buttons */}
                         <View style={styles.spawnActionsSubrow}>
-                          <AppButton
+                          <AppButton style={styles.pairedAction} textStyle={{ flexShrink: 1 }}
                             title="Báo cáo khay"
                             variant="primary"
                             size="sm"
@@ -884,7 +820,7 @@ export const AdminOrdersScreen: React.FC = () => {
                               setDailyTrayModalVisible(true);
                             }}
                           />
-                          <AppButton
+                          <AppButton style={styles.pairedAction} textStyle={{ flexShrink: 1 }}
                             title="Lịch sử khay"
                             variant="outline"
                             size="sm"
@@ -898,7 +834,7 @@ export const AdminOrdersScreen: React.FC = () => {
                         </View>
 
                         <View style={styles.spawnActionsSubrow}>
-                          <AppButton
+                          <AppButton style={styles.pairedAction} textStyle={{ flexShrink: 1 }}
                             title="Cập nhật tiến độ"
                             variant="outline"
                             size="sm"
@@ -930,7 +866,7 @@ export const AdminOrdersScreen: React.FC = () => {
                               setGrowthModalVisible(true);
                             }}
                           />
-                          <AppButton
+                          <AppButton style={styles.pairedAction} textStyle={{ flexShrink: 1 }}
                             title="Đánh giá thu hoạch"
                             variant="outline"
                             size="sm"
@@ -956,7 +892,7 @@ export const AdminOrdersScreen: React.FC = () => {
                         )}
 
                         <View style={styles.spawnActionsSubrow}>
-                          <AppButton
+                          <AppButton style={styles.pairedAction} textStyle={{ flexShrink: 1 }}
                             title="Xem tầng & khay"
                             variant="outline"
                             size="sm"
@@ -970,7 +906,7 @@ export const AdminOrdersScreen: React.FC = () => {
                               } as any)
                             }
                           />
-                          <AppButton
+                          <AppButton style={styles.pairedAction} textStyle={{ flexShrink: 1 }}
                             title="Xem chi tiết"
                             variant="outline"
                             size="sm"
@@ -1025,6 +961,7 @@ export const AdminOrdersScreen: React.FC = () => {
                     )}
                   </View>
                 </AppCard>
+                </React.Fragment>
               );
             })
           )
@@ -1069,10 +1006,15 @@ export const AdminOrdersScreen: React.FC = () => {
                   </View>
                   <StatusBadge
                     variant={order.payment_status === 'PAID' ? 'success' : 'warning'}
-                    label={order.payment_status === 'PAID' ? 'Đã thanh toán' : 'Chờ thanh toán'}
+                    label={statusLabel(order.payment_status)}
                   />
                 </View>
 
+                {(order.package_name || order.mushroom_name) && (
+                  <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+                    {[order.package_name, order.mushroom_name].filter(Boolean).join(' · ')}
+                  </AppText>
+                )}
                 {/* Items preview */}
                 {order.items && order.items.length > 0 && (
                   <View style={styles.orderItemsBox}>
@@ -1122,7 +1064,7 @@ export const AdminOrdersScreen: React.FC = () => {
                                 <AppText variant="caption" weight="bold">
                                   Phiên #{s.session_id}
                                 </AppText>
-                                {renderSessionBadge(s.status)}
+                                {renderSessionBadge(sessionGroup(s))}
                               </View>
                               <AppText variant="caption" color={theme.colors.text.secondary} numberOfLines={1}>
                                 {s.mushroom_name || 'Nấm giống'} • {s.required_trays || 1} khay
@@ -1413,7 +1355,15 @@ const styles = StyleSheet.create({
     color: theme.colors.text.primary,
     paddingVertical: 0,
   },
+  pairedAction: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 48,
+    paddingHorizontal: 8,
+    borderRadius: theme.borderRadius.sm,
+  },
   chipsScrollWrapper: {
+    flexShrink: 0,
     marginVertical: theme.spacing.xs,
   },
   chipsContent: {

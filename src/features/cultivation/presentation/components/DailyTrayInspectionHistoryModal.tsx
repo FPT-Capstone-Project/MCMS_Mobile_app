@@ -1,3 +1,6 @@
+import { RequestExpertModal } from '../../../expert/presentation/RequestExpertModal';
+import type { ExpertRequestContext } from '../../../expert/domain/entities/expert-consultation';
+import { cultivationNote } from '../../domain/cultivationNotes';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -109,6 +112,7 @@ const DailyTrayInspectionHistoryModalContent: React.FC<{
     initialSessionTrayId || null
   );
 
+  const [expertContext, setExpertContext] = useState<ExpertRequestContext | null>(null);
   const [inspections, setInspections] = useState<DailyTrayInspection[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -186,6 +190,7 @@ const DailyTrayInspectionHistoryModalContent: React.FC<{
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
+        {expertContext && <RequestExpertModal context={expertContext} onClose={() => { setExpertContext(null); onClose(); }} />}
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={styles.sheetContainer}>
           <View style={styles.dragHandle} />
@@ -372,11 +377,17 @@ const DailyTrayInspectionHistoryModalContent: React.FC<{
                       <View style={styles.notesBox}>
                         <AppText variant="caption" color={theme.colors.text.secondary}>
                           <AppText variant="caption" weight="bold">Ghi chú: </AppText>
-                          {item.notes}
+                          {cultivationNote(item.notes)}
                         </AppText>
                       </View>
                     ) : null}
 
+                    {['CULTIVATING', 'HARVEST_READY', 'HARVESTING'].includes(session.status) && !!item.inspectionId && !!item.sessionTrayId && (
+                      <AppButton title="Nhờ chuyên gia" variant="outline" size="sm" onPress={() => setExpertContext({
+                        sessionId: session.session_id, sessionTrayId: item.sessionTrayId,
+                        inspectionId: item.inspectionId, label: `${item.trayCode || 'Khay'} · Báo cáo #${item.inspectionId}`,
+                      })} />
+                    )}
                     {/* Inspector info */}
                     {item.inspectedByName ? (
                       <AppText variant="caption" color={theme.colors.text.muted} style={{ marginTop: 4 }}>

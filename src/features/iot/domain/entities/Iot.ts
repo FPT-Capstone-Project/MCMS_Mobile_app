@@ -158,6 +158,7 @@ export interface CultivationTrayInfo {
   rental_id?: number | null;
   mushroom_type_id?: number | null;
   mushroom_name?: string | null;
+  mushroom_image_url?: string | null;
   cultivation_status?: string | null;
   position_id?: number | null;
   row_number?: number | null;
@@ -284,6 +285,9 @@ export interface UpdateHarvestReadinessRequest {
 export type HarvestStatus = 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
 export interface HarvestItem {
+  cultivation_status?: FarmSessionStatus;
+  harvest_status?: string | null;
+  harvest_request_id?: number | null;
   harvest_id: number;
   id?: number;
   session_id: number;

@@ -1,3 +1,4 @@
+import { cultivationNote } from '../../domain/cultivationNotes';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
@@ -156,7 +157,7 @@ function sanitizeGrowthConditionToVietnamese(val?: string | null): string {
   if (upper === 'WARNING') return 'Cần theo dõi, độ ẩm chưa tối ưu';
   if (upper === 'ABNORMAL') return 'Bất thường, cần can thiệp xử lý';
   if (upper === 'POOR') return 'Tốc độ phát triển chậm hơn thông thường';
-  return trimmed;
+  return cultivationNote(trimmed);
 }
 
 function sanitizeNotesToVietnamese(val?: string | null): string {
@@ -167,7 +168,7 @@ function sanitizeNotesToVietnamese(val?: string | null): string {
     return 'Sinh trưởng bình thường, đúng tiến độ.';
   if (upper === 'GOOD' || upper === 'OPTIMAL')
     return 'Quả thể phát triển tốt, màu sắc tự nhiên.';
-  return trimmed;
+  return cultivationNote(trimmed);
 }
 
 export const GrowthUpdateModal: React.FC<GrowthUpdateModalProps> = ({

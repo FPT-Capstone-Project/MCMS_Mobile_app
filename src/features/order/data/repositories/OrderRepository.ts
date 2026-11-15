@@ -97,6 +97,26 @@ function mapBackendOrder(order: BackendCustomerOrder): CustomerOrder {
  * Order & PayOS Payment Repository Implementation
  */
 export class OrderRepository {
+  async getAdminOrders(): Promise<CustomerOrder[]> {
+    try {
+      const orders: CustomerOrder[] = [];
+      let page = 1;
+      let totalPages = 1;
+      do {
+        const response = await axiosClient.get<{
+          data: (Omit<BackendCustomerOrder, 'user_id'> & { customer_id: number })[];
+          pagination: { totalPages: number };
+        }>(API_ENDPOINTS.ORDERS.ADMIN_LIST, { params: { page, pageSize: 100 } });
+        orders.push(...response.data.data.map(order => mapBackendOrder({ ...order, user_id: order.customer_id })));
+        totalPages = response.data.pagination.totalPages;
+        page += 1;
+      } while (page <= totalPages);
+      return orders;
+    } catch (error) {
+      throw error instanceof AppError ? error : handleApiError(error);
+    }
+  }
+
   /**
    * Fetch rental packages catalog
    */

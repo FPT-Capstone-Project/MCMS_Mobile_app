@@ -1,3 +1,6 @@
+import { RequestExpertModal } from '../../../expert/presentation/RequestExpertModal';
+import type { ExpertRequestContext } from '../../../expert/domain/entities/expert-consultation';
+import { cultivationNote } from '../../domain/cultivationNotes';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -68,7 +71,7 @@ function sanitizeConditionToVietnamese(
   if (upper === 'WARNING') return 'Cần theo dõi, độ ẩm chưa tối ưu';
   if (upper === 'ABNORMAL') return 'Bất thường, cần can thiệp xử lý';
   if (upper === 'POOR') return 'Kém phát triển, thiếu ẩm';
-  return trimmed;
+  return cultivationNote(trimmed);
 }
 
 function sanitizeMushroomConditionToVietnamese(
@@ -84,7 +87,7 @@ function sanitizeMushroomConditionToVietnamese(
   if (upper === 'WARNING') return 'Nấm phát triển chậm, cần theo dõi';
   if (upper === 'ABNORMAL') return 'Nấm có dấu hiệu dị hình hoặc sâu bệnh';
   if (upper === 'POOR') return 'Nấm còi cọc, phát triển kém';
-  return trimmed;
+  return cultivationNote(trimmed);
 }
 
 export const DailyTrayInspectionModal: React.FC<DailyTrayInspectionModalProps> = ({
@@ -126,6 +129,7 @@ const DailyTrayInspectionModalContent: React.FC<{
     initialSessionTrayId ||
     (trays.length > 0 ? trays[0].session_tray_id : null);
 
+  const [expertContext, setExpertContext] = useState<ExpertRequestContext | null>(null);
   const [selectedSessionTrayId, setSelectedSessionTrayId] = useState<number | null>(defaultTrayId);
   const [trayCondition, setTrayCondition] = useState<string>(
     sanitizeConditionToVietnamese(session.condition)
@@ -335,7 +339,10 @@ const DailyTrayInspectionModalContent: React.FC<{
       Alert.alert(
         'Thành công',
         `Báo cáo khay hằng ngày #${inspectionId} đã được ghi nhận đầy đủ kèm ${images.length} ảnh.`,
-        [{ text: 'Đóng', onPress: onSuccess }]
+        [{ text: 'Đóng', onPress: onSuccess }, { text: 'Nhờ chuyên gia', onPress: () => {
+          if (inspectionId && selectedSessionTrayId) setExpertContext({ sessionId: session.session_id,
+            sessionTrayId: selectedSessionTrayId, inspectionId, label: `Báo cáo khay #${inspectionId}` });
+        } }]
       );
     } catch (err: any) {
       setErrorMessage(err?.message || 'Không thể tạo báo cáo khay. Vui lòng kiểm tra lại.');
@@ -376,7 +383,10 @@ const DailyTrayInspectionModalContent: React.FC<{
       Alert.alert(
         'Hoàn tất',
         `Toàn bộ ảnh đã được tải lên báo cáo #${createdInspectionId} thành công!`,
-        [{ text: 'Đóng', onPress: onSuccess }]
+        [{ text: 'Đóng', onPress: onSuccess }, { text: 'Nhờ chuyên gia', onPress: () => {
+          if (createdInspectionId && selectedSessionTrayId) setExpertContext({ sessionId: session.session_id,
+            sessionTrayId: selectedSessionTrayId, inspectionId: createdInspectionId, label: `Báo cáo khay #${createdInspectionId}` });
+        } }]
       );
     } else {
       setErrorMessage(
@@ -388,6 +398,7 @@ const DailyTrayInspectionModalContent: React.FC<{
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
+        {expertContext && <RequestExpertModal context={expertContext} onClose={() => { setExpertContext(null); onSuccess(); onClose(); }} />}
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={styles.sheetContainer}>
           <View style={styles.dragHandle} />

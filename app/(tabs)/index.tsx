@@ -65,13 +65,13 @@ const staffActions: QuickActionItem[] = [
     route: '/admin-orders',
   },
   {
-    id: 'ssr',
-    title: 'SSR 8 kênh thủ công',
-    desc: 'Điều khiển rơ-le Master',
-    icon: 'hardware-chip-outline',
+    id: 'expert-support',
+    title: 'Làm việc với chuyên gia',
+    desc: 'Yêu cầu tư vấn & theo dõi xử lý',
+    icon: 'chatbubbles-outline',
     iconColor: '#3B82F6',
     iconBg: 'rgba(59, 130, 246, 0.1)',
-    route: '/control/manual',
+    route: '/expert-support',
   },
   {
     id: 'control',
@@ -413,18 +413,18 @@ export default function HomeScreen() {
                 Điều hành IoT & Hạ tầng
               </AppText>
               <AppText variant="bodySmall" color="rgba(255, 255, 255, 0.9)" style={styles.ctaSubtitle}>
-                Điều khiển rơ-le 8 kênh SSR cho master01 hoặc các Master khác, giám sát cảm biến và cấu hình tự động.
+                Theo dõi tư vấn chuyên gia, giám sát cảm biến và quản lý chăm sóc tự động.
               </AppText>
             </View>
 
             <View style={styles.ctaActionRow}>
               <AppButton
-                title="Điều khiển SSR thủ công"
+                title="Làm việc với chuyên gia"
                 variant="secondary"
                 size="md"
                 style={styles.ctaButton}
-                leftIcon={<Ionicons name="hardware-chip" size={18} color={theme.colors.primary[700]} />}
-                onPress={() => router.push('/control/manual' as any)}
+                leftIcon={<Ionicons name="chatbubbles-outline" size={18} color={theme.colors.primary[700]} />}
+                onPress={() => router.push('/expert-support' as any)}
               />
               <AppButton
                 title="Tự động hóa"
