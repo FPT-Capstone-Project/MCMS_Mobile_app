@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { theme } from '../../src/core/theme';
 import { useAuth } from '../../src/features/auth';
+import { emptyAddressParts, formatAddress, parseAddress } from '../../src/shared/utils/address';
 import {
   AppButton,
   AppCard,
@@ -41,7 +42,7 @@ export default function ProfileScreen() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const [editProfileModalVisible, setEditProfileModalVisible] = useState(false);
-  const [profileForm, setProfileForm] = useState({ fullName: '', phone: '', address: '' });
+  const [profileForm, setProfileForm] = useState({ fullName: '', phone: '', address: emptyAddressParts() });
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
 
@@ -58,7 +59,7 @@ export default function ProfileScreen() {
     setProfileForm({
       fullName: user?.fullName || user?.full_name || '',
       phone: user?.phone || user?.phoneNumber || '',
-      address: user?.address || '',
+      address: parseAddress(user?.address),
     });
     setProfileError(null);
     setEditProfileModalVisible(true);
@@ -77,7 +78,7 @@ export default function ProfileScreen() {
       await updateProfile({
         fullName,
         phone: profileForm.phone.trim() || null,
-        address: profileForm.address.trim() || null,
+        address: formatAddress(profileForm.address) || null,
       });
       setEditProfileModalVisible(false);
       Alert.alert('Thành công', 'Thông tin hồ sơ đã được cập nhật.');
@@ -437,15 +438,40 @@ export default function ProfileScreen() {
                       textContentType="telephoneNumber"
                     />
                     <AppInput
-                      label="Địa chỉ"
-                      placeholder="Nhập địa chỉ"
-                      value={profileForm.address}
-                      onChangeText={(address) =>
-                        setProfileForm((current) => ({ ...current, address }))
-                      }
-                      multiline
-                      numberOfLines={3}
-                      inputStyle={{ minHeight: 64, textAlignVertical: 'top' }}
+                      label="Số nhà"
+                      placeholder="Nhập số nhà"
+                      value={profileForm.address.houseNumber}
+                      onChangeText={(houseNumber) => setProfileForm((current) => ({
+                        ...current,
+                        address: { ...current.address, houseNumber },
+                      }))}
+                    />
+                    <AppInput
+                      label="Tên đường"
+                      placeholder="Nhập tên đường"
+                      value={profileForm.address.street}
+                      onChangeText={(street) => setProfileForm((current) => ({
+                        ...current,
+                        address: { ...current.address, street },
+                      }))}
+                    />
+                    <AppInput
+                      label="Phường"
+                      placeholder="Nhập phường"
+                      value={profileForm.address.ward}
+                      onChangeText={(ward) => setProfileForm((current) => ({
+                        ...current,
+                        address: { ...current.address, ward },
+                      }))}
+                    />
+                    <AppInput
+                      label="Tỉnh/Thành phố"
+                      placeholder="Nhập tỉnh/thành phố"
+                      value={profileForm.address.province}
+                      onChangeText={(province) => setProfileForm((current) => ({
+                        ...current,
+                        address: { ...current.address, province },
+                      }))}
                     />
                     <AppText variant="caption" color={theme.colors.text.muted}>
                       Để trống số điện thoại hoặc địa chỉ nếu bạn muốn xóa thông tin đó.

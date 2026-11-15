@@ -96,14 +96,17 @@ export interface CustomerCultivationStatus {
     order_item_id?: number;
     session_id: number;
     mushroom_type_id?: number;
+    harvest_request_id?: number | null;
     status: string;
     tray_quantity?: number | null;
     start_at?: string | null;
     end_at?: string | null;
     harvest_status?: string | null;
+    harvest_ready_at?: string | null;
     harvest_method?: 'PICKUP' | 'DELIVERY' | null;
     harvest_request_status?: string | null;
     scheduled_at?: string | null;
+    delivery_address?: string | null;
     harvest_date?: string | null;
     current_stage?: string | null;
     progress_percent?: number | null;

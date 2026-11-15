@@ -288,6 +288,22 @@ export class OrderRepository {
     }
   }
 
+  async saveCustomerHarvestReceiving(
+    sessionId: number,
+    requestId: number | null | undefined,
+    input: { harvestMethod: 'PICKUP' | 'DELIVERY'; scheduledAt?: string; deliveryAddress?: string }
+  ): Promise<void> {
+    try {
+      if (requestId) {
+        await axiosClient.patch(API_ENDPOINTS.HARVEST_REQUESTS.DETAIL(requestId), input);
+      } else {
+        await axiosClient.post(API_ENDPOINTS.HARVEST_REQUESTS.BASE, { sessionId, ...input });
+      }
+    } catch (error) {
+      throw error instanceof AppError ? error : handleApiError(error);
+    }
+  }
+
   async getSessionInspectionCount(sessionId: number): Promise<number | null> {
     try {
       const response = await axiosClient.get<SessionReportApiPayload>(
