@@ -439,26 +439,6 @@ export const ControlCenterScreen: React.FC = () => {
           </AppText>
         </View>
 
-        {/* Banner linking to Manual SSR 8-channel Control */}
-        <Pressable onPress={() => router.push('/control/manual' as any)}>
-          <AppCard elevation="xs" style={styles.ssrBannerCard}>
-            <View style={styles.ssrBannerRow}>
-              <View style={styles.ssrBannerIcon}>
-                <Ionicons name="hardware-chip" size={24} color="#3B82F6" />
-              </View>
-              <View style={styles.ssrBannerContent}>
-                <AppText variant="label" weight="bold">
-                  Bảng điều khiển SSR 8 kênh thủ công
-                </AppText>
-                <AppText variant="caption" color={theme.colors.text.secondary}>
-                  Gửi lệnh ON/OFF trực tiếp cho master01 hoặc Master tùy chọn
-                </AppText>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={theme.colors.text.muted} />
-            </View>
-          </AppCard>
-        </Pressable>
-
         {/* Room Selector Pills */}
         <View style={styles.roomSelectorSection}>
           <AppText variant="label" color={theme.colors.text.muted}>

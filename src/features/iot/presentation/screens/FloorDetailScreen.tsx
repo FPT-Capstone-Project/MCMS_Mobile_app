@@ -79,10 +79,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
 
   // Modals
   const [configModalVisible, setConfigModalVisible] = useState(false);
-  const [confirmStartModal, setConfirmStartModal] = useState<{
-    visible: boolean;
-    dryRun: boolean;
-  }>({ visible: false, dryRun: false });
+  const [confirmStartVisible, setConfirmStartVisible] = useState(false);
 
   // Action Loading
   const [actionLoading, setActionLoading] = useState(false);
@@ -288,10 +285,10 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
   );
 
   // START AUTO Handler
-  const handleStartAuto = async (dryRun: boolean) => {
+  const handleStartAuto = async () => {
     if (!floorId) return;
 
-    if (!hasActiveCultivatingSessions && !dryRun) {
+    if (!hasActiveCultivatingSessions) {
       Alert.alert(
         'Không thể khởi động AUTO',
         'Tầng hiện chưa có phiên nuôi trồng nào đang hoạt động. Bạn cần xếp khay cho phiên trồng ở mục Phòng tầng khay trước khi bật AUTO thiết bị thật.'
@@ -307,17 +304,15 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
       return;
     }
 
-    setConfirmStartModal({ visible: false, dryRun });
+    setConfirmStartVisible(false);
     setActionLoading(true);
 
     try {
-      await iotRepository.startAutoControl(floorId, dryRun);
+      await iotRepository.startAutoControl(floorId, false);
       await loadFloorData();
       Alert.alert(
         'Khởi động thành công',
-        dryRun
-          ? 'Hệ thống đã bắt đầu chế độ CHẠY MÔ PHỎNG (không kích hoạt rơ-le thiết bị thực).'
-          : `Hệ thống đã BẮT ĐẦU ĐIỀU KHIỂN THIẾT BỊ THỰC cho ${floor.floor_name}.`
+        `Đã bắt đầu điều khiển tự động cho ${floor.floor_name}.`
       );
     } catch (err: any) {
       Alert.alert('Lỗi khởi động AUTO', err?.message || 'Không thể bắt đầu phiên tự động.');
@@ -368,23 +363,31 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
     }
   };
 
+  const expectedTrayCount = (floor.total_rows || 0) * (floor.total_columns || 0);
+  const occupiedPositions = new Set(cultivationTrays
+    .filter(tray => tray.row_number != null && tray.column_number != null &&
+      tray.row_number > 0 && tray.row_number <= (floor.total_rows || 0) &&
+      tray.column_number > 0 && tray.column_number <= (floor.total_columns || 0))
+    .map(tray => `${tray.row_number}:${tray.column_number}`)).size;
+  const missingTrayCount = Math.max(0, expectedTrayCount - occupiedPositions);
+
   // Generate Trays (Floor rack grid generation)
   const handleGenerateTrays = async () => {
     if (!floorId || !floor.total_rows || !floor.total_columns) {
       Alert.alert(
         'Chưa cài đặt số hàng & cột',
-        'Vui lòng cấu hình số hàng và số cột của tầng trước khi sinh khay tự động.'
+        'Vui lòng cấu hình số hàng và số cột của tầng trước khi tạo khay.'
       );
       return;
     }
 
     Alert.alert(
-      'Sinh lưới khay tự động',
-      `Tạo lưới khay vật lý ${floor.total_rows} hàng × ${floor.total_columns} cột (= ${floor.total_rows * floor.total_columns} khay) cho ${floor.floor_name}?`,
+      'Tạo khay còn thiếu',
+      `Tạo bản ghi cho ${missingTrayCount} khay còn thiếu trong sơ đồ ${floor.total_rows} hàng × ${floor.total_columns} cột của ${floor.floor_name}? Khay đã có sẽ được giữ nguyên. Thao tác này không gán phiên trồng hay bật thiết bị.`,
       [
         { text: 'Hủy', style: 'cancel' },
         {
-          text: 'Sinh khay ngay',
+          text: 'Tạo khay',
           onPress: async () => {
             setActionLoading(true);
             try {
@@ -393,9 +396,9 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
                 total_columns: floor.total_columns || 4,
               });
               await loadFloorData();
-              Alert.alert('Thành công', 'Đã sinh ma trận khay tự động cho tầng.');
+              Alert.alert('Thành công', 'Đã tạo các khay còn thiếu trong sơ đồ tầng.');
             } catch (err: any) {
-              Alert.alert('Lỗi sinh khay', err?.message || 'Không thể sinh khay.');
+              Alert.alert('Không thể tạo khay', err?.message || 'Không thể tạo khay.');
             } finally {
               setActionLoading(false);
             }
@@ -450,16 +453,16 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
               {/* Simulation Badge */}
               {isDryRun && isRunning ? (
                 <View style={styles.dryRunBadge}>
-                  <Ionicons name="flask" size={11} color="#FFFFFF" />
+
                   <AppText variant="caption" weight="bold" color="#FFFFFF" style={styles.badgeTextSmall}>
-                    MÔ PHỎNG
+                    Mô phỏng
                   </AppText>
                 </View>
               ) : isRunning ? (
                 <View style={styles.runningBadge}>
-                  <Ionicons name="play" size={11} color="#FFFFFF" />
+
                   <AppText variant="caption" weight="bold" color="#FFFFFF" style={styles.badgeTextSmall}>
-                    ĐANG CHẠY
+                    Đang chạy
                   </AppText>
                 </View>
               ) : isFault ? (
@@ -471,15 +474,15 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
                 </View>
               ) : isOffPending ? (
                 <View style={styles.offPendingBadge}>
-                  <Ionicons name="time" size={11} color="#FFFFFF" />
+
                   <AppText variant="caption" weight="bold" color="#FFFFFF" style={styles.badgeTextSmall}>
-                    CHỜ TẮT
+                    Chờ tắt
                   </AppText>
                 </View>
               ) : (
                 <View style={styles.stoppedBadge}>
                   <AppText variant="caption" weight="semibold" color={theme.colors.text.secondary} style={styles.badgeTextSmall}>
-                    THỦ CÔNG
+                    Thủ công
                   </AppText>
                 </View>
               )}
@@ -495,14 +498,11 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
       {/* 3 Tab Buttons */}
       <View style={styles.tabNavRow}>
         <Pressable
+          accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'overview' }}
           onPress={() => setActiveTab('overview')}
           style={[styles.tabButton, activeTab === 'overview' && styles.tabButtonActive]}
         >
-          <Ionicons
-            name="speedometer-outline"
-            size={16}
-            color={activeTab === 'overview' ? theme.colors.primary[700] : theme.colors.text.secondary}
-          />
+
           <AppText
             variant="bodySmall"
             weight={activeTab === 'overview' ? 'bold' : 'normal'}
@@ -514,14 +514,11 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
         </Pressable>
 
         <Pressable
+          accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'trays' }}
           onPress={() => setActiveTab('trays')}
           style={[styles.tabButton, activeTab === 'trays' && styles.tabButtonActive]}
         >
-          <Ionicons
-            name="cube-outline"
-            size={16}
-            color={activeTab === 'trays' ? theme.colors.primary[700] : theme.colors.text.secondary}
-          />
+
           <AppText
             variant="bodySmall"
             weight={activeTab === 'trays' ? 'bold' : 'normal'}
@@ -533,14 +530,11 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
         </Pressable>
 
         <Pressable
+          accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'logs' }}
           onPress={() => setActiveTab('logs')}
           style={[styles.tabButton, activeTab === 'logs' && styles.tabButtonActive]}
         >
-          <Ionicons
-            name="newspaper-outline"
-            size={16}
-            color={activeTab === 'logs' ? theme.colors.primary[700] : theme.colors.text.secondary}
-          />
+
           <AppText
             variant="bodySmall"
             weight={activeTab === 'logs' ? 'bold' : 'normal'}
@@ -568,9 +562,9 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
               {/* Temperature Box */}
               <AppCard elevation="xs" style={styles.gaugeCard}>
                 <View style={styles.gaugeTopRow}>
-                  <Ionicons name="thermometer-outline" size={20} color="#EF4444" />
+
                   <AppText variant="caption" weight="bold" color={theme.colors.text.muted}>
-                    NHIỆT ĐỘ
+                    Nhiệt độ
                   </AppText>
                 </View>
 
@@ -598,7 +592,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
                   <AppText
                     variant="caption"
                     color={envData?.healthy ? theme.colors.success.dark : theme.colors.warning.dark}
-                    style={{ fontSize: 10, marginLeft: 3 }}
+                    style={{ fontSize: 12, flexShrink: 1 }}
                   >
                     {envData?.healthy ? 'Cảm biến đạt yêu cầu' : 'Dữ liệu chưa sẵn sàng'}
                   </AppText>
@@ -608,9 +602,9 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
               {/* Humidity Box */}
               <AppCard elevation="xs" style={styles.gaugeCard}>
                 <View style={styles.gaugeTopRow}>
-                  <Ionicons name="water-outline" size={20} color="#0EA5E9" />
+
                   <AppText variant="caption" weight="bold" color={theme.colors.text.muted}>
-                    ĐỘ ẨM
+                    Độ ẩm
                   </AppText>
                 </View>
 
@@ -638,7 +632,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
                   <AppText
                     variant="caption"
                     color={envData?.healthy ? theme.colors.success.dark : theme.colors.warning.dark}
-                    style={{ fontSize: 10, marginLeft: 3 }}
+                    style={{ fontSize: 12, flexShrink: 1 }}
                   >
                     {envData?.healthy ? 'Cảm biến đạt yêu cầu' : 'Dữ liệu chưa sẵn sàng'}
                   </AppText>
@@ -660,9 +654,9 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
             <AppCard elevation="xs" style={styles.sectionCard}>
               <View style={styles.cardHeaderRow}>
                 <View style={styles.cardHeaderLeft}>
-                  <Ionicons name="water" size={18} color={theme.colors.primary[600]} />
+
                   <AppText variant="label" weight="bold">
-                    CHĂM SÓC TỰ ĐỘNG
+                    Điều khiển tự động
                   </AppText>
                 </View>
 
@@ -680,7 +674,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
                     ]}
                   />
                   <AppText variant="caption" weight="bold">
-                    Van SSR: {formatMistingCode('ssrState', statusData?.ssr?.reported_state || 'OFF')}
+                    Van phun: {statusData?.ssr?.reported_state ? formatMistingCode('ssrState', statusData.ssr.reported_state) : 'Chưa có dữ liệu'}
                   </AppText>
                 </View>
               </View>
@@ -694,7 +688,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
 
                 {cooldownRemainingSeconds > 0 && (
                   <View style={styles.cooldownPill}>
-                    <Ionicons name="timer-outline" size={13} color={theme.colors.primary[700]} />
+
                     <AppText variant="caption" weight="bold" color={theme.colors.primary[800]} style={{ marginLeft: 3 }}>
                       Còn {cooldownRemainingSeconds} giây
                     </AppText>
@@ -706,7 +700,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
               {(statusData?.lastDecision?.reason || statusData?.runtime?.last_reason) && (
                 <View style={styles.reasonBox}>
                   <AppText variant="caption" color={theme.colors.text.muted}>
-                    Lý do quyết định gần nhất:
+                    Hoạt động gần nhất
                   </AppText>
                   <AppText variant="bodySmall" color={theme.colors.text.secondary}>
                     {statusData.lastDecision?.reason || statusData.runtime?.last_reason}
@@ -715,13 +709,61 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
               )}
             </AppCard>
 
+            {/* 4. Action Area at Bottom */}
+            {canManage && (
+              <View style={styles.actionAreaContainer}>
+                {isRunning ? (
+                  <AppButton
+                    title="Dừng tự động"
+                    variant="danger"
+                    size="lg"
+                    fullWidth
+                    loading={actionLoading}
+
+                    onPress={handleStopAuto}
+                  />
+                ) : isOffPending ? (
+                  <View style={styles.offPendingNotice}>
+                    <ActivityIndicator size="small" color={theme.colors.warning.dark} />
+                    <AppText variant="bodySmall" weight="bold" color={theme.colors.warning.dark} style={{ marginLeft: 6 }}>
+                      Đang chờ thiết bị xác nhận tắt an toàn...
+                    </AppText>
+                  </View>
+                ) : (
+                  <View style={styles.startActionRow}>
+                    <View style={{ flex: 1 }}>
+                      <AppButton
+                        title="Chạy thiết bị"
+                        variant="primary"
+                        size="md"
+                        disabled={actionLoading || !autoConfig || !autoConfig.profile_approved || !hasActiveCultivatingSessions}
+                        onPress={() => setConfirmStartVisible(true)}
+                      />
+                    </View>
+                  </View>
+                )}
+
+                {/* Notice explaining disabled state */}
+                {!isRunning && autoConfig && !autoConfig.profile_approved && (
+                  <AppText variant="caption" color={theme.colors.warning.dark} align="center" style={{ marginTop: 4 }}>
+                    Hồ sơ cấu hình chưa được phê duyệt. Vui lòng bấm &quot;Chỉnh sửa cấu hình&quot; và phê duyệt trước khi bắt đầu chạy.
+                  </AppText>
+                )}
+                {!isRunning && autoConfig?.profile_approved && !hasActiveCultivatingSessions && (
+                  <AppText variant="caption" color={theme.colors.text.muted} align="center" style={{ marginTop: 4 }}>
+                    Chạy thiết bị thật yêu cầu ít nhất 1 phiên trồng đang hoạt động trên tầng.
+                  </AppText>
+                )}
+              </View>
+            )}
+
             {/* 3. Card "Cấu hình chăm sóc" */}
             <AppCard elevation="xs" style={styles.sectionCard}>
               <View style={styles.cardHeaderRow}>
                 <View style={styles.cardHeaderLeft}>
-                  <Ionicons name="options" size={18} color={theme.colors.primary[600]} />
+
                   <AppText variant="label" weight="bold">
-                    CẤU HÌNH CHĂM SÓC
+                    Cấu hình chăm sóc
                   </AppText>
                 </View>
 
@@ -737,17 +779,18 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
               </View>
 
               <AppText variant="bodyMedium" weight="bold">
-                {autoConfig?.profile_name || 'Chưa thiết lập hồ sơ cấu hình'}
+                {autoConfig?.profile_name || 'Chưa có cấu hình'}
               </AppText>
 
               {/* Approved Mushroom Types Chips */}
               <View style={styles.chipsRow}>
                 {/* Cultivating Chips */}
                 {cultivationTrays
-                  .filter((t) => t.session_id && t.mushroom_name)
+                  .filter((t, index, trays) => t.session_id && t.mushroom_name &&
+                    trays.findIndex(other => other.session_id && other.mushroom_type_id === t.mushroom_type_id && other.mushroom_name === t.mushroom_name) === index)
                   .map((t) => (
                     <View key={`cult_${t.tray_id}`} style={styles.chipCultivating}>
-                      <Ionicons name="leaf" size={12} color={theme.colors.success.dark} />
+
                       <AppText variant="caption" weight="bold" color={theme.colors.success.dark} style={{ marginLeft: 3 }}>
                         {t.mushroom_name} · Đang trồng
                       </AppText>
@@ -759,7 +802,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
                   ?.filter((sp) => !activeCultivatingMushroomIds.includes(sp.mushroom_type_id))
                   .map((sp) => (
                     <View key={`appr_${sp.mushroom_type_id}`} style={styles.chipApproved}>
-                      <Ionicons name="checkmark-circle" size={12} color={theme.colors.primary[700]} />
+
                       <AppText variant="caption" weight="semibold" color={theme.colors.primary[800]} style={{ marginLeft: 3 }}>
                         {sp.mushroom_name || `Nấm #${sp.mushroom_type_id}`} · Đã duyệt
                       </AppText>
@@ -784,83 +827,30 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
                 </View>
               ) : (
                 <AppText variant="caption" color={theme.colors.warning.dark}>
-                  Tầng chưa có cấu hình. Hãy bấm Chỉnh sửa để thiết lập profile loại nấm và ngưỡng vi khí hậu.
+                  Chọn Chỉnh sửa để đặt loại nấm, độ ẩm và thời gian phun.
                 </AppText>
               )}
             </AppCard>
 
-            {/* 4. Action Area at Bottom */}
-            {canManage && (
-              <View style={styles.actionAreaContainer}>
-                {isRunning ? (
-                  <AppButton
-                    title="Dừng AUTO"
-                    variant="danger"
-                    size="lg"
-                    fullWidth
-                    loading={actionLoading}
-                    leftIcon={<Ionicons name="stop-circle" size={20} color="#FFFFFF" />}
-                    onPress={handleStopAuto}
-                  />
-                ) : isOffPending ? (
-                  <View style={styles.offPendingNotice}>
-                    <ActivityIndicator size="small" color={theme.colors.warning.dark} />
-                    <AppText variant="bodySmall" weight="bold" color={theme.colors.warning.dark} style={{ marginLeft: 6 }}>
-                      Đang chờ thiết bị xác nhận tắt an toàn...
-                    </AppText>
-                  </View>
-                ) : (
-                  <View style={styles.startActionRow}>
-                    <View style={{ flex: 1 }}>
-                      <AppButton
-                        title="Chạy mô phỏng"
-                        variant="outline"
-                        size="md"
-                        disabled={actionLoading || !autoConfig || !autoConfig.profile_approved}
-                        onPress={() => setConfirmStartModal({ visible: true, dryRun: true })}
-                      />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <AppButton
-                        title="Chạy thiết bị"
-                        variant="primary"
-                        size="md"
-                        disabled={actionLoading || !autoConfig || !autoConfig.profile_approved || !hasActiveCultivatingSessions}
-                        onPress={() => setConfirmStartModal({ visible: true, dryRun: false })}
-                      />
-                    </View>
-                  </View>
-                )}
 
-                {/* Notice explaining disabled state */}
-                {!isRunning && autoConfig && !autoConfig.profile_approved && (
-                  <AppText variant="caption" color={theme.colors.warning.dark} align="center" style={{ marginTop: 4 }}>
-                    Hồ sơ cấu hình chưa được phê duyệt. Vui lòng bấm &quot;Chỉnh sửa cấu hình&quot; và phê duyệt trước khi bắt đầu chạy.
-                  </AppText>
-                )}
-                {!isRunning && autoConfig?.profile_approved && !hasActiveCultivatingSessions && (
-                  <AppText variant="caption" color={theme.colors.text.muted} align="center" style={{ marginTop: 4 }}>
-                    Chạy thiết bị thật yêu cầu ít nhất 1 phiên trồng đang hoạt động trên tầng.
-                  </AppText>
-                )}
-              </View>
-            )}
           </View>
         )}
 
         {/* ================= TAB 2: KHAY ================= */}
         {activeTab === 'trays' && (
           <View style={styles.tabContentWrap}>
-            <View style={styles.traysToolbarRow}>
+            {canManage && missingTrayCount > 0 && <View style={styles.traysToolbarRow}>
               {canManage && (
                 <AppButton
-                  title="Sinh lưới khay"
+                  title={`Tạo ${missingTrayCount} khay còn thiếu`}
+                  disabled={actionLoading || isRunning || isOffPending}
+                  loading={actionLoading}
                   variant="outline"
                   size="sm"
                   onPress={handleGenerateTrays}
                 />
               )}
-            </View>
+            </View>}
 
             {/* Rack Grid Component */}
             <FloorTraysGrid
@@ -898,26 +888,18 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
       />
 
       {/* Confirm Start Modal */}
-      <Modal visible={confirmStartModal.visible} transparent animationType="fade">
+      <Modal visible={confirmStartVisible} transparent animationType="fade">
         <View style={styles.confirmBackdrop}>
           <AppCard elevation="md" style={styles.confirmCard}>
             <View style={styles.confirmHeader}>
-              <Ionicons
-                name={confirmStartModal.dryRun ? 'flask' : 'play-circle'}
-                size={28}
-                color={confirmStartModal.dryRun ? '#0284C7' : theme.colors.success.main}
-              />
+
               <AppText variant="title" weight="bold" align="center">
-                {confirmStartModal.dryRun
-                  ? 'Xác nhận chạy Mô phỏng'
-                  : 'Xác nhận chạy Thiết bị thật'}
+                Bắt đầu chạy thiết bị?
               </AppText>
             </View>
 
             <AppText variant="bodySmall" color={theme.colors.text.secondary} align="center">
-              {confirmStartModal.dryRun
-                ? `Hệ thống sẽ chạy thuật toán AUTO giả lập cho ${floor.floor_name} theo hồ sơ "${autoConfig?.profile_name}". Không bật rơ-le hay van phun thực.`
-                : `Hệ thống sẽ ĐIỀU KHIỂN THIẾT BỊ THỰC (van phun sương rơ-le #${floor.misting_ssr_channel}) cho ${floor.floor_name} theo hồ sơ "${autoConfig?.profile_name}".`}
+              {`Van phun của ${floor.floor_name} sẽ hoạt động tự động theo cấu hình "${autoConfig?.profile_name}".`}
             </AppText>
 
             <View style={styles.confirmBtnRow}>
@@ -926,15 +908,15 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
                   title="Hủy"
                   variant="ghost"
                   size="md"
-                  onPress={() => setConfirmStartModal({ visible: false, dryRun: false })}
+                  onPress={() => setConfirmStartVisible(false)}
                 />
               </View>
               <View style={{ flex: 1 }}>
                 <AppButton
                   title="Bắt đầu ngay"
-                  variant={confirmStartModal.dryRun ? 'secondary' : 'primary'}
+                  variant="primary"
                   size="md"
-                  onPress={() => handleStartAuto(confirmStartModal.dryRun)}
+                  onPress={handleStartAuto}
                 />
               </View>
             </View>
@@ -969,7 +951,7 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     padding: 6,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.sm,
     backgroundColor: theme.colors.neutral[100],
   },
   titleBadgeRow: {
@@ -987,7 +969,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0284C7',
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.sm,
   },
   runningBadge: {
     flexDirection: 'row',
@@ -995,7 +977,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.success.main,
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.sm,
   },
   faultBadge: {
     flexDirection: 'row',
@@ -1003,7 +985,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.error.main,
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.sm,
   },
   offPendingBadge: {
     flexDirection: 'row',
@@ -1011,13 +993,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.warning.main,
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.sm,
   },
   stoppedBadge: {
     backgroundColor: theme.colors.neutral[200],
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.sm,
   },
   tabNavRow: {
     flexDirection: 'row',
@@ -1088,11 +1070,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: theme.borderRadius.md,
     padding: theme.spacing.md,
-    gap: theme.spacing.xs,
+    gap: theme.spacing.sm,
     borderWidth: 1,
     borderColor: theme.colors.border.light,
   },
   cardHeaderRow: {
+    flexWrap: 'wrap',
+    gap: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1109,7 +1093,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.neutral[100],
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.sm,
   },
   ssrDot: {
     width: 8,
@@ -1117,6 +1101,8 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   controlStateBox: {
+    flexWrap: 'wrap',
+    gap: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1128,7 +1114,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary[50],
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.sm,
   },
   reasonBox: {
     backgroundColor: theme.colors.neutral[50],
@@ -1146,31 +1132,32 @@ const styles = StyleSheet.create({
   chipCultivating: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(34, 197, 94, 0.12)',
-    borderColor: theme.colors.success.main,
+    backgroundColor: theme.colors.neutral[50],
+    borderColor: theme.colors.border.light,
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.sm,
   },
   chipApproved: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.primary[50],
-    borderColor: theme.colors.primary[300],
+    borderColor: theme.colors.border.light,
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.sm,
   },
   configSummaryRow: {
     marginTop: 2,
   },
   actionAreaContainer: {
-    marginTop: theme.spacing.sm,
+    gap: 8,
+    marginBottom: theme.spacing.sm,
   },
   startActionRow: {
-    flexDirection: 'row',
+    flexDirection: 'column-reverse',
     gap: theme.spacing.sm,
   },
   offPendingNotice: {

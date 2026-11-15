@@ -61,6 +61,7 @@ export const API_ENDPOINTS = {
   // Orders
   ORDERS: {
     BASE: '/api/orders',
+    ADMIN_LIST: '/api/orders/admin',
     DETAIL: (id: string | number) => `/api/orders/${id}`,
     CULTIVATION: '/api/orders/cultivation',
     CANCEL: (orderId: string | number) => `/api/orders/${orderId}/cancel`,
@@ -82,6 +83,11 @@ export const API_ENDPOINTS = {
     FLOOR: (floorId: string | number) => `/api/environment-history/floors/${floorId}`,
   },
   EXPERT: {
+    ISSUES: '/api/issues',
+    REQUEST: (id: number | string) => `/api/issues/${id}/consultations`,
+    ISSUE_STATUS: (id: number | string) => `/api/issues/${id}/status`,
+    MESSAGES: (id: number | string) => `/api/consultations/${id}/messages`,
+    TREATMENTS: (id: number | string) => `/api/consultations/${id}/treatments`,
     CONSULTATIONS: '/api/consultations',
     CONSULTATION: (consultationId: number | string) =>
       `/api/consultations/${consultationId}`,
@@ -175,6 +181,11 @@ export const API_ENDPOINTS = {
       `/api/cultivation-sessions/${sessionId}/trays/${sessionTrayId}/daily-inspections`,
   },
   // Harvests Workflow (Admin & Operator)
+  HARVEST_REQUESTS: {
+    COMPLETE: (id: number) => `/api/harvest-requests/${id}/complete`,
+    BASE: '/api/harvest-requests',
+    DETAIL: (id: number) => `/api/harvest-requests/${id}`,
+  },
   HARVESTS: {
     CREATE: '/api/harvests',
     ADMIN_LIST: '/api/harvests/admin',

@@ -1,3 +1,4 @@
+import { cultivationNote } from '../../domain/cultivationNotes';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
@@ -111,7 +112,7 @@ const HarvestReadinessModalContent: React.FC<{
   const [harvestReady, setHarvestReady] = useState(
     () => session.harvest_status === 'HARVEST_READY' || Boolean(session.harvest_ready)
   );
-  const [notes, setNotes] = useState(() => session.notes || '');
+  const [notes, setNotes] = useState(() => cultivationNote(session.notes));
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 

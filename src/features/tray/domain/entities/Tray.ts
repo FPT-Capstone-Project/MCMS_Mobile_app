@@ -42,6 +42,7 @@ export interface TrayRackTier {
 export type CustomerTrayUsage = 'MY_CULTIVATION' | 'OTHER_CULTIVATION' | 'AVAILABLE';
 
 export interface CustomerTrayCard {
+  mushroomImageUrl?: string;
   id: number;
   code: string;
   usage: CustomerTrayUsage;

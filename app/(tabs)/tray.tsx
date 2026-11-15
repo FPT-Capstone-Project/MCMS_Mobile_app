@@ -1,3 +1,4 @@
+import { TrayMushroomImage } from '../../src/features/iot/presentation/components/TrayMushroomImage';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -1341,6 +1342,9 @@ const TrayTile: React.FC<TrayTileProps> = ({
         ) : null}
       </View>
 
+      {isInUse && <View style={{ alignItems: 'center', paddingVertical: 4 }}>
+        <TrayMushroomImage uri={tray.mushroomImageUrl} name={tray.mushroomName} />
+      </View>}
       {/* Middle Body */}
       {isAssignMode ? (
         <View style={styles.tileCenterContent}>

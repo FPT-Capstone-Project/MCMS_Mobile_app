@@ -1,3 +1,5 @@
+import { cultivationNote } from '../../domain/cultivationNotes';
+import { statusLabel } from '../../domain/sessionWorkflow';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -219,7 +221,7 @@ const SessionDetailModalContent: React.FC<{
       COMPLETED: 'Đã hoàn thành',
       CANCELLED: 'Đã hủy',
     };
-    return map[st] || st;
+    return map[st] || statusLabel(st);
   };
 
   const formatSessionDetailHarvestStatus = (st: string): string => {
@@ -231,7 +233,7 @@ const SessionDetailModalContent: React.FC<{
       IN_PROGRESS: 'Đang thu hoạch',
       COMPLETED: 'Đã hoàn thành',
     };
-    return map[st] || st;
+    return map[st] || statusLabel(st);
   };
 
   const renderStatusBadge = (status: string) => {
@@ -467,7 +469,7 @@ const SessionDetailModalContent: React.FC<{
                         weight="bold"
                         color={current.spawn_issued ? theme.colors.success.dark : theme.colors.warning.dark}
                       >
-                        {current.spawn_status || (current.spawn_issued ? 'Đã xuất kho phôi' : 'Chờ xuất phôi')}
+                        {(current.spawn_status ? statusLabel(current.spawn_status) : null) || (current.spawn_issued ? 'Đã xuất kho phôi' : 'Chờ xuất phôi')}
                       </AppText>
                     </View>
                   </View>
@@ -656,7 +658,7 @@ const SessionDetailModalContent: React.FC<{
                               </AppText>
                               {item.description && (
                                 <AppText variant="caption" color={theme.colors.text.muted}>
-                                  {item.description}
+                                  {cultivationNote(item.description)}
                                 </AppText>
                               )}
                             </View>

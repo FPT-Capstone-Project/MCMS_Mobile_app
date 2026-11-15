@@ -1,3 +1,4 @@
+import { TrayMushroomImage } from './TrayMushroomImage';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
 import {
@@ -38,6 +39,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
   availableTrayIds,
   onToggleSelectTray,
 }) => {
+  const [gridWidth, setGridWidth] = useState(0);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [activeTrayDetail, setActiveTrayDetail] = useState<CultivationTrayInfo | null>(null);
 
@@ -72,6 +74,12 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
       unpositionedTrays: unpositioned,
     };
   }, [floor, trays]);
+
+  const visibleColumns = Math.min(maxCols, 3);
+  const cellWidth = gridWidth > 0
+    ? Math.max(80, Math.floor((gridWidth - (visibleColumns - 1) * 6) / visibleColumns))
+    : 100;
+  const needsHorizontalScroll = maxCols * cellWidth + (maxCols - 1) * 6 > gridWidth;
 
   const handlePressTray = (tray: CultivationTrayInfo) => {
     if (isAssignMode) {
@@ -138,8 +146,8 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
   }, [trays, availableTrayIds]);
 
   return (
-    <View style={styles.container}>
-      {availableTrayIds === undefined && (
+    <View style={styles.container} onLayout={({ nativeEvent }) => setGridWidth(nativeEvent.layout.width)}>
+      {isAssignMode && availableTrayIds === undefined && (
         <AppText variant="caption" color={theme.colors.text.secondary}>
           Chưa xác định được khay có thể gán. Kéo xuống để tải lại.
         </AppText>
@@ -149,7 +157,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
         <View style={styles.countBadge}>
           <Ionicons name="cube" size={16} color={theme.colors.primary[600]} />
           <AppText variant="caption" weight="bold" color={theme.colors.primary[800]}>
-            Tổng: {trays.length} khay ({maxRows}×{maxCols}) • Có thể gắn: {(availableTrayIds?.length ?? '?')} khay
+            {trays.length} khay · {maxRows} hàng × {maxCols} cột
           </AppText>
         </View>
 
@@ -194,15 +202,17 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
         </View>
       </View>
 
+      <AppText variant="caption" color={theme.colors.text.secondary}>
+        {isAssignMode ? 'Chọn các khay trống để gán phiên trồng.' : needsHorizontalScroll ? 'Chạm vào khay để xem chi tiết. Vuốt ngang để xem thêm cột.' : 'Chạm vào khay để xem mã đầy đủ và thông tin phiên trồng.'}
+      </AppText>
       {/* Grid Mode */}
       {viewMode === 'grid' ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+        <ScrollView horizontal scrollEnabled={needsHorizontalScroll} showsHorizontalScrollIndicator={needsHorizontalScroll} style={styles.horizontalScroll}>
           <View style={styles.gridContainer}>
             {/* Column Headers */}
             <View style={styles.columnHeaderRow}>
-              <View style={styles.cornerHeaderCell} />
               {Array.from({ length: maxCols }, (_, ci) => ci + 1).map((colNum) => (
-                <View key={`col_${colNum}`} style={styles.columnHeaderCell}>
+                <View key={`col_${colNum}`} style={[styles.columnHeaderCell, { width: cellWidth }]}>
                   <AppText variant="caption" weight="bold" color={theme.colors.text.secondary}>
                     Cột {colNum}
                   </AppText>
@@ -212,18 +222,19 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
 
             {/* Rows with Row Headers */}
             {Array.from({ length: maxRows }, (_, ri) => ri + 1).map((rowNum) => (
-              <View key={`row_${rowNum}`} style={styles.rowWrapper}>
+              <View key={`row_${rowNum}`} style={styles.gridRow}>
                 <View style={styles.rowHeaderCell}>
                   <AppText variant="caption" weight="bold" color={theme.colors.text.secondary}>
                     Hàng {rowNum}
                   </AppText>
                 </View>
 
+                <View style={styles.rowWrapper}>
                 {Array.from({ length: maxCols }, (_, ci) => ci + 1).map((colNum) => {
                   const tray = gridMatrix[`${rowNum}_${colNum}`];
                   if (!tray) {
                     return (
-                      <View key={`empty_${rowNum}_${colNum}`} style={styles.emptyGridCell}>
+                      <View key={`empty_${rowNum}_${colNum}`} style={[styles.emptyGridCell, { width: cellWidth }]}>
                         <AppText variant="caption" color={theme.colors.text.muted} style={{ fontSize: 10 }}>
                           Trống
                         </AppText>
@@ -238,10 +249,13 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                   return (
                     <Pressable
                       key={tray.tray_id}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${`Khay ${rowNum}.${colNum}`}, hàng ${rowNum}, cột ${colNum}${status.hasSession ? `, ${tray.mushroom_name}` : ''}`}
                       onPress={() => handlePressTray(tray)}
                       disabled={isAssignMode && !isSelectable}
                       style={[
                         styles.gridCell,
+                        { width: cellWidth },
                         status.hasSession && styles.cellCultivating,
                         status.isEligibleForAssign && !status.hasSession && styles.cellEligible,
                         status.isUnavailable && styles.cellLegacyBlocked,
@@ -257,7 +271,10 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                         </View>
                       )}
 
-                      {/* Icon */}
+                      {status.hasSession ? (
+                        <TrayMushroomImage uri={tray.mushroom_image_url} name={tray.mushroom_name} />
+                      ) : (
+
                       <View style={styles.cellIconBox}>
                         <Ionicons
                           name={
@@ -283,12 +300,13 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                           }
                         />
                       </View>
+                      )}
 
                       <AppText
                         variant="caption"
                         weight="bold"
                         numberOfLines={1}
-                        style={{ fontSize: 11, textAlign: 'center' }}
+                        style={{ fontSize: 13, textAlign: 'center' }}
                       >
                         {tray.tray_code}
                       </AppText>
@@ -298,8 +316,8 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                           variant="caption"
                           weight="semibold"
                           color={theme.colors.success.dark}
-                          numberOfLines={1}
-                          style={{ fontSize: 9, textAlign: 'center' }}
+                          numberOfLines={2}
+                          style={{ fontSize: 12, textAlign: 'center' }}
                         >
                           {tray.mushroom_name}
                         </AppText>
@@ -309,7 +327,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                           weight="bold"
                           color={theme.colors.warning.dark}
                           numberOfLines={1}
-                          style={{ fontSize: 8, textAlign: 'center' }}
+                          style={{ fontSize: 11, textAlign: 'center' }}
                         >
                           Chưa thể gán
                         </AppText>
@@ -318,7 +336,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                           variant="caption"
                           color={theme.colors.primary[700]}
                           weight="semibold"
-                          style={{ fontSize: 9 }}
+                          style={{ fontSize: 11 }}
                         >
                           Có thể gắn
                         </AppText>
@@ -326,7 +344,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                         <AppText
                           variant="caption"
                           color={theme.colors.text.muted}
-                          style={{ fontSize: 9 }}
+                          style={{ fontSize: 11 }}
                         >
                           {formatMistingCode('trayStatus', tray.tray_status)}
                         </AppText>
@@ -334,6 +352,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                     </Pressable>
                   );
                 })}
+                </View>
               </View>
             ))}
           </View>
@@ -359,6 +378,9 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                 ]}
               >
                 <View style={styles.listLeftRow}>
+                  {status.hasSession ? (
+                    <TrayMushroomImage uri={tray.mushroom_image_url} name={tray.mushroom_name} compact />
+                  ) : (
                   <View
                     style={[
                       styles.listIconBox,
@@ -389,6 +411,7 @@ export const FloorTraysGrid: React.FC<FloorTraysGridProps> = ({
                       }
                     />
                   </View>
+                  )}
 
                   <View style={{ flex: 1 }}>
                     <View style={styles.listTitleRow}>
@@ -627,7 +650,8 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   topControlRow: {
-    flexDirection: 'row',
+    gap: 12,
+    flexDirection: 'column',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginVertical: 4,
@@ -648,29 +672,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    minHeight: 40,
+    paddingVertical: 8,
     borderRadius: theme.borderRadius.sm - 2,
   },
   toggleBtnActive: {
     backgroundColor: theme.colors.primary[600],
   },
   horizontalScroll: {
+    width: '100%',
+    flexGrow: 0,
     marginVertical: 4,
   },
   gridContainer: {
     gap: 6,
-    paddingRight: theme.spacing.lg,
+    paddingBottom: 8,
   },
   columnHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  cornerHeaderCell: {
-    width: 60,
+  gridRow: {
+    gap: 6,
   },
   columnHeaderCell: {
-    width: 76,
+    width: 112,
     alignItems: 'center',
   },
   rowWrapper: {
@@ -679,12 +706,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   rowHeaderCell: {
-    width: 60,
     alignItems: 'flex-start',
   },
   gridCell: {
-    width: 76,
-    height: 76,
+    width: 112,
+    minHeight: 132,
     borderRadius: theme.borderRadius.md,
     borderWidth: 1.5,
     borderColor: theme.colors.border.light,
@@ -692,12 +718,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 4,
-    gap: 1,
+    gap: 6,
     position: 'relative',
   },
   emptyGridCell: {
-    width: 76,
-    height: 76,
+    width: 112,
+    minHeight: 132,
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     borderStyle: 'dashed',

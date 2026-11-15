@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
 import { Image } from 'expo-image';
 import {
@@ -257,6 +257,7 @@ function formatIncidentLocation(incident?: DeviceIncident | null): string {
 }
 
 export default function NotificationsScreen() {
+  const router = useRouter();
   const { user, isCustomer, isFarmOperator, isAdmin } = useAuth();
 
   const [notifications, setNotifications] = useState<CustomerNotification[]>([]);
@@ -987,6 +988,13 @@ export default function NotificationsScreen() {
                   {selectedNotificationText?.message}
                 </AppText>
               </View>
+
+              {(isAdmin || isFarmOperator) && selectedNotification?.reference_type === 'CULTIVATION_ISSUE' && !!selectedNotification.reference_id && (
+                <AppButton title="Xem phản hồi của chuyên gia" variant="outline" onPress={() => {
+                  setIsDetailModalVisible(false);
+                  router.push({ pathname: '/expert-support', params: { issueId: String(selectedNotification.reference_id) } });
+                }} />
+              )}
 
               {/* ================= SECTION: SỰ CỐ THIẾT BỊ IOT ================= */}
               {activeIncident ? (

@@ -1,3 +1,4 @@
+import { getMushroomImages, findMushroomImage } from '../../../../core/api/mushroomImages';
 import { axiosClient } from '../../../../core/api/axiosClient';
 import { API_ENDPOINTS } from '../../../../core/api/endpoints';
 import { AppError } from '../../../../core/errors/appError';
@@ -341,14 +342,20 @@ export class IotRepository {
       const response = await axiosClient.get<{ data: AutoControlConfigResponse } | AutoControlConfigResponse>(
         API_ENDPOINTS.AUTOMATIC.AUTO_CONTROL(floorId)
       );
-      const resData = response.data as any;
-      if (resData && typeof resData === 'object') {
-        if ('data' in resData && resData.data) {
-          return resData.data;
-        }
-        return resData as AutoControlConfigResponse;
-      }
-      return { mode: 'MANUAL' };
+      const config = 'data' in response.data ? response.data.data : response.data;
+      if (!config.cultivation?.trays.length) return config;
+      const images = await getMushroomImages();
+      return {
+        ...config,
+        cultivation: {
+          ...config.cultivation,
+          trays: config.cultivation.trays.map(tray => ({
+            ...tray,
+            mushroom_image_url: tray.mushroom_image_url?.trim() ||
+              findMushroomImage(images, tray.mushroom_type_id, tray.mushroom_name) || null,
+          })),
+        },
+      };
     } catch (error) {
       throw error instanceof AppError ? error : handleApiError(error);
     }
@@ -1326,6 +1333,21 @@ export class IotRepository {
    * Start a planned harvest
    * POST /api/harvests/:id/start
    */
+  async completeHarvestReceiving(requestId: number): Promise<void> {
+    try {
+      await axiosClient.post(API_ENDPOINTS.HARVEST_REQUESTS.COMPLETE(requestId));
+    } catch (error) { throw error instanceof AppError ? error : handleApiError(error); }
+  }
+
+  async saveHarvestReceiving(sessionId: number, requestId: number | null | undefined, input: {
+    harvestMethod: 'PICKUP' | 'DELIVERY'; scheduledAt?: string; customerNote?: string;
+  }): Promise<void> {
+    try {
+      if (requestId) await axiosClient.patch(API_ENDPOINTS.HARVEST_REQUESTS.DETAIL(requestId), input);
+      else await axiosClient.post(API_ENDPOINTS.HARVEST_REQUESTS.BASE, { sessionId, ...input });
+    } catch (error) { throw error instanceof AppError ? error : handleApiError(error); }
+  }
+
   async startHarvest(harvestId: number | string): Promise<HarvestItem> {
     try {
       const response = await axiosClient.post<{ data: HarvestItem; message?: string } | HarvestItem>(

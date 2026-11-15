@@ -1,3 +1,5 @@
+import { RequestExpertModal } from '../../../expert/presentation/RequestExpertModal';
+import type { ExpertRequestContext } from '../../../expert/domain/entities/expert-consultation';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
@@ -74,6 +76,7 @@ const SpawnInspectionModalContent: React.FC<{
   const requiredTrays = session.required_trays || session.tray_count || 1;
   const expectedSpawnBags = spawnQuantityFromBackend ?? requiredTrays * 2;
 
+  const [expertContext, setExpertContext] = useState<ExpertRequestContext | null>(null);
   const [totalChecked, setTotalChecked] = useState(String(expectedSpawnBags));
   const [normalQuantity, setNormalQuantity] = useState(String(expectedSpawnBags));
   const [warningQuantity, setWarningQuantity] = useState('0');
@@ -362,6 +365,8 @@ const SpawnInspectionModalContent: React.FC<{
         ? 'Đợt kiểm tra đạt chuẩn và đủ số lượng bịch phôi. Phiên đã đủ điều kiện để chuyển sang Sẵn sàng trồng.'
         : 'Kết quả kiểm tra phôi cùng hình ảnh minh chứng đã được lưu thành công vào lịch sử.',
       [
+        { text: 'Nhờ chuyên gia', onPress: () => setExpertContext({ sessionId: session.session_id,
+          spawnInspectionId: inspectionId, label: `Kiểm tra phôi #${inspectionId}` }) },
         {
           text: 'Đóng',
           onPress: () => {
@@ -429,6 +434,7 @@ const SpawnInspectionModalContent: React.FC<{
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
+        {expertContext && <RequestExpertModal context={expertContext} onClose={() => { setExpertContext(null); onSuccess(); onClose(); }} />}
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={styles.sheetContainer}>
           <View style={styles.dragHandle} />

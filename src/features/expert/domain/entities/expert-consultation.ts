@@ -57,6 +57,9 @@ export interface ExpertIssueMedia {
 }
 
 export interface ExpertIssue {
+  latest_consultation_id?: number | string | null;
+  inspection_id?: number | null;
+  spawn_inspection_id?: number | null;
   issue_id: number | string;
   title: string;
   description?: string | null;
@@ -88,4 +91,21 @@ export interface ExpertResponseInput {
   diagnosis: string;
   solution?: string;
   needsMoreInfo: boolean;
+}
+
+export interface ExpertRequestContext {
+  sessionId: number;
+  sessionTrayId?: number;
+  inspectionId?: number;
+  spawnInspectionId?: number;
+  label: string;
+}
+export interface CreateIssueInput {
+  sessionTrayId?: number;
+  inspectionId?: number;
+  spawnInspectionId?: number;
+  title: string;
+  description: string;
+  issueType: string;
+  severity: string;
 }

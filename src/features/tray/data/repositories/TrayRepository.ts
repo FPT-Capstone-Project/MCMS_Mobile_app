@@ -1,3 +1,4 @@
+import { getMushroomImages, findMushroomImage } from '../../../../core/api/mushroomImages';
 import { axiosClient } from '../../../../core/api/axiosClient';
 import { API_ENDPOINTS } from '../../../../core/api/endpoints';
 import {
@@ -235,10 +236,11 @@ export class TrayRepository implements ITrayRepository {
   }
 
   async getCustomerFloorRacks(): Promise<CustomerFloorRack[]> {
-    const [floors, trays, orders] = await Promise.all([
+    const [floors, trays, orders, mushroomImages] = await Promise.all([
       iotRepository.getFloors(),
       cultivationRepository.getTrays(),
       orderRepository.getCustomerOrders(),
+      getMushroomImages(),
     ]);
 
     const activeOrders = orders.filter(
@@ -279,7 +281,7 @@ export class TrayRepository implements ITrayRepository {
     // Also fetch active admin cultivation sessions and historical past sessions
     const activeAdminTraySessions = new Map<
       number,
-      { sessionId: number; sessionTrayId?: number; mushroomName?: string }
+      { sessionId: number; sessionTrayId?: number; mushroomName?: string; mushroomTypeId?: number }
     >();
     const pastTraySessions = new Map<
       number,
@@ -310,6 +312,7 @@ export class TrayRepository implements ITrayRepository {
                   sessionId: sess.session_id,
                   sessionTrayId: t.session_tray_id ? Number(t.session_tray_id) : undefined,
                   mushroomName: sess.mushroom_name || undefined,
+                  mushroomTypeId: sess.mushroom_type_id,
                 });
               } else {
                 // Record into past sessions history (e.g. RELEASED links or completed sessions)
@@ -421,6 +424,9 @@ export class TrayRepository implements ITrayRepository {
                 : 'OTHER_CULTIVATION'
               : 'AVAILABLE',
             mushroomName: isCurrentlyActive ? activeMushroomName : undefined,
+            mushroomImageUrl: isCurrentlyActive
+              ? findMushroomImage(mushroomImages, activeAdminTraySessions.get(tray.tray_id)?.mushroomTypeId, activeMushroomName)
+              : undefined,
             sessionId: isCurrentlyActive ? activeSessionId : undefined,
             sessionTrayId: isCurrentlyActive ? activeSessionTrayId : undefined,
             orderId: isCurrentlyActive ? ownedSession?.orderId : undefined,
