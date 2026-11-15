@@ -4,6 +4,15 @@ import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleShee
 import { theme } from '../../../../core/theme';
 import { AppButton, AppCard, AppInput, AppText } from '../../../../shared/components';
 import { formatAddress, parseAddress } from '../../../../shared/utils/address';
+import {
+  formatVietnamDate,
+  getCustomerPickupDateKeys,
+  getCustomerPickupHourOptions,
+  getCustomerPickupMinuteOptions,
+  getCustomerPickupTimeOptions,
+  getVietnamDateKey,
+  toVietnamDateTime,
+} from '../../domain/harvestSchedule';
 import { CustomerCultivationStatus } from '../../domain/entities/Order';
 
 type ReadySession = CustomerCultivationStatus['sessions'][number];
@@ -20,9 +29,12 @@ export function HarvestReceivingModal({ visible, session, profileAddress, profil
   onConfirm: (data: { method: Method; address?: string; scheduledAt?: string }) => Promise<void>;
 }) {
   const [method, setMethod] = useState<Method | null>(null);
-  const [step, setStep] = useState<'phone' | 'choose' | 'address' | 'review'>(profilePhone.trim() ? 'choose' : 'phone');
+  const [step, setStep] = useState<'phone' | 'choose' | 'address' | 'schedule' | 'review'>(profilePhone.trim() ? 'choose' : 'phone');
   const [addressParts, setAddressParts] = useState(() => parseAddress(profileAddress));
   const [phone, setPhone] = useState(profilePhone);
+  const [pickupDate, setPickupDate] = useState('');
+  const [pickupHour, setPickupHour] = useState('');
+  const [pickupMinute, setPickupMinute] = useState('00');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -31,6 +43,9 @@ export function HarvestReceivingModal({ visible, session, profileAddress, profil
     setStep(profilePhone.trim() ? 'choose' : 'phone');
     setAddressParts(parseAddress(profileAddress));
     setPhone(profilePhone);
+    setPickupDate('');
+    setPickupHour('');
+    setPickupMinute('00');
     setError(null);
     onClose();
   };
@@ -56,24 +71,49 @@ export function HarvestReceivingModal({ visible, session, profileAddress, profil
 
   const startConfirm = (next: Method) => {
     setMethod(next);
-    setAddressParts(parseAddress(profileAddress));
+    setAddressParts(parseAddress(session?.delivery_address || profileAddress));
     setError(null);
-    setStep(next === 'PICKUP' ? 'review' : 'address');
+    if (next === 'PICKUP') {
+      const dateOptions = getCustomerPickupDateKeys(session?.harvest_ready_at);
+      const existingDate = session?.scheduled_at ? getVietnamDateKey(session.scheduled_at) : null;
+      const nextDate = existingDate && dateOptions.includes(existingDate) ? existingDate : dateOptions[0] ?? '';
+      const existingTime = session?.scheduled_at
+        ? new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(session.scheduled_at))
+        : '';
+      const [existingHour = '', existingMinute = '00'] = existingTime.split(':');
+      const hourOptions = nextDate ? getCustomerPickupHourOptions(nextDate) : [];
+      const nextHour = hourOptions.includes(existingHour) ? existingHour : hourOptions[0] ?? '';
+      const minuteOptions = nextDate && nextHour ? getCustomerPickupMinuteOptions(nextDate, nextHour) : [];
+      setPickupDate(nextDate);
+      setPickupHour(nextHour);
+      setPickupMinute(minuteOptions.includes(existingMinute) ? existingMinute : minuteOptions[0] ?? '');
+      setStep('schedule');
+    } else {
+      setStep('address');
+    }
   };
 
   const submit = async () => {
     if (!method || saving) return;
     const deliveryAddress = formatAddress(addressParts);
+    const pickupTime = pickupHour && pickupMinute ? `${pickupHour}:${pickupMinute}` : '';
+    const scheduledAt = pickupDate && pickupTime ? toVietnamDateTime(pickupDate, pickupTime) : undefined;
     if (method === 'DELIVERY' && Object.values(addressParts).some((part) => !part.trim())) {
       setStep('address');
       setError('Vui lòng nhập đầy đủ 4 phần địa chỉ nhận hàng.');
+      return;
+    }
+    if (method === 'PICKUP' && (!scheduledAt || !getCustomerPickupDateKeys(session?.harvest_ready_at).includes(pickupDate)
+      || !getCustomerPickupTimeOptions(pickupDate).includes(pickupTime))) {
+      setStep('schedule');
+      setError('Vui lòng chọn ngày trong 3 ngày từ khi sẵn sàng thu hoạch và giờ từ 07:00 đến 17:00.');
       return;
     }
     setSaving(true);
     setError(null);
     try {
       await onConfirm(method === 'PICKUP'
-        ? { method, scheduledAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() }
+        ? { method, scheduledAt }
         : { method, address: deliveryAddress });
       close();
     } catch (submitError) {
@@ -174,9 +214,95 @@ export function HarvestReceivingModal({ visible, session, profileAddress, profil
             </AppCard>
           ) : null}
 
+          {step === 'schedule' && method === 'PICKUP' ? (
+            <AppCard variant="outlined" style={styles.panel}>
+              <AppText variant="bodySmall" weight="bold">Chọn ngày và giờ đến hái nấm</AppText>
+              <AppText variant="caption" color={theme.colors.text.secondary}>Ngày nhận từ ngày sẵn sàng thu hoạch đến tối đa 3 ngày sau đó.</AppText>
+              <AppText variant="caption" weight="bold">Địa chỉ trang trại</AppText>
+              <AppText variant="bodySmall">{farmAddress}</AppText>
+
+              <AppText variant="caption" weight="bold">Ngày đến</AppText>
+              <View style={styles.optionGrid}>
+                {getCustomerPickupDateKeys(session.harvest_ready_at).map((date) => (
+                  <Pressable
+                    key={date}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: pickupDate === date }}
+                    style={[styles.optionChip, pickupDate === date && styles.optionChipSelected]}
+                    onPress={() => {
+                      const hours = getCustomerPickupHourOptions(date);
+                      const nextHour = hours.includes(pickupHour) ? pickupHour : hours[0] ?? '';
+                      const minutes = nextHour ? getCustomerPickupMinuteOptions(date, nextHour) : [];
+                      setPickupDate(date);
+                      setPickupHour(nextHour);
+                      setPickupMinute(minutes.includes(pickupMinute) ? pickupMinute : minutes[0] ?? '');
+                      setError(null);
+                    }}
+                  >
+                    <AppText variant="caption" weight="bold" color={pickupDate === date ? theme.colors.primary[700] : theme.colors.text.primary}>
+                      {formatVietnamDate(date)}
+                    </AppText>
+                  </Pressable>
+                ))}
+              </View>
+
+              <AppText variant="caption" weight="bold">Giờ đến · 07–17 giờ</AppText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pickerOptions}>
+                {(pickupDate ? getCustomerPickupHourOptions(pickupDate) : []).map((hour) => (
+                  <Pressable
+                    key={hour}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: pickupHour === hour }}
+                    style={[styles.optionChip, pickupHour === hour && styles.optionChipSelected]}
+                    onPress={() => {
+                      const minutes = getCustomerPickupMinuteOptions(pickupDate, hour);
+                      setPickupHour(hour);
+                      setPickupMinute(minutes.includes(pickupMinute) ? pickupMinute : minutes[0] ?? '');
+                      setError(null);
+                    }}
+                  >
+                    <AppText variant="caption" weight="bold" color={pickupHour === hour ? theme.colors.primary[700] : theme.colors.text.primary}>
+                      {hour}
+                    </AppText>
+                  </Pressable>
+                ))}
+              </ScrollView>
+
+              <AppText variant="caption" weight="bold">Phút</AppText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pickerOptions}>
+                {(pickupDate && pickupHour ? getCustomerPickupMinuteOptions(pickupDate, pickupHour) : []).map((minute) => (
+                  <Pressable
+                    key={minute}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: pickupMinute === minute }}
+                    style={[styles.optionChip, pickupMinute === minute && styles.optionChipSelected]}
+                    onPress={() => { setPickupMinute(minute); setError(null); }}
+                  >
+                    <AppText variant="caption" weight="bold" color={pickupMinute === minute ? theme.colors.primary[700] : theme.colors.text.primary}>
+                      {minute}
+                    </AppText>
+                  </Pressable>
+                ))}
+              </ScrollView>
+              {getCustomerPickupDateKeys(session.harvest_ready_at).length === 0 ? (
+                <AppText variant="caption" color={theme.colors.error.main}>Không còn khung ngày và giờ hợp lệ để chọn.</AppText>
+              ) : null}
+              {error ? <AppText variant="caption" color={theme.colors.error.main}>{error}</AppText> : null}
+              <AppButton title="Tiếp tục xác nhận lịch" variant="primary" onPress={() => {
+                if (!pickupDate || !pickupHour || !pickupMinute) {
+                  setError('Vui lòng chọn ngày, giờ và phút đến.');
+                  return;
+                }
+                setError(null);
+                setStep('review');
+              }} />
+            </AppCard>
+          ) : null}
+
           {step === 'review' && method === 'PICKUP' ? (
             <AppCard variant="outlined" style={styles.panel}>
               <AppText variant="bodySmall" weight="bold">Đến trang trại hái nấm</AppText>
+              <AppText variant="caption" color={theme.colors.text.secondary}>Lịch hẹn: {formatVietnamDate(pickupDate)} · {pickupHour}:{pickupMinute}</AppText>
               <AppText variant="caption" color={theme.colors.text.secondary}>Địa chỉ trang trại</AppText>
               <AppText variant="bodySmall" weight="medium">{farmAddress}</AppText>
               <View style={styles.notice}>
@@ -202,9 +328,9 @@ export function HarvestReceivingModal({ visible, session, profileAddress, profil
             </AppCard>
           ) : null}
 
-          {error && step !== 'address' ? <AppText variant="caption" color={theme.colors.error.main}>{error}</AppText> : null}
+          {error && step !== 'address' && step !== 'schedule' ? <AppText variant="caption" color={theme.colors.error.main}>{error}</AppText> : null}
           {step !== 'choose' && step !== 'phone' ? <AppButton title="Quay lại" variant="ghost" disabled={saving} onPress={() => {
-            setStep(method === 'DELIVERY' && step === 'review' ? 'address' : 'choose');
+            setStep(method === 'DELIVERY' && step === 'review' ? 'address' : method === 'PICKUP' && step === 'review' ? 'schedule' : 'choose');
             setError(null);
           }} /> : null}
         </ScrollView>
@@ -236,6 +362,10 @@ const styles = StyleSheet.create({
   choiceIcon: { width: 40, height: 40, borderRadius: theme.borderRadius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.primary[50] },
   choiceCopy: { flex: 1, gap: 3 },
   panel: { gap: theme.spacing.md },
+  optionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs },
+  pickerOptions: { flexDirection: 'row', gap: theme.spacing.xs, paddingVertical: 2 },
+  optionChip: { minWidth: 74, alignItems: 'center', justifyContent: 'center', paddingVertical: theme.spacing.xs, paddingHorizontal: theme.spacing.sm, borderWidth: 1, borderColor: theme.colors.border.light, borderRadius: theme.borderRadius.md, backgroundColor: theme.colors.background.paper },
+  optionChipSelected: { borderColor: theme.colors.primary[600], backgroundColor: theme.colors.primary[50] },
   notice: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.xs, padding: theme.spacing.sm, borderRadius: theme.borderRadius.sm, backgroundColor: theme.colors.warning.light },
   noticeText: { flex: 1 },
   addressReview: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.xs, padding: theme.spacing.sm, borderRadius: theme.borderRadius.sm, backgroundColor: theme.colors.neutral[50] },

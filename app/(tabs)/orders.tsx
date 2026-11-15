@@ -22,6 +22,7 @@ import {
 } from '../../src/features/order';
 import { cultivationRepository, MushroomType } from '../../src/features/cultivation';
 import { HarvestReceivingModal } from '../../src/features/order/presentation/components/HarvestReceivingModal';
+import { canCustomerUpdateHarvestMethod } from '../../src/features/order/domain/harvestSchedule';
 import { ABOUT_US_INFO } from '../../src/features/profile/data/policiesData';
 import {
   AppButton,
@@ -756,19 +757,30 @@ function CustomerOrdersContent() {
                         <AppText variant="captionMedium" weight="bold">{session.mushroom_name}</AppText>
                         <AppText variant="caption" color={theme.colors.text.secondary}>Đã sẵn sàng thu hoạch</AppText>
                         {session.harvest_method ? (
-                          <AppText variant="caption" color={theme.colors.text.secondary}>
-                            Phương thức giao nhận: {session.harvest_method === 'PICKUP' ? 'Đến trang trại hái nấm' : 'Giao hàng'}
-                          </AppText>
+                          <>
+                            <AppText variant="caption" color={theme.colors.text.secondary}>
+                              Phương thức giao nhận: {session.harvest_method === 'PICKUP' ? 'Đến trang trại hái nấm' : 'Giao hàng'}
+                            </AppText>
+                            {session.harvest_request_status !== 'COMPLETED' &&
+                              canCustomerUpdateHarvestMethod(session.harvest_ready_at) ? (
+                                <AppButton
+                                  title="Cập nhật phương thức giao hàng"
+                                  variant="outline"
+                                  size="sm"
+                                  onPress={() => setReceivingContext({ orderId: order.order_id, session })}
+                                />
+                              ) : null}
+                          </>
+                        ) : null}
+                        {!session.harvest_method ? (
+                          <AppButton
+                            title="Chọn phương thức giao hàng"
+                            variant="outline"
+                            size="sm"
+                            onPress={() => setReceivingContext({ orderId: order.order_id, session })}
+                          />
                         ) : null}
                       </View>
-                      {!session.harvest_method ? (
-                        <AppButton
-                          title="Chọn phương thức giao hàng"
-                          variant="outline"
-                          size="sm"
-                          onPress={() => setReceivingContext({ orderId: order.order_id, session })}
-                        />
-                      ) : null}
                     </View>
                   ))}
 
