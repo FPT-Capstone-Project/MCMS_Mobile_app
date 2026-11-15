@@ -31,6 +31,30 @@ const labels: Record<string, string> = {
 export function statusLabel(value?: string | null): string {
   return value ? labels[value.trim().toUpperCase()] ?? 'Chưa xác định' : 'Chưa ghi nhận';
 }
+const lifecycleLabels: Record<string, string> = {
+  RECEIVED: 'Phôi đã được tiếp nhận',
+  PENDING: 'Phôi đã được tiếp nhận',
+  RESTING: 'Phôi đang nghỉ và ổn định',
+  SPAWN_RESTING: 'Phôi đang nghỉ và ổn định',
+  DEVELOPING: 'Tơ nấm đang phát triển',
+  MYCELIAL_DEVELOPMENT: 'Tơ nấm đang phát triển',
+  READY_FOR_CULTIVATION: 'Sẵn sàng đưa vào khay trồng',
+  FRUITING_INITIATION: 'Bắt đầu kích hoạt ra quả thể',
+  PINNING: 'Mầm nấm bắt đầu xuất hiện',
+  YOUNG_FRUITING: 'Nấm non đang phát triển',
+  MATURATION: 'Nấm trưởng thành, đang kiểm tra chất lượng',
+  HARVEST_READY: 'Sẵn sàng thu hoạch',
+  HARVESTING: 'Đang thu hoạch',
+  COMPLETED: 'Đã hoàn thành',
+  CANCELLED: 'Đã hủy',
+};
+
+export function lifecycleStatusLabel(value?: string | null): string {
+  if (!value) return 'Chưa ghi nhận';
+  const normalized = value.trim().toUpperCase();
+  return lifecycleLabels[normalized] ?? statusLabel(normalized);
+}
+
 // Readiness is a separate backend field, not a lifecycle transition.
 export function sessionGroup(session: CultivationSessionAdmin): string {
   if (['COMPLETED', 'CANCELLED', 'HARVESTING'].includes(session.status)) return session.status;

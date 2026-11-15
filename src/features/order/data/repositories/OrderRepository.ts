@@ -7,11 +7,51 @@ import {
   BackendCustomerOrder,
   CustomerOrder,
   CustomerCultivationStatus,
+  OrderHarvestHistory,
+  CompletedSessionReportData,
+  CultivationProgressEntry,
+  CultivationEnvironmentSessionReport,
   PaymentStatusData,
   PayosPaymentData,
   RentalPackage,
   SepayQrData,
 } from '../../domain/entities/Order';
+
+interface SessionReportApiPayload {
+  data?: SessionReportApiPayload;
+  pagination?: { total?: number };
+  total?: number;
+  inspections?: unknown[];
+  records?: { temperature_avg?: number | string | null; humidity_avg?: number | string | null }[];
+  temperature_avg?: number | string | null;
+  humidity_avg?: number | string | null;
+  readings?: { temperature?: number | string | null; humidity?: number | string | null }[];
+}
+
+interface EnvironmentHistoryApiPoint {
+  session_id: number;
+  floor_id: number;
+  period_start: string;
+  period_end: string;
+  growth_stage: string;
+  temperature_avg: number | string | null;
+  humidity_avg: number | string | null;
+}
+
+interface EnvironmentHistoryApiResponse {
+  data?: EnvironmentHistoryApiPoint[];
+  pagination?: { totalPages?: number };
+}
+
+interface MushroomConditionApiResponse {
+  data?: {
+    mushroom_type_id: number;
+    temperature_min: number | string | null;
+    temperature_max: number | string | null;
+    humidity_min: number | string | null;
+    humidity_max: number | string | null;
+  }[];
+}
 
 function toAmount(value: number | string | undefined, field: string): number | undefined {
   if (value === undefined) return undefined;
@@ -219,6 +259,163 @@ export class OrderRepository {
       return response.data.data;
     } catch (error) {
       throw error instanceof AppError ? error : handleApiError(error);
+    }
+  }
+
+  async getCustomerHarvestHistory(orderId: number): Promise<OrderHarvestHistory> {
+    try {
+      const response = await axiosClient.get<{ data: OrderHarvestHistory }>(
+        API_ENDPOINTS.CUSTOMER.HARVEST_HISTORY(orderId)
+      );
+      if (!response.data?.data || !Array.isArray(response.data.data.harvests)) {
+        throw new AppError('Dữ liệu thu hoạch từ máy chủ không hợp lệ.', 'API_ERROR', 500);
+      }
+      return response.data.data;
+    } catch (error) {
+      throw error instanceof AppError ? error : handleApiError(error);
+    }
+  }
+
+  async getCustomerCultivationProgress(orderId: number): Promise<CultivationProgressEntry[]> {
+    try {
+      const response = await axiosClient.get<{ data: CultivationProgressEntry[] } | CultivationProgressEntry[]>(
+        API_ENDPOINTS.CUSTOMER.CULTIVATION_PROGRESS(orderId)
+      );
+      const entries = Array.isArray(response.data) ? response.data : response.data?.data;
+      return Array.isArray(entries) ? entries : [];
+    } catch (error) {
+      throw error instanceof AppError ? error : handleApiError(error);
+    }
+  }
+
+  async getSessionInspectionCount(sessionId: number): Promise<number | null> {
+    try {
+      const response = await axiosClient.get<SessionReportApiPayload>(
+        API_ENDPOINTS.CULTIVATION_SESSIONS.DAILY_INSPECTIONS(sessionId),
+        { params: { page: 1, pageSize: 1 } }
+      );
+      const body = response.data?.data ?? response.data;
+      const pagination = body?.pagination;
+      return Number.isFinite(Number(pagination?.total))
+        ? Number(pagination?.total)
+        : (body?.inspections?.length ?? 0);
+    } catch {
+      return null;
+    }
+  }
+
+  async getSessionEnvironmentReport(
+    sessionId: number,
+    mushroomTypeId?: number,
+    startAt?: string | null,
+    endAt?: string | null
+  ): Promise<CultivationEnvironmentSessionReport | null> {
+    try {
+      const response = await axiosClient.get<{ data: CultivationEnvironmentSessionReport }>(
+        API_ENDPOINTS.ENVIRONMENT_HISTORY.SESSION_REPORT(sessionId)
+      );
+      return response.data?.data ?? null;
+    } catch {
+      return this.getEnvironmentReportFallback(sessionId, mushroomTypeId, startAt, endAt);
+    }
+  }
+
+  async getCompletedSessionReportData(
+    sessionId: number,
+    mushroomTypeId?: number,
+    startAt?: string | null,
+    endAt?: string | null
+  ): Promise<CompletedSessionReportData> {
+    const [inspectionCount, environmentReport] = await Promise.all([
+      this.getSessionInspectionCount(sessionId),
+      this.getSessionEnvironmentReport(sessionId, mushroomTypeId, startAt, endAt),
+    ]);
+    return { inspectionCount, environmentReport };
+  }
+
+  private async getEnvironmentReportFallback(
+    sessionId: number,
+    mushroomTypeId?: number,
+    startAt?: string | null,
+    endAt?: string | null
+  ): Promise<CultivationEnvironmentSessionReport | null> {
+    try {
+      const firstPage = await axiosClient.get<EnvironmentHistoryApiResponse>(
+        API_ENDPOINTS.ENVIRONMENT_HISTORY.SESSION(sessionId),
+        { params: { page: 1, pageSize: 100 } }
+      );
+      const totalPages = Math.max(1, Number(firstPage.data?.pagination?.totalPages) || 1);
+      const otherPages = await Promise.all(Array.from({ length: totalPages - 1 }, (_, index) =>
+        axiosClient.get<EnvironmentHistoryApiResponse>(
+          API_ENDPOINTS.ENVIRONMENT_HISTORY.SESSION(sessionId),
+          { params: { page: index + 2, pageSize: 100 } }
+        )
+      ));
+      const rows = [firstPage.data?.data ?? [], ...otherPages.map((page) => page.data?.data ?? [])].flat();
+      const fromTime = startAt ? Date.parse(startAt) : Number.NEGATIVE_INFINITY;
+      const toTime = endAt ? Date.parse(endAt) : Number.POSITIVE_INFINITY;
+      const grouped = new Map<string, EnvironmentHistoryApiPoint[]>();
+      rows.forEach((row) => {
+        const timestamp = Date.parse(row.period_start);
+        if (!Number.isFinite(timestamp) || timestamp < fromTime || timestamp >= toTime) return;
+        const bucket = grouped.get(row.period_start) ?? [];
+        bucket.push(row);
+        grouped.set(row.period_start, bucket);
+      });
+      const averageValue = (values: (number | string | null)[]) => {
+        const valid = values.map((value) => value == null ? Number.NaN : Number(value)).filter(Number.isFinite);
+        return valid.length ? valid.reduce((sum, value) => sum + value, 0) / valid.length : null;
+      };
+      const points = [...grouped.entries()].sort(([left], [right]) => Date.parse(left) - Date.parse(right)).map(([periodStart, bucket]) => ({
+        period_start: periodStart,
+        period_end: bucket[0].period_end,
+        growth_stage: bucket[0].growth_stage,
+        temperature_avg: averageValue(bucket.map((point) => point.temperature_avg)),
+        humidity_avg: averageValue(bucket.map((point) => point.humidity_avg)),
+      }));
+
+      const conditionResponse = mushroomTypeId
+        ? await axiosClient.get<MushroomConditionApiResponse>(API_ENDPOINTS.MUSHROOM_CONDITIONS.BASE, { params: { mushroomTypeId } })
+        : null;
+      const condition = conditionResponse?.data?.data?.find((item) => item.mushroom_type_id === mushroomTypeId);
+      const toNullableNumber = (value: number | string | null | undefined) => value == null ? null : Number(value);
+      const thresholds = {
+        temperatureMin: toNullableNumber(condition?.temperature_min),
+        temperatureMax: toNullableNumber(condition?.temperature_max),
+        humidityMin: toNullableNumber(condition?.humidity_min),
+        humidityMax: toNullableNumber(condition?.humidity_max),
+      };
+      const tempValues = points.map((point) => point.temperature_avg).filter((value): value is number => value != null);
+      const humidityValues = points.map((point) => point.humidity_avg).filter((value): value is number => value != null);
+      const hasTemperatureThresholds = thresholds.temperatureMin != null && thresholds.temperatureMax != null;
+      const hasHumidityThresholds = thresholds.humidityMin != null && thresholds.humidityMax != null;
+      const tempExceeds = (value: number | null) => hasTemperatureThresholds && value != null
+        && (value < thresholds.temperatureMin! || value > thresholds.temperatureMax!);
+      const humidityExceeds = (value: number | null) => hasHumidityThresholds && value != null
+        && (value < thresholds.humidityMin! || value > thresholds.humidityMax!);
+      const temperatureExceedanceCount = hasTemperatureThresholds ? points.filter((point) => tempExceeds(point.temperature_avg)).length : null;
+      const humidityExceedanceCount = hasHumidityThresholds ? points.filter((point) => humidityExceeds(point.humidity_avg)).length : null;
+      const mean = (values: number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+
+      return {
+        sessionId,
+        startAt: startAt ?? points[0]?.period_start ?? null,
+        endAt: endAt ?? points[points.length - 1]?.period_end ?? null,
+        thresholds,
+        summary: {
+          averageTemperature: mean(tempValues),
+          averageHumidity: mean(humidityValues),
+          temperatureExceedanceCount,
+          humidityExceedanceCount,
+          exceededBucketCount: hasTemperatureThresholds || hasHumidityThresholds
+            ? points.filter((point) => tempExceeds(point.temperature_avg) || humidityExceeds(point.humidity_avg)).length
+            : null,
+          bucketCount: points.length,
+        },
+        points,
+      };
+    } catch {
+      return null;
     }
   }
 

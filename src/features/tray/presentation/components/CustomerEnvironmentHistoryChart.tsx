@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Svg, { Line, Path, Text as SvgText } from 'react-native-svg';
 import { theme } from '../../../../core/theme';
 import { AppText } from '../../../../shared/components';
@@ -9,9 +9,12 @@ import { CustomerEnvironmentHistoryPoint } from '../../domain/entities/Tray';
 export type EnvironmentHistoryRange = 1 | 6 | 12 | 24;
 
 interface CustomerEnvironmentHistoryChartProps {
-  points: CustomerEnvironmentHistoryPoint[];
-  range: EnvironmentHistoryRange;
-  onRangeChange: (range: EnvironmentHistoryRange) => void;
+  points: Pick<CustomerEnvironmentHistoryPoint, 'period_start' | 'temperature_avg' | 'humidity_avg'>[];
+  range?: EnvironmentHistoryRange;
+  onRangeChange?: (range: EnvironmentHistoryRange) => void;
+  showRangeControls?: boolean;
+  selectDay?: boolean;
+  timeLabelMode?: 'time' | 'date';
   loading: boolean;
   error: string | null;
 }
@@ -64,29 +67,65 @@ function formatTime(value: string): string {
     : date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
+function formatDate(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? '--/--'
+    : date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+}
+
+function getLocalDayKey(value: string): string | null {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function formatDayLabel(dayKey: string): string {
+  const [year, month, day] = dayKey.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString('vi-VN', {
+    weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric',
+  });
+}
+
 export const CustomerEnvironmentHistoryChart: React.FC<CustomerEnvironmentHistoryChartProps> = ({
   points,
-  range,
+  range = 24,
   onRangeChange,
+  showRangeControls = true,
+  selectDay = false,
+  timeLabelMode = 'time',
   loading,
   error,
 }) => {
   const [width, setWidth] = useState(320);
-  const temperatures = useMemo(() => finiteValues(points.map((point) => point.temperature_avg)), [points]);
-  const humidities = useMemo(() => finiteValues(points.map((point) => point.humidity_avg)), [points]);
+  const availableDays = useMemo(() => [...new Set(points
+    .map((point) => getLocalDayKey(point.period_start))
+    .filter((day): day is string => day !== null))].sort(), [points]);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const activeDay = selectedDay && availableDays.includes(selectedDay)
+    ? selectedDay
+    : availableDays[availableDays.length - 1] ?? null;
+  const visiblePoints = useMemo(
+    () => selectDay && activeDay
+      ? points.filter((point) => getLocalDayKey(point.period_start) === activeDay)
+      : points,
+    [activeDay, points, selectDay]
+  );
+  const temperatures = useMemo(() => finiteValues(visiblePoints.map((point) => point.temperature_avg)), [visiblePoints]);
+  const humidities = useMemo(() => finiteValues(visiblePoints.map((point) => point.humidity_avg)), [visiblePoints]);
   const temperatureBounds = useMemo(() => getBounds(temperatures, [0, 10]), [temperatures]);
   const humidityBounds = useMemo(() => getBounds(humidities, [0, 100]), [humidities]);
   const temperaturePath = useMemo(
-    () => createLinePath(points.map((point) => point.temperature_avg), width, temperatureBounds),
-    [points, temperatureBounds, width]
+    () => createLinePath(visiblePoints.map((point) => point.temperature_avg), width, temperatureBounds),
+    [visiblePoints, temperatureBounds, width]
   );
   const humidityPath = useMemo(
-    () => createLinePath(points.map((point) => point.humidity_avg), width, humidityBounds),
-    [points, humidityBounds, width]
+    () => createLinePath(visiblePoints.map((point) => point.humidity_avg), width, humidityBounds),
+    [visiblePoints, humidityBounds, width]
   );
-  const first = points[0];
-  const middle = points[Math.floor((points.length - 1) / 2)];
-  const last = points[points.length - 1];
+  const first = visiblePoints[0];
+  const middle = visiblePoints[Math.floor((visiblePoints.length - 1) / 2)];
+  const last = visiblePoints[visiblePoints.length - 1];
 
   return (
     <View style={styles.card} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
@@ -97,13 +136,13 @@ export const CustomerEnvironmentHistoryChart: React.FC<CustomerEnvironmentHistor
             Diễn biến nhiệt độ & độ ẩm
           </AppText>
         </View>
-        <View style={styles.rangeRow}>
+        {showRangeControls ? <View style={styles.rangeRow}>
           {RANGE_OPTIONS.map((option) => (
             <Pressable
               key={option}
               accessibilityRole="button"
               accessibilityState={{ selected: range === option }}
-              onPress={() => onRangeChange(option)}
+              onPress={() => onRangeChange?.(option)}
               style={[styles.rangeButton, range === option && styles.rangeButtonActive]}
             >
               <AppText
@@ -115,8 +154,34 @@ export const CustomerEnvironmentHistoryChart: React.FC<CustomerEnvironmentHistor
               </AppText>
             </Pressable>
           ))}
-        </View>
+        </View> : null}
       </View>
+
+      {selectDay && availableDays.length > 0 ? (
+        <View style={styles.daySelector}>
+          <AppText variant="caption" weight="bold" color={theme.colors.text.secondary}>Chọn ngày xem</AppText>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayOptions}>
+            {availableDays.map((day) => (
+              <Pressable
+                key={day}
+                accessibilityRole="button"
+                accessibilityLabel={`Xem biểu đồ ngày ${formatDayLabel(day)}`}
+                accessibilityState={{ selected: day === activeDay }}
+                onPress={() => setSelectedDay(day)}
+                style={[styles.dayButton, day === activeDay && styles.dayButtonActive]}
+              >
+                <AppText
+                  variant="caption"
+                  weight={day === activeDay ? 'bold' : 'medium'}
+                  color={day === activeDay ? theme.colors.primary[700] : theme.colors.text.secondary}
+                >
+                  {formatDayLabel(day)}
+                </AppText>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
 
       {error ? (
         <View style={styles.message}>
@@ -131,7 +196,7 @@ export const CustomerEnvironmentHistoryChart: React.FC<CustomerEnvironmentHistor
             Đang tải lịch sử môi trường…
           </AppText>
         </View>
-      ) : points.length === 0 ? (
+      ) : visiblePoints.length === 0 ? (
         <View style={styles.message}>
           <Ionicons name="time-outline" size={18} color={theme.colors.text.muted} />
           <AppText variant="caption" color={theme.colors.text.secondary}>
@@ -168,13 +233,10 @@ export const CustomerEnvironmentHistoryChart: React.FC<CustomerEnvironmentHistor
             {humidityPath ? <Path d={humidityPath} fill="none" stroke="#2868E8" strokeWidth={2.5} strokeDasharray="7 5" strokeLinecap="round" strokeLinejoin="round" /> : null}
           </Svg>
           <View style={styles.xAxis}>
-            <AppText variant="caption" color={theme.colors.text.muted}>{first ? formatTime(first.period_start) : ''}</AppText>
-            <AppText variant="caption" color={theme.colors.text.muted}>{middle ? formatTime(middle.period_start) : ''}</AppText>
-            <AppText variant="caption" color={theme.colors.text.muted}>{last ? formatTime(last.period_start) : ''}</AppText>
+            <AppText variant="caption" color={theme.colors.text.muted}>{first ? (timeLabelMode === 'date' ? formatDate(first.period_start) : formatTime(first.period_start)) : ''}</AppText>
+            <AppText variant="caption" color={theme.colors.text.muted}>{middle ? (timeLabelMode === 'date' ? formatDate(middle.period_start) : formatTime(middle.period_start)) : ''}</AppText>
+            <AppText variant="caption" color={theme.colors.text.muted}>{last ? (timeLabelMode === 'date' ? formatDate(last.period_start) : formatTime(last.period_start)) : ''}</AppText>
           </View>
-          <AppText variant="caption" color={theme.colors.text.muted}>
-            Mỗi điểm là giá trị trung bình theo nhóm 10 phút.
-          </AppText>
         </>
       )}
     </View>
@@ -200,6 +262,10 @@ const styles = StyleSheet.create({
   header: { gap: theme.spacing.xs },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs },
   rangeRow: { flexDirection: 'row', alignSelf: 'flex-end', gap: 2 },
+  daySelector: { gap: 5 },
+  dayOptions: { gap: 6, paddingRight: 4 },
+  dayButton: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: theme.borderRadius.sm, backgroundColor: '#F3F6F8' },
+  dayButtonActive: { backgroundColor: '#EAF2FF', borderWidth: 1, borderColor: '#C8D9FA' },
   rangeButton: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: theme.borderRadius.sm, backgroundColor: '#F3F6F8' },
   rangeButtonActive: { backgroundColor: '#EAF2FF', borderWidth: 1, borderColor: '#C8D9FA' },
   legend: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: theme.spacing.sm },
