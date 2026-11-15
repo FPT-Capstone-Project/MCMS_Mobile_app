@@ -18,6 +18,7 @@ import {
   CustomerCultivationStatus,
   orderRepository,
   PaymentQrModal,
+  CompletedOrderReportModal,
 } from '../../src/features/order';
 import { cultivationRepository, MushroomType } from '../../src/features/cultivation';
 import {
@@ -219,6 +220,7 @@ function CustomerOrdersContent() {
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
   const [orderDetailLoading, setOrderDetailLoading] = useState(false);
   const [orderDetailError, setOrderDetailError] = useState<string | null>(null);
+  const [reportOrderId, setReportOrderId] = useState<number | null>(null);
 
   const mushroomImagesById = useMemo(
     () => new Map(mushroomTypes.map((mushroom) => [mushroom.mushroom_type_id, mushroom.image_url])),
@@ -293,11 +295,7 @@ function CustomerOrdersContent() {
       if (ordersResult.status === 'rejected') throw ordersResult.reason;
       setOrders(ordersResult.value);
 
-      const activePaidOrders = ordersResult.value.filter(
-        (order) =>
-          order.payment_status === 'PAID' &&
-          !['COMPLETED', 'CANCELLED'].includes(order.order_status)
-      );
+      const activePaidOrders = ordersResult.value.filter((order) => order.payment_status === 'PAID');
       setCultivationByOrder(
         Object.fromEntries(activePaidOrders.map((order) => [order.order_id, { loading: true }]))
       );
@@ -739,6 +737,17 @@ function CustomerOrdersContent() {
                   </AppText>
                 ) : null}
 
+                {order.order_status === 'COMPLETED' &&
+                  cultivationByOrder[order.order_id]?.data?.sessions.some((session) => session.status === 'COMPLETED') ? (
+                    <AppButton
+                      title="Xem báo cáo tổng kết"
+                      variant="outline"
+                      size="sm"
+                      leftIcon={<Ionicons name="document-text-outline" size={17} color={theme.colors.primary[600]} />}
+                      onPress={() => setReportOrderId(order.order_id)}
+                    />
+                  ) : null}
+
                 <AppButton
                   title={expandedOrderId === order.order_id ? 'Ẩn chi tiết' : 'Xem chi tiết'}
                   variant="ghost"
@@ -874,6 +883,12 @@ function CustomerOrdersContent() {
           }}
         />
       )}
+      <CompletedOrderReportModal
+        visible={reportOrderId !== null}
+        orderId={reportOrderId}
+        cultivation={reportOrderId === null ? undefined : cultivationByOrder[reportOrderId]?.data}
+        onClose={() => setReportOrderId(null)}
+      />
     </ScreenContainer>
   );
 }

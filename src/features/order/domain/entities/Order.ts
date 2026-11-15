@@ -95,7 +95,11 @@ export interface CustomerCultivationStatus {
   sessions: {
     order_item_id?: number;
     session_id: number;
+    mushroom_type_id?: number;
     status: string;
+    tray_quantity?: number | null;
+    start_at?: string | null;
+    end_at?: string | null;
     harvest_status?: string | null;
     harvest_method?: 'PICKUP' | 'DELIVERY' | null;
     harvest_request_status?: string | null;
@@ -106,9 +110,69 @@ export interface CustomerCultivationStatus {
     mushroom_name: string;
     assigned_trays: {
       tray_id: number;
+      tray_code?: string;
       status: string;
     }[];
   }[];
+}
+
+export interface OrderHarvestHistory {
+  order_id: number;
+  order_code: string;
+  harvests: {
+    session_id: number;
+    mushroom_type: { id: number; name: string };
+    harvest: null | {
+      harvest_id: number;
+      status: string;
+      harvest_date: string | null;
+      total_weight_kg: number | string | null;
+      usable_weight_kg: number | string | null;
+      rejected_weight_kg: number | string | null;
+      quality_grade: string | null;
+      harvest_method: 'PICKUP' | 'DELIVERY' | null;
+    };
+  }[];
+}
+
+export interface CompletedSessionReportData {
+  inspectionCount: number | null;
+  environmentReport: CultivationEnvironmentSessionReport | null;
+}
+
+export interface CultivationEnvironmentSessionReport {
+  sessionId: number;
+  startAt: string | null;
+  endAt: string | null;
+  thresholds: {
+    temperatureMin: number | null;
+    temperatureMax: number | null;
+    humidityMin: number | null;
+    humidityMax: number | null;
+  };
+  summary: {
+    averageTemperature: number | null;
+    averageHumidity: number | null;
+    temperatureExceedanceCount: number | null;
+    humidityExceedanceCount: number | null;
+    exceededBucketCount: number | null;
+    bucketCount: number;
+  };
+  points: {
+    period_start: string;
+    period_end: string;
+    growth_stage: string;
+    temperature_avg: number | null;
+    humidity_avg: number | null;
+  }[];
+}
+
+export interface CultivationProgressEntry {
+  session_id: number;
+  current_stage: string | null;
+  progress_percent: number | null;
+  updated_at: string | null;
+  description: string | null;
 }
 
 /**

@@ -67,6 +67,8 @@ export const API_ENDPOINTS = {
     CANCEL: (orderId: string | number) => `/api/orders/${orderId}/cancel`,
   },
   CUSTOMER: {
+    HARVEST_HISTORY: (orderId: string | number) =>
+      `/api/orders/${orderId}/harvest-history`,
     CULTIVATION_STATUS: (orderId: string | number) =>
       `/api/customer/orders/${orderId}/cultivation-status`,
     CULTIVATION_PROGRESS: (orderId: string | number) =>
@@ -78,6 +80,7 @@ export const API_ENDPOINTS = {
   },
   ENVIRONMENT_HISTORY: {
     SESSION: (sessionId: string | number) => `/api/environment-history/sessions/${sessionId}`,
+    SESSION_REPORT: (sessionId: string | number) => `/api/environment-history/sessions/${sessionId}/report`,
     SESSION_LATEST: (sessionId: string | number) =>
       `/api/environment-history/sessions/${sessionId}/latest`,
     FLOOR: (floorId: string | number) => `/api/environment-history/floors/${floorId}`,
