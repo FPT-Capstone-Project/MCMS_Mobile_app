@@ -96,6 +96,7 @@ export interface CustomerCultivationStatus {
     order_item_id?: number;
     session_id: number;
     mushroom_type_id?: number;
+    harvest_request_id?: number | null;
     status: string;
     tray_quantity?: number | null;
     start_at?: string | null;

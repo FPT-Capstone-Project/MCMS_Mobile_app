@@ -21,6 +21,8 @@ import {
   CompletedOrderReportModal,
 } from '../../src/features/order';
 import { cultivationRepository, MushroomType } from '../../src/features/cultivation';
+import { HarvestReceivingModal } from '../../src/features/order/presentation/components/HarvestReceivingModal';
+import { ABOUT_US_INFO } from '../../src/features/profile/data/policiesData';
 import {
   AppButton,
   AppCard,
@@ -183,6 +185,10 @@ function hasHandoverProgress(cultivation?: CustomerCultivationStatus): boolean {
   );
 }
 
+function isHarvestReady(session: CustomerCultivationStatus['sessions'][number]): boolean {
+  return session.status === 'HARVEST_READY' || session.harvest_status === 'HARVEST_READY';
+}
+
 function matchesOrderFilter(
   order: CustomerOrder,
   filter: CustomerOrderFilter,
@@ -203,6 +209,7 @@ function matchesOrderFilter(
 
 function CustomerOrdersContent() {
   const router = useRouter();
+  const { user, updateProfile } = useAuth();
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [orderFilter, setOrderFilter] = useState<CustomerOrderFilter>('all');
   const [cultivationByOrder, setCultivationByOrder] = useState<
@@ -221,6 +228,10 @@ function CustomerOrdersContent() {
   const [orderDetailLoading, setOrderDetailLoading] = useState(false);
   const [orderDetailError, setOrderDetailError] = useState<string | null>(null);
   const [reportOrderId, setReportOrderId] = useState<number | null>(null);
+  const [receivingContext, setReceivingContext] = useState<{
+    orderId: number;
+    session: CustomerCultivationStatus['sessions'][number];
+  } | null>(null);
 
   const mushroomImagesById = useMemo(
     () => new Map(mushroomTypes.map((mushroom) => [mushroom.mushroom_type_id, mushroom.image_url])),
@@ -737,6 +748,30 @@ function CustomerOrdersContent() {
                   </AppText>
                 ) : null}
 
+                {(cultivationByOrder[order.order_id]?.data?.sessions ?? [])
+                  .filter(isHarvestReady)
+                  .map((session) => (
+                    <View key={`harvest-receiving-${session.session_id}`} style={styles.harvestReceivingRow}>
+                      <View style={styles.harvestReceivingCopy}>
+                        <AppText variant="captionMedium" weight="bold">{session.mushroom_name}</AppText>
+                        <AppText variant="caption" color={theme.colors.text.secondary}>Đã sẵn sàng thu hoạch</AppText>
+                        {session.harvest_method ? (
+                          <AppText variant="caption" color={theme.colors.text.secondary}>
+                            Phương thức giao nhận: {session.harvest_method === 'PICKUP' ? 'Đến trang trại hái nấm' : 'Giao hàng'}
+                          </AppText>
+                        ) : null}
+                      </View>
+                      {!session.harvest_method ? (
+                        <AppButton
+                          title="Chọn phương thức giao hàng"
+                          variant="outline"
+                          size="sm"
+                          onPress={() => setReceivingContext({ orderId: order.order_id, session })}
+                        />
+                      ) : null}
+                    </View>
+                  ))}
+
                 {order.order_status === 'COMPLETED' &&
                   cultivationByOrder[order.order_id]?.data?.sessions.some((session) => session.status === 'COMPLETED') ? (
                     <AppButton
@@ -889,6 +924,57 @@ function CustomerOrdersContent() {
         cultivation={reportOrderId === null ? undefined : cultivationByOrder[reportOrderId]?.data}
         onClose={() => setReportOrderId(null)}
       />
+      <HarvestReceivingModal
+        visible={receivingContext !== null}
+        session={receivingContext?.session ?? null}
+        profileAddress={user?.address ?? ''}
+        profilePhone={user?.phone || user?.phoneNumber || ''}
+        farmAddress={ABOUT_US_INFO.contact.address}
+        onClose={() => setReceivingContext(null)}
+        onSavePhone={async (phone) => {
+          await updateProfile({
+            fullName: user?.fullName || user?.full_name || '',
+            phone,
+            address: user?.address ?? null,
+          });
+        }}
+        onConfirm={async ({ method, address, scheduledAt }) => {
+          if (!receivingContext) return;
+          await orderRepository.saveCustomerHarvestReceiving(
+            receivingContext.session.session_id,
+            receivingContext.session.harvest_request_id,
+            { harvestMethod: method, scheduledAt, deliveryAddress: address }
+          );
+          setCultivationByOrder((current) => {
+            const existing = current[receivingContext.orderId];
+            if (!existing?.data) return current;
+
+            return {
+              ...current,
+              [receivingContext.orderId]: {
+                ...existing,
+                data: {
+                  ...existing.data,
+                  sessions: existing.data.sessions.map((session) =>
+                    session.session_id === receivingContext.session.session_id
+                      ? { ...session, harvest_method: method, scheduled_at: scheduledAt ?? session.scheduled_at }
+                      : session
+                  ),
+                },
+              },
+            };
+          });
+          try {
+            const refreshed = await orderRepository.getCustomerCultivationStatus(receivingContext.orderId);
+            setCultivationByOrder((current) => ({
+              ...current,
+              [receivingContext.orderId]: { data: refreshed },
+            }));
+          } catch {
+            // Current details remain visible and will be refreshed when the orders list reloads.
+          }
+        }}
+      />
     </ScreenContainer>
   );
 }
@@ -958,6 +1044,16 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xxs,
     paddingHorizontal: theme.spacing.xs,
   },
+  harvestReceivingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.success.light,
+  },
+  harvestReceivingCopy: { flex: 1, gap: 2 },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -3,4 +3,5 @@
  */
 export * from '../../core/utils/currency';
 export * from '../../core/utils/date';
+export * from './address';
 
