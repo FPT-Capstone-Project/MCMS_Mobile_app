@@ -53,7 +53,7 @@ function formatConditionLabel(condition?: string | null): string {
     ABNORMAL: 'Bất thường',
     POOR: 'Kém phát triển',
   };
-  return map[upper] ?? condition;
+  return map[upper] ?? cultivationNote(condition);
 }
 
 export const SessionDetailModal: React.FC<SessionDetailModalProps> = ({
@@ -221,7 +221,7 @@ const SessionDetailModalContent: React.FC<{
       COMPLETED: 'Đã hoàn thành',
       CANCELLED: 'Đã hủy',
     };
-    return map[st] || statusLabel(st);
+    return map[st.trim().toUpperCase()] || statusLabel(st);
   };
 
   const formatSessionDetailHarvestStatus = (st: string): string => {
@@ -233,7 +233,7 @@ const SessionDetailModalContent: React.FC<{
       IN_PROGRESS: 'Đang thu hoạch',
       COMPLETED: 'Đã hoàn thành',
     };
-    return map[st] || statusLabel(st);
+    return map[st.trim().toUpperCase()] || statusLabel(st);
   };
 
   const renderStatusBadge = (status: string) => {
@@ -334,7 +334,7 @@ const SessionDetailModalContent: React.FC<{
                       Giai đoạn sinh trưởng
                     </AppText>
                     <AppText variant="bodySmall" weight="bold" color={theme.colors.primary[700]}>
-                      {growthStage || 'Chưa ghi nhận'}
+                      {statusLabel(growthStage)}
                     </AppText>
                     {growthStage ? (
                       <View style={styles.progressBarBg}>
@@ -647,7 +647,7 @@ const SessionDetailModalContent: React.FC<{
                             <View style={styles.timelineContent}>
                               <View style={styles.timelineHeader}>
                                 <AppText variant="bodySmall" weight="bold" color={isLatest ? theme.colors.primary[700] : theme.colors.text.primary}>
-                                  {item.current_stage} ({item.progress_percent}%)
+                                  {statusLabel(item.current_stage)} ({item.progress_percent}%)
                                 </AppText>
                                 <AppText variant="caption" color={theme.colors.text.muted}>
                                   {item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : ''}

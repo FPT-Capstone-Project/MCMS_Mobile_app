@@ -82,6 +82,9 @@ const FloorProfileConfigModalContent: React.FC<FloorProfileConfigModalProps> = (
 
   // Form Fields
   const cfg = initialConfig;
+  const [fanEnabled, setFanEnabled] = useState(Boolean(cfg?.fan_enabled));
+  const [fanRun, setFanRun] = useState(String(cfg?.fan_run_minutes ?? ''));
+  const [fanRest, setFanRest] = useState(String(cfg?.fan_rest_minutes ?? ''));
   const [profileName, setProfileName] = useState(
     cfg?.profile_name || `Cấu hình ${floor.floor_name || `Tầng ${floor.floor_number}`}`
   );
@@ -278,6 +281,10 @@ const FloorProfileConfigModalContent: React.FC<FloorProfileConfigModalProps> = (
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
+    if (fanEnabled) {
+      if (!floor.fan_ssr_channel) errs.fan = 'Hãy gán kênh quạt cho tầng trước.';
+      if (![fanRun, fanRest].every(v => /^\d+$/.test(v.trim()) && Number(v) >= 1 && Number(v) <= 1440)) errs.fan = 'Thời gian chạy và nghỉ phải từ 1 đến 1440 phút.';
+    }
 
     if (selectedMushroomIds.length === 0) {
       errs.mushrooms = 'Phải chọn ít nhất 1 loại nấm cho tầng.';
@@ -356,6 +363,9 @@ const FloorProfileConfigModalContent: React.FC<FloorProfileConfigModalProps> = (
       humidity_max: Number(humMax),
       humidity_start_threshold: Number(humStart),
       humidity_stop_threshold: Number(humStop),
+      fan_enabled: fanEnabled,
+      fan_run_minutes: fanEnabled ? Number(fanRun) : null,
+      fan_rest_minutes: fanEnabled ? Number(fanRest) : null,
       cooling_enabled: coolingEnabled,
       misting_pulse_ms: Math.max(1000, Number(pulseSec) * 1000),
       cooldown_ms: Math.max(5000, Number(cooldownSec) * 1000),
@@ -389,7 +399,7 @@ const FloorProfileConfigModalContent: React.FC<FloorProfileConfigModalProps> = (
           <View style={styles.headerRow}>
             <View>
               <AppText variant="h3" weight="bold">
-                Cấu hình AUTO Phun Sương
+                Cấu hình AUTO tầng
               </AppText>
               <AppText variant="caption" color={theme.colors.text.secondary}>
                 {floor.floor_name} (Tầng {floor.floor_number}) • Cấu hình FLOOR
@@ -831,6 +841,19 @@ const FloorProfileConfigModalContent: React.FC<FloorProfileConfigModalProps> = (
               )}
             </AppCard>
 
+            <AppCard style={styles.groupCard}>
+              <View style={styles.switchRow}>
+                <AppText weight="bold">Cho quạt chạy cùng AUTO</AppText>
+                <Switch value={fanEnabled} onValueChange={v => { setFanEnabled(v); setProfileApproved(false); }} />
+              </View>
+              <AppText variant="caption">Dùng chung nút chạy/dừng AUTO của tầng. Quạt lặp lại chu kỳ chạy rồi nghỉ.</AppText>
+              {fanEnabled && <>
+                <AppInput label="Thời gian chạy (phút)" value={fanRun} keyboardType="number-pad" onChangeText={v => { setFanRun(v); setProfileApproved(false); }} />
+                <AppInput label="Thời gian nghỉ (phút)" value={fanRest} keyboardType="number-pad" onChangeText={v => { setFanRest(v); setProfileApproved(false); }} />
+                <AppText variant="caption">Ví dụ: chạy 5 phút, nghỉ 55 phút. 60 phút = 1 giờ.</AppText>
+              </>}
+              {errors.fan && <AppText color={theme.colors.error.main}>{errors.fan}</AppText>}
+            </AppCard>
             {/* GROUP 4: DUYỆT CẤU HÌNH */}
             <AppCard elevation="xs" style={styles.groupCard}>
               <View style={styles.groupHeaderRow}>

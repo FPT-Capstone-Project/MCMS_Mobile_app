@@ -57,9 +57,9 @@ interface QuickActionItem {
 const staffActions: QuickActionItem[] = [
   {
     id: 'admin-orders',
-    title: 'Đơn của khách',
-    desc: 'Đơn thuê khay & Đơn nông sản',
-    icon: 'receipt-outline',
+    title: 'Phiên nuôi trồng',
+    desc: 'Theo dõi phôi, xếp khay & thu hoạch',
+    icon: 'leaf-outline',
     iconColor: '#059669',
     iconBg: 'rgba(5, 150, 105, 0.1)',
     route: '/admin-orders',
@@ -205,7 +205,6 @@ export default function HomeScreen() {
   const appStateRef = useRef<AppStateStatus>((AppState.currentState as AppStateStatus) || 'active');
 
   const loadDashboardData = useCallback(async () => {
-    setDashboardLoading(true);
     setDashboardError(null);
     try {
       const ordersData = await orderRepository.getCustomerOrders();

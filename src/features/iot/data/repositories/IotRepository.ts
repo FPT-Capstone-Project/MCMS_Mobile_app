@@ -399,6 +399,9 @@ export class IotRepository {
         humidity_max: Number(config.humidity_max),
         humidity_start_threshold: Number(config.humidity_start_threshold),
         humidity_stop_threshold: Number(config.humidity_stop_threshold),
+        fan_enabled: Boolean(config.fan_enabled),
+        fan_run_minutes: config.fan_run_minutes ?? null,
+        fan_rest_minutes: config.fan_rest_minutes ?? null,
         cooling_enabled: isCooling,
         misting_pulse_ms: Math.round(Number(config.misting_pulse_ms)),
         cooldown_ms: Math.round(Number(config.cooldown_ms)),
@@ -760,6 +763,7 @@ export class IotRepository {
                 : null,
             status: item.status,
             harvest_status: item.harvest_status ?? null,
+            harvest_ready_at: item.harvest_ready_at ?? null,
             spawn_status: item.spawn_status ?? null,
             mushroom_type_id: Number(item.mushroom_type_id || 1),
             mushroom_name: item.mushroom_name ?? item.mushroom?.name ?? 'Nấm giống',
@@ -899,6 +903,7 @@ export class IotRepository {
                   : null,
               status: item.status,
               harvest_status: item.harvest_status ?? null,
+              harvest_ready_at: item.harvest_ready_at ?? null,
               spawn_status: item.spawn_status ?? null,
               mushroom_type_id: Number(item.mushroom_type_id || 1),
               mushroom_name: item.mushroom_name ?? item.mushroom?.name ?? 'Nấm giống',
@@ -1339,8 +1344,18 @@ export class IotRepository {
     } catch (error) { throw error instanceof AppError ? error : handleApiError(error); }
   }
 
+  async getSessionReceiving(sessionId: number): Promise<Partial<HarvestItem> | null> {
+    try {
+      const response = await axiosClient.get<{ data: (Omit<Partial<HarvestItem>, 'status'> & { status: string })[] }>(`${API_ENDPOINTS.HARVEST_REQUESTS.BASE}/admin`);
+      const request = response.data.data.find((item) => item.session_id === sessionId);
+      if (!request) return null;
+      const { status, ...receiving } = request;
+      return { ...receiving, harvest_request_status: status };
+    } catch (error) { throw error instanceof AppError ? error : handleApiError(error); }
+  }
+
   async saveHarvestReceiving(sessionId: number, requestId: number | null | undefined, input: {
-    harvestMethod: 'PICKUP' | 'DELIVERY'; scheduledAt?: string; customerNote?: string;
+    harvestMethod: 'PICKUP' | 'DELIVERY'; scheduledAt?: string; customerNote?: string; deliveryAddress?: string;
   }): Promise<void> {
     try {
       if (requestId) await axiosClient.patch(API_ENDPOINTS.HARVEST_REQUESTS.DETAIL(requestId), input);

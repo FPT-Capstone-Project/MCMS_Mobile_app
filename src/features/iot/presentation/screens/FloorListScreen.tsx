@@ -88,14 +88,14 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
       ]);
 
       const loadedRooms = roomsRes.status === 'fulfilled' ? roomsRes.value : [];
-      setRooms(loadedRooms);
+      if (roomsRes.status === 'fulfilled') setRooms(loadedRooms);
 
       if (mastersRes.status === 'fulfilled') {
         setMasters(mastersRes.value);
       }
 
       const loadedFloors = floorsRes.status === 'fulfilled' ? floorsRes.value : [];
-      setFloors(loadedFloors);
+      if (floorsRes.status === 'fulfilled') setFloors(loadedFloors);
 
       // Default select room that actually has floors, or first room
       const roomWithFloors = loadedRooms.find((r) =>
@@ -109,18 +109,6 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
       setRefreshing(false);
     }
   }, []);
-
-  useEffect(() => {
-    let isMounted = true;
-    void (async () => {
-      if (isMounted) {
-        await loadInitialData();
-      }
-    })();
-    return () => {
-      isMounted = false;
-    };
-  }, [loadInitialData]);
 
   // Hydrate limited floor info for currently selected room's floors
   const activeRoomFloors = useMemo(
@@ -200,12 +188,8 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
     }
   }, []);
 
-  const hydrateAllFloors = useCallback((targetFloors: FloorMapping[], targetRoomId: number | null) => {
-    if (targetFloors.length === 0) return;
-    const active = targetFloors.filter((f) => f.room_id === targetRoomId);
-    const others = targetFloors.filter((f) => f.room_id !== targetRoomId);
-    active.forEach((f) => void hydrateFloor(f));
-    others.forEach((f) => void hydrateFloor(f));
+  const hydrateAllFloors = useCallback((targetFloors: FloorMapping[]) => {
+    targetFloors.forEach((floor) => void hydrateFloor(floor));
   }, [hydrateFloor]);
 
   // Re-fetch data and re-hydrate whenever screen comes into focus
@@ -217,10 +201,10 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
     }, [loadInitialData])
   );
 
-  // Pre-hydrate all floors across all rooms whenever floors list or room selection changes
+  // Refresh floor details when the list is reloaded, not when selecting another room.
   useEffect(() => {
-    hydrateAllFloors(floors, selectedRoomId);
-  }, [floors, selectedRoomId, hydrateAllFloors]);
+    hydrateAllFloors(floors);
+  }, [floors, hydrateAllFloors]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -403,7 +387,7 @@ export const FloorListScreen: React.FC<FloorListScreenProps> = ({
                   (status?.runtime?.control_state === 'FAULT' ||
                     status?.runtime?.control_state === 'SENSOR_FAULT' ||
                     status?.runtime?.control_state === 'DEVICE_OFFLINE'));
-              const isOffPending = status?.runtime?.control_state === 'OFF_PENDING';
+              const isOffPending = status?.runtime?.control_state === 'OFF_PENDING' || status?.fan?.state === 'OFF_PENDING';
 
               // Has config check: Truly check if config exists in DB or has thresholds snapshot
               const hasConfig = Boolean(

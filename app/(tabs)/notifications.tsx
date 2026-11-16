@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useReadNotificationMutation, useReadAllNotificationsMutation } from '../../src/features/notification/data/notificationApi';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
 import { Image } from 'expo-image';
@@ -257,6 +258,8 @@ function formatIncidentLocation(incident?: DeviceIncident | null): string {
 }
 
 export default function NotificationsScreen() {
+  const [readNotification] = useReadNotificationMutation();
+  const [readAllNotifications] = useReadAllNotificationsMutation();
   const router = useRouter();
   const { user, isCustomer, isFarmOperator, isAdmin } = useAuth();
 
@@ -443,8 +446,7 @@ export default function NotificationsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
-      loadNotifications();
+      void loadNotifications();
       const intervalId = setInterval(() => {
         void loadNotifications();
       }, 60_000);
@@ -456,9 +458,9 @@ export default function NotificationsScreen() {
     if (notification.is_read) return;
 
     try {
-      const updated = await notificationRepository.markAsRead(
+      const updated = await readNotification(
         notification.notification_id
-      );
+      ).unwrap();
       setNotifications((current) =>
         filter === 'unread'
           ? current.filter((item) => item.notification_id !== updated.notification_id)
@@ -487,7 +489,7 @@ export default function NotificationsScreen() {
     try {
       setMarkingAll(true);
       if (unreadCount > 0) {
-        await notificationRepository.markAllAsRead();
+        await readAllNotifications().unwrap();
       }
       await loadNotifications();
     } catch (error: unknown) {
@@ -681,7 +683,7 @@ export default function NotificationsScreen() {
               key={value}
               accessibilityRole="button"
               accessibilityState={{ selected: filter === value }}
-              onPress={() => setFilter(value)}
+              onPress={() => { if (filter !== value) { setLoading(true); setFilter(value); } }}
               style={[
                 styles.filterButton,
                 filter === value && styles.filterButtonSelected,

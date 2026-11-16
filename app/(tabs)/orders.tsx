@@ -308,15 +308,17 @@ function CustomerOrdersContent() {
       setOrders(ordersResult.value);
 
       const activePaidOrders = ordersResult.value.filter((order) => order.payment_status === 'PAID');
-      setCultivationByOrder(
-        Object.fromEntries(activePaidOrders.map((order) => [order.order_id, { loading: true }]))
+      setCultivationByOrder((current) =>
+        Object.fromEntries(activePaidOrders.map((order) => [
+          order.order_id,
+          current[order.order_id]?.data ? current[order.order_id] : { loading: true },
+        ]))
       );
 
       if (mushroomsResult.status === 'fulfilled') {
         setMushroomTypes(mushroomsResult.value);
         setMushroomLoadError(null);
       } else {
-        setMushroomTypes([]);
         setMushroomLoadError(
           mushroomsResult.reason instanceof Error
             ? mushroomsResult.reason.message
@@ -346,7 +348,11 @@ function CustomerOrdersContent() {
                     : 'Không thể tải trạng thái nuôi trồng.',
               };
       });
-      setCultivationByOrder(nextCultivationByOrder);
+      setCultivationByOrder((current) => Object.fromEntries(
+        Object.entries(nextCultivationByOrder).map(([id, result]) => [
+          id, result.data ? result : { ...current[Number(id)], ...result, loading: false },
+        ])
+      ));
     } catch (err: unknown) {
       setErrorMsg(
         typeof err === 'string'

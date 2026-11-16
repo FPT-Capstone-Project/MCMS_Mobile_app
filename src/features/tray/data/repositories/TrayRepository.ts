@@ -418,7 +418,9 @@ export class TrayRepository implements ITrayRepository {
           return {
             id: tray.tray_id,
             code: positionCode,
-            usage: isCurrentlyActive
+            usage: rawPhysicalStatus === 'MAINTENANCE' || rawPhysicalStatus === 'INACTIVE'
+              ? rawPhysicalStatus
+              : isCurrentlyActive
               ? hasOwnActiveCultivation
                 ? 'MY_CULTIVATION'
                 : 'OTHER_CULTIVATION'

@@ -9,6 +9,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { AppError } from '../../src/core/errors/appError';
@@ -171,6 +172,9 @@ export default function TrayScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ sessionId?: string; floorId?: string }>();
   const { canControlIot } = useAuth();
+  const [cleaningTrayId, setCleaningTrayId] = useState<number | null>(null);
+  const cleaningInFlight = useRef(false);
+
 
   const [racks, setRacks] = useState<CustomerFloorRack[]>([]);
   const [loadState, setLoadState] = useState<TrayLoadState>('loading');
@@ -268,6 +272,29 @@ export default function TrayScreen() {
       setLoadState('error');
     }
   }, [canControlIot]);
+  const handleCompleteSanitation = (tray: CustomerTrayCard) => {
+    if (!canControlIot || cleaningInFlight.current) return;
+    Alert.alert('Xác nhận đã vệ sinh xong', `Khay ${tray.code} đã được vệ sinh và sẵn sàng sử dụng cho phiên trồng mới?`, [
+      { text: 'Hủy', style: 'cancel' },
+      { text: 'Đã vệ sinh xong', onPress: () => {
+        if (cleaningInFlight.current) return;
+        cleaningInFlight.current = true;
+        setCleaningTrayId(tray.id);
+        void (async () => {
+          try {
+            await cultivationRepository.completeTraySanitation(tray.id);
+            await loadRacks();
+            Alert.alert('Đã hoàn tất', `Khay ${tray.code} đã được trả về trạng thái sẵn sàng.`);
+          } catch (error) {
+            Alert.alert('Chưa thể xác nhận', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+          } finally {
+            cleaningInFlight.current = false;
+            setCleaningTrayId(null);
+          }
+        })();
+      } },
+    ]);
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -791,29 +818,6 @@ export default function TrayScreen() {
           </AppCard>
         )}
 
-        {/* Staff Action Card when NOT in assign mode */}
-        {!assigningSession && canControlIot && (
-          <AppCard elevation="xs" style={styles.staffActionCard}>
-            <View style={styles.staffActionRow}>
-              <View style={{ flex: 1, marginRight: 10 }}>
-                <AppText variant="bodySmall" weight="bold" color={theme.colors.primary[800]}>
-                  Xếp khay vào tầng
-                </AppText>
-                <AppText variant="caption" color={theme.colors.text.secondary} style={{ marginTop: 2 }}>
-                  Chọn phiên nuôi trồng sẵn sàng để phân bổ vào các khay trống.
-                </AppText>
-              </View>
-              <AppButton
-                title="Xếp khay ngay"
-                variant="primary"
-                size="sm"
-                leftIcon={<Ionicons name="grid-outline" size={14} color="#FFFFFF" />}
-                onPress={() => handleStartAssignWorkflow()}
-              />
-            </View>
-          </AppCard>
-        )}
-
         <TrayLegend isStaff={canControlIot} />
 
         {loadState === 'loading' ? (
@@ -860,15 +864,6 @@ export default function TrayScreen() {
                   </AppText>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                  {canControlIot && !assigningSession && (
-                    <AppButton
-                      title="Xếp khay"
-                      variant="secondary"
-                      size="sm"
-                      leftIcon={<Ionicons name="grid-outline" size={14} color={theme.colors.primary[700]} />}
-                      onPress={() => handleStartAssignWorkflow(rack.id)}
-                    />
-                  )}
                   {getCameraIdForFloor(rack.floorNumber) ? (
                     <AppButton
                       title="Camera"
@@ -909,9 +904,8 @@ export default function TrayScreen() {
                     // Requirement 3: Use GET /api/cultivation-sessions/admin/available-trays?floorId=...
                     // as source of truth for selectable trays. Trays in available list MUST NOT be blocked.
                     const floorAvailableSet = availableTrayIdsByFloor.get(rack.id);
-                    const isTrayAvailableForAssign = floorAvailableSet
-                      ? floorAvailableSet.has(tray.id)
-                      : tray.usage === 'AVAILABLE';
+                    const isTrayAvailableForAssign = tray.usage === 'AVAILABLE' &&
+                      (!floorAvailableSet || floorAvailableSet.has(tray.id));
 
                     const isDisabledForAssign =
                       isAssignMode &&
@@ -932,6 +926,9 @@ export default function TrayScreen() {
                         onViewDetails={handleViewDetails}
                         onOpenReport={handleOpenDailyReport}
                         onOpenHistory={handleOpenDailyHistory}
+                        onCompleteSanitation={handleCompleteSanitation}
+                        isCleaning={cleaningTrayId === tray.id}
+                        sanitationDisabled={cleaningTrayId !== null}
                         onStartAssignOnFloor={() => handleStartAssignWorkflow(rack.id)}
                       />
                     );
@@ -1207,6 +1204,9 @@ function getCameraIdForFloor(floorNumber: number): string | null {
 }
 
 interface TrayTileProps {
+  onCompleteSanitation: (tray: CustomerTrayCard) => void;
+  isCleaning: boolean;
+  sanitationDisabled: boolean;
   tray: CustomerTrayCard;
   isStaff: boolean;
   isAssignMode: boolean;
@@ -1221,6 +1221,9 @@ interface TrayTileProps {
 }
 
 const TrayTile: React.FC<TrayTileProps> = ({
+  onCompleteSanitation,
+  isCleaning,
+  sanitationDisabled,
   tray,
   isStaff,
   isAssignMode,
@@ -1233,8 +1236,10 @@ const TrayTile: React.FC<TrayTileProps> = ({
   onOpenHistory,
   onStartAssignOnFloor,
 }) => {
+  const { fontScale } = useWindowDimensions();
   const isMine = tray.usage === 'MY_CULTIVATION';
-  const isInUse = tray.usage !== 'AVAILABLE';
+  const isInUse = isMine || tray.usage === 'OTHER_CULTIVATION';
+  const isBlocked = tray.usage === 'MAINTENANCE' || tray.usage === 'INACTIVE';
 
   // Palette based on mode and status
   let palette = {
@@ -1283,13 +1288,15 @@ const TrayTile: React.FC<TrayTileProps> = ({
     };
   }
 
+  if (isBlocked) palette = { background: '#FFF7ED', border: '#FDBA74', text: '#9A3412', accent: '#EA580C' };
+
   // Handle tile click
   const handleTilePress = () => {
     if (isAssignMode) {
       if (!isDisabledForAssign) {
         onSelectForAssign();
       }
-    } else if (isInUse) {
+    } else if (isInUse || isBlocked) {
       onViewDetails(tray);
     } else if (isStaff) {
       onStartAssignOnFloor();
@@ -1305,11 +1312,12 @@ const TrayTile: React.FC<TrayTileProps> = ({
       style={({ pressed }) => [
         styles.trayTile,
         {
+          height: 220 * Math.max(1, fontScale),
           backgroundColor: palette.background,
           borderColor: palette.border,
           borderWidth: isSelectedForAssign ? 2 : 1,
         },
-        !isInUse && !isAssignMode && styles.unusedTile,
+        !isInUse && !isBlocked && !isAssignMode && styles.unusedTile,
         isDisabledForAssign && { opacity: 0.4 },
         pressed && !isDisabledForAssign && { opacity: 0.8 },
       ]}
@@ -1317,7 +1325,7 @@ const TrayTile: React.FC<TrayTileProps> = ({
           ? `khay của tôi, đang trồng ${tray.mushroomName ?? 'nấm'}`
           : isInUse
             ? `đang trồng ${tray.mushroomName ?? 'nấm'}`
-            : 'chưa sử dụng'
+            : isBlocked ? 'bảo trì hoặc ngừng sử dụng' : 'chưa sử dụng'
         }`}
     >
       {/* Top Header Row */}
@@ -1397,18 +1405,27 @@ const TrayTile: React.FC<TrayTileProps> = ({
         </View>
       ) : (
         <View style={styles.tileCenterContent}>
-          <AppText variant="caption" color="#94A3B8" align="center" style={{ fontSize: 11 }}>
-            Chưa sử dụng
+          {isBlocked && <Ionicons name="construct-outline" size={22} color={palette.accent} />}
+          <AppText variant="caption" color={palette.text} align="center" style={{ fontSize: 11 }}>
+            {tray.usage === 'MAINTENANCE' ? 'Bảo trì / vệ sinh' : tray.usage === 'INACTIVE' ? 'Ngừng sử dụng' : 'Chưa sử dụng'}
           </AppText>
-          {isStaff && (
-            <AppText variant="caption" color={theme.colors.primary[600]} style={{ fontSize: 10 }}>
-              + Xếp khay
-            </AppText>
-          )}
+
         </View>
       )}
 
       {/* Bottom Action Area */}
+      {!isAssignMode && isStaff && tray.usage === 'MAINTENANCE' && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Xác nhận đã vệ sinh xong khay ${tray.code}`}
+          disabled={sanitationDisabled}
+          onPress={e => { e.stopPropagation(); onCompleteSanitation(tray); }}
+          style={[styles.reportNowButton, { minHeight: 40, opacity: sanitationDisabled ? 0.5 : 1 }]}
+        >
+          {isCleaning ? <ActivityIndicator color="#FFFFFF" size="small" /> :
+            <AppText variant="caption" color="#FFFFFF" weight="bold" align="center">Đã vệ sinh xong</AppText>}
+        </Pressable>
+      )}
       {!isAssignMode && isInUse ? (
         isStaff ? (
           <View style={styles.tileActionCol}>
@@ -1774,6 +1791,7 @@ const TrayLegend: React.FC<{ isStaff?: boolean }> = ({ isStaff }) => (
     {!isStaff && <LegendItem color="#168A4A" label="Khay của tôi" />}
     <LegendItem color={isStaff ? '#168A4A' : '#3478C5'} label="Đang trồng" />
     <LegendItem color="#94A3B8" label="Chưa sử dụng" />
+    <LegendItem color="#EA580C" label="Bảo trì / vệ sinh" />
     {isStaff && <LegendItem color="#059669" label="Đang chọn xếp" />}
   </View>
 );
@@ -1833,18 +1851,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: theme.spacing.sm,
   },
-  staffActionCard: {
-    backgroundColor: 'rgba(5, 150, 105, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(5, 150, 105, 0.25)',
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
-  },
-  staffActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   centerState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1897,7 +1903,7 @@ const styles = StyleSheet.create({
   },
   trayTile: {
     width: '31.5%',
-    minHeight: 120,
+    minHeight: 220,
     borderRadius: 12,
     padding: theme.spacing.xs,
     justifyContent: 'space-between',

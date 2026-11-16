@@ -20,6 +20,16 @@ import {
  * Repository for Rooms, Trays, Mushroom Types, Conditions, and Daily Tray Inspections
  */
 export class CultivationRepository {
+  async completeTraySanitation(trayId: number): Promise<CultivationTray> {
+    try {
+      const response = await axiosClient.post<{ data: CultivationTray }>(
+        `${API_ENDPOINTS.TRAYS.BASE}/${trayId}/complete-sanitation`
+      );
+      return response.data.data;
+    } catch (error) {
+      throw error instanceof AppError ? error : handleApiError(error);
+    }
+  }
   /**
    * Fetch all cultivation rooms
    */

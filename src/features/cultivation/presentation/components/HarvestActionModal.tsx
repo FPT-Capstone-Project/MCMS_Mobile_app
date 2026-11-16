@@ -1,3 +1,4 @@
+import { canCustomerUpdateHarvestMethod, getCustomerPickupDateKeys, getCustomerPickupHourOptions, getCustomerPickupMinuteOptions, getVietnamDateKey, formatVietnamDate } from '../../../order/domain/harvestSchedule';
 import { receivingBlocker, parsePickupTime, harvestError } from '../../domain/harvestReceiving';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -112,15 +113,21 @@ const HarvestActionModalContent: React.FC<{
   const [harvest, setHarvest] = useState<HarvestItem | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [receiving, setReceiving] = useState<Partial<HarvestItem> | null>(null);
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const canEditReceiving = !canCustomerUpdateHarvestMethod(session.harvest_ready_at);
+  const dateOptions = getCustomerPickupDateKeys(new Date().toISOString());
   const [receivingMethod, setReceivingMethod] = useState<'PICKUP' | 'DELIVERY' | null>(null);
   const [pickupDate, setPickupDate] = useState('');
   const [pickupTime, setPickupTime] = useState('');
   const [receivingNote, setReceivingNote] = useState('');
-  const blocker = harvest ? receivingBlocker(harvest) : null;
-  const receivingChanged = !!harvest && (
-    receivingMethod !== (harvest.harvest_method || null) ||
-    receivingNote.trim() !== (harvest.customer_note || '').trim() ||
-    (receivingMethod === 'PICKUP' && Date.parse(parsePickupTime(pickupDate, pickupTime) || '') !== Date.parse(harvest.scheduled_at || ''))
+  const dateKey = getVietnamDateKey(parsePickupTime(pickupDate, '12:00') || '');
+  const blocker = receivingBlocker(receiving || {});
+  const receivingChanged = (
+    (receivingMethod === 'DELIVERY' && deliveryAddress.trim() !== (receiving?.delivery_address || '').trim()) ||
+    receivingMethod !== (receiving?.harvest_method || null) ||
+    receivingNote.trim() !== (receiving?.customer_note || '').trim() ||
+    (receivingMethod === 'PICKUP' && Date.parse(parsePickupTime(pickupDate, pickupTime) || '') !== Date.parse(receiving?.scheduled_at || ''))
   );
   const handoverCompleted = harvest?.harvest_request_status === 'COMPLETED';
   const currentSessionStatus = harvest?.cultivation_status || session.status;
@@ -138,9 +145,17 @@ const HarvestActionModalContent: React.FC<{
     setLoading(true);
     setErrorMessage(null);
     try {
-      const harvests = await iotRepository.getAdminHarvests({
-        orderId: session.order_id || undefined,
-      });
+      const [harvests, request] = await Promise.all([
+        iotRepository.getAdminHarvests({ orderId: session.order_id || undefined }),
+        iotRepository.getSessionReceiving(session.session_id),
+      ]);
+      setReceiving(request);
+      setReceivingMethod(request?.harvest_method || null);
+      setReceivingNote(request?.customer_note || '');
+      setDeliveryAddress(request?.delivery_address || '');
+      const scheduled = request?.scheduled_at ? new Date(request.scheduled_at) : null;
+      setPickupDate(scheduled ? scheduled.toLocaleDateString('en-GB', { timeZone: 'Asia/Ho_Chi_Minh' }) : '');
+      setPickupTime(scheduled ? scheduled.toLocaleTimeString('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', hour12: false }) : '');
 
       // Find harvest belonging to this session
       const found = harvests.find((h) => h.session_id === session.session_id);
@@ -149,13 +164,6 @@ const HarvestActionModalContent: React.FC<{
         try {
           const detail = await iotRepository.getHarvestDetail(found.harvest_id || (found as any).id);
           setHarvest(detail);
-          setReceivingMethod(detail.harvest_method || null);
-          setReceivingNote(detail.customer_note || '');
-          if (detail.scheduled_at) {
-            const date = new Date(detail.scheduled_at);
-            setPickupDate(date.toLocaleDateString('en-GB', { timeZone: 'Asia/Ho_Chi_Minh' }));
-            setPickupTime(date.toLocaleTimeString('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', hour12: false }));
-          } else { setPickupDate(''); setPickupTime(''); }
           if (detail.total_weight_kg != null) {
             setTotalWeight(String(detail.total_weight_kg));
           }
@@ -197,39 +205,20 @@ const HarvestActionModalContent: React.FC<{
     };
   }, [fetchHarvestInfo]);
 
-  // 1. Create Planned Harvest
-  const handleCreateHarvest = async () => {
-    setActionLoading(true);
-    setErrorMessage(null);
-    try {
-      const created = await iotRepository.createHarvest(session.session_id);
-      Alert.alert(
-        'Đã lập kế hoạch thu hoạch',
-        `Đã tạo thành công đợt thu hoạch #${created.harvest_id || (created as any).id} cho phiên #${session.session_id}.`
-      );
-      await fetchHarvestInfo();
-      await onSuccess();
-    } catch (err: any) {
-      const msg = err?.message || 'Không thể tạo đợt thu hoạch.';
-      setErrorMessage(msg);
-      Alert.alert('Lỗi tạo thu hoạch', msg);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   const handleSaveReceiving = async () => {
-    if (!harvest || !receivingMethod || actionLoading) return;
+    if (!receivingMethod || actionLoading || !canEditReceiving) return;
     const scheduledAt = receivingMethod === 'PICKUP' ? parsePickupTime(pickupDate, pickupTime) : undefined;
-    if (receivingMethod === 'PICKUP' && !scheduledAt) {
-      Alert.alert('Lịch hẹn chưa hợp lệ', 'Nhập ngày theo DD/MM/YYYY và giờ theo HH:mm (giờ Việt Nam).');
+    if (receivingMethod === 'PICKUP' && (!scheduledAt || !dateKey || !dateOptions.includes(dateKey) || Date.parse(scheduledAt) <= new Date().getTime() || pickupTime < '07:00' || pickupTime > '17:00')) {
+      Alert.alert('Lịch hẹn chưa hợp lệ', 'Chọn ngày từ hôm nay đến 3 ngày tới, giờ từ 07:00 đến 17:00 và sau thời điểm hiện tại.');
       return;
     }
+    if (receivingMethod === 'DELIVERY' && !deliveryAddress.trim()) { Alert.alert('Thiếu địa chỉ', 'Vui lòng nhập địa chỉ giao hàng.'); return; }
     setActionLoading(true); setErrorMessage(null);
     try {
-      await iotRepository.saveHarvestReceiving(session.session_id, harvest.harvest_request_id, {
+      await iotRepository.saveHarvestReceiving(session.session_id, receiving?.harvest_request_id, {
         harvestMethod: receivingMethod, scheduledAt: scheduledAt || undefined,
         customerNote: receivingNote.trim() || undefined,
+        deliveryAddress: receivingMethod === 'DELIVERY' ? deliveryAddress.trim() : undefined,
       });
       await fetchHarvestInfo();
       Alert.alert('Đã lưu phương thức nhận', 'Thông tin nhận nấm đã được lưu. Bạn có thể tiếp tục bắt đầu thu hoạch khi đủ điều kiện.');
@@ -240,13 +229,15 @@ const HarvestActionModalContent: React.FC<{
 
   // 2. Start Harvest
   const handleStartHarvest = async () => {
-    if (!harvest || actionLoading) return;
-    const reason = receivingChanged ? 'Hãy lưu thay đổi phương thức nhận trước khi bắt đầu thu hoạch.' : receivingBlocker(harvest);
+    if (actionLoading || errorMessage) return;
+    const reason = receivingChanged ? 'Hãy lưu thay đổi phương thức nhận trước khi bắt đầu thu hoạch.' : receivingBlocker(receiving || {});
     if (reason) { Alert.alert('Chưa thể thu hoạch', reason); return; }
-    const harvestId = harvest.harvest_id || (harvest as any).id;
     setActionLoading(true);
     setErrorMessage(null);
     try {
+      const planned = harvest || await iotRepository.createHarvest(session.session_id);
+      setHarvest(planned);
+      const harvestId = planned.harvest_id;
       await iotRepository.startHarvest(harvestId);
       Alert.alert(
         'Bắt đầu thu hoạch',
@@ -474,34 +465,42 @@ const HarvestActionModalContent: React.FC<{
                   </View>
                 )}
 
-                {/* CASE 1: No Harvest exists yet -> Button to create Planned Harvest */}
-                {!harvest && (
-                  <View style={styles.stepContainer}>
-                    <View style={styles.stepHeader}>
-                      <View style={styles.stepBadge}>
-                        <AppText variant="caption" weight="bold" color="#FFFFFF">
-                          BƯỚC 1
-                        </AppText>
+                {receiving?.harvest_method && <AppCard variant="outlined">
+                  <AppText weight="bold">Phương thức khách đã chọn</AppText>
+                  <AppText>{receiving.harvest_method === 'PICKUP' ? 'Nhận tại trang trại' : 'Giao hàng tận nơi'}</AppText>
+                  {receiving.scheduled_at && <AppText>Lịch hẹn: {new Date(receiving.scheduled_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</AppText>}
+                  {receiving.delivery_address && <AppText>Địa chỉ: {receiving.delivery_address}</AppText>}
+                  {receiving.customer_note && <AppText>Ghi chú: {receiving.customer_note}</AppText>}
+                </AppCard>}
+                {!canEditReceiving && !receiving?.harvest_method && <AppText>Đang chờ khách chọn phương thức nhận nấm.</AppText>}
+                    {(!harvest || harvest.status === 'PLANNED') && canEditReceiving && !errorMessage && (
+                      <View style={styles.actionSection}>
+                        <AppText weight="bold">Phương thức nhận nấm</AppText>
+                        <AppText variant="caption">Ghi nhận phương thức nhận đã thống nhất với khách.</AppText>
+                        <AppButton title="Khách đến nhận tại nông trại" variant={receivingMethod === 'PICKUP' ? 'primary' : 'outline'} disabled={actionLoading} onPress={() => setReceivingMethod('PICKUP')} />
+                        <AppButton title="Giao hàng tận nơi" variant={receivingMethod === 'DELIVERY' ? 'primary' : 'outline'} disabled={actionLoading} onPress={() => setReceivingMethod('DELIVERY')} />
+                        {receivingMethod === 'PICKUP' && <>
+                          <AppText variant="caption">Chọn ngày trong 3 ngày tới · 07:00–17:00 (giờ Việt Nam)</AppText>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                            {dateOptions.map((date) => <AppButton key={date} title={formatVietnamDate(date)} size="sm" variant={dateKey === date ? 'primary' : 'outline'} disabled={actionLoading} onPress={() => { setPickupDate(date.split('-').reverse().join('/')); setPickupTime(''); }} />)}
+                          </View>
+                          <AppText variant="caption">Giờ</AppText>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                            {(dateKey ? getCustomerPickupHourOptions(dateKey) : []).map((hour) => <AppButton key={hour} title={hour} size="sm" variant={pickupTime.split(':')[0] === hour ? 'primary' : 'outline'} disabled={actionLoading} onPress={() => setPickupTime(`${hour}:${getCustomerPickupMinuteOptions(dateKey!, hour)[0]}`)} />)}
+                          </View>
+                          <AppText variant="caption">Phút</AppText>
+                          <ScrollView horizontal>
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                              {(dateKey && pickupTime ? getCustomerPickupMinuteOptions(dateKey, pickupTime.split(':')[0]) : []).map((minute) => <AppButton key={minute} title={minute} size="sm" variant={pickupTime.split(':')[1] === minute ? 'primary' : 'outline'} disabled={actionLoading} onPress={() => setPickupTime(`${pickupTime.split(':')[0]}:${minute}`)} />)}
+                            </View>
+                          </ScrollView>
+                        </>}
+                        {receivingMethod === 'DELIVERY' && <AppInput label="Địa chỉ giao hàng" placeholder="Số nhà, đường, phường, tỉnh/thành phố" value={deliveryAddress} onChangeText={setDeliveryAddress} multiline editable={!actionLoading} />}
+                        <AppInput label="Ghi chú nhận nấm" value={receivingNote} onChangeText={setReceivingNote} multiline maxLength={2000} editable={!actionLoading} />
+                        <AppButton title="Lưu phương thức nhận" variant="outline" loading={actionLoading} disabled={!receivingMethod} onPress={handleSaveReceiving} />
                       </View>
-                      <AppText variant="bodySmall" weight="bold">
-                        Lập kế hoạch thu hoạch
-                      </AppText>
-                    </View>
-
-                    <AppText variant="caption" color={theme.colors.text.secondary}>
-                      Phiên đã được xác nhận sẵn sàng thu hoạch. Bấm nút bên dưới để tạo kế hoạch thu hoạch mới cho phiên này.
-                    </AppText>
-
-                    <AppButton
-                      title={actionLoading ? 'Đang tạo kế hoạch...' : 'Tạo kế hoạch thu hoạch'}
-                      variant="primary"
-                      size="md"
-                      onPress={handleCreateHarvest}
-                      disabled={actionLoading}
-                      leftIcon={<Ionicons name="calendar-outline" size={18} color="#FFFFFF" />}
-                    />
-                  </View>
-                )}
+                    )}
+                {!harvest && !errorMessage && <AppButton title="Bắt đầu thu hoạch" loading={actionLoading} disabled={!!blocker || receivingChanged} onPress={handleStartHarvest} />}
 
                 {/* CASE 2: Harvest Exists */}
                 {harvest && (
@@ -549,20 +548,6 @@ const HarvestActionModalContent: React.FC<{
 
                     <AppDivider spacing="sm" />
 
-                    {harvest.status === 'PLANNED' && harvest.harvest_request_status !== 'COMPLETED' && (
-                      <View style={styles.actionSection}>
-                        <AppText weight="bold">Phương thức nhận nấm</AppText>
-                        <AppText variant="caption">Ghi nhận theo lựa chọn đã thống nhất với khách. Lập kế hoạch thu hoạch chưa bao gồm bước này.</AppText>
-                        <AppButton title="Khách đến nhận tại nông trại" variant={receivingMethod === 'PICKUP' ? 'primary' : 'outline'} disabled={actionLoading} onPress={() => setReceivingMethod('PICKUP')} />
-                        <AppButton title="Giao hàng tận nơi" variant={receivingMethod === 'DELIVERY' ? 'primary' : 'outline'} disabled={actionLoading} onPress={() => setReceivingMethod('DELIVERY')} />
-                        {receivingMethod === 'PICKUP' && <>
-                          <AppInput label="Ngày khách đến (DD/MM/YYYY)" placeholder="25/11/2026" value={pickupDate} onChangeText={setPickupDate} editable={!actionLoading} />
-                          <AppInput label="Giờ hẹn (HH:mm, giờ Việt Nam)" placeholder="09:00" value={pickupTime} onChangeText={setPickupTime} editable={!actionLoading} />
-                        </>}
-                        <AppInput label="Ghi chú nhận nấm" value={receivingNote} onChangeText={setReceivingNote} multiline maxLength={2000} editable={!actionLoading} />
-                        <AppButton title="Lưu phương thức nhận" variant="outline" loading={actionLoading} disabled={!receivingMethod} onPress={handleSaveReceiving} />
-                      </View>
-                    )}
                     {receivingChanged && !blocker && harvest.status === 'PLANNED' && <AppText color={theme.colors.warning.dark}>Có thay đổi chưa lưu. Bấm Lưu phương thức nhận để áp dụng.</AppText>}
                     {!!blocker && harvest.status === 'PLANNED' && <AppText color={theme.colors.warning.dark}>{blocker}</AppText>}
                     {/* SUB-STEP A: Start Harvest (if PLANNED) */}

@@ -18,6 +18,13 @@ export const NO_DATA_TEXT = 'Chưa có dữ liệu';
  * 1. event_type / lastDecision.event_type
  */
 export const EVENT_TYPE_MAP: Record<string, string> = {
+  FAN_OFF_REQUESTED: 'Đã yêu cầu tắt quạt',
+  FAN_OFF_CONFIRMED: 'Đã xác nhận quạt tắt',
+  FAN_ON_REQUESTED: 'Đã yêu cầu bật quạt',
+  FAN_ON_CONFIRMED: 'Đã xác nhận quạt bật',
+  FAN_REST_STARTED: 'Quạt bắt đầu nghỉ',
+  FAN_STOPPED: 'Quạt đã dừng',
+  FAN_LEGACY_CONFIG: 'Cấu hình quạt đã chuyển từ phiên bản cũ',
   CONFIG_SAVED: 'Đã lưu cấu hình',
   START: 'Bắt đầu chế độ tự động',
   STOP: 'Dừng chế độ tự động',

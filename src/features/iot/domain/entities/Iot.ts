@@ -118,6 +118,9 @@ export interface AutoMistingConfig {
   humidity_max: number;
   humidity_start_threshold: number;
   humidity_stop_threshold: number;
+  fan_enabled?: boolean;
+  fan_run_minutes?: number | null;
+  fan_rest_minutes?: number | null;
   cooling_enabled?: boolean;
   temperature_min?: number;
   temperature_max?: number;
@@ -301,6 +304,7 @@ export interface HarvestItem {
   status: HarvestStatus;
   harvest_date?: string | null;
   harvest_method?: 'PICKUP' | 'DELIVERY' | null;
+  delivery_address?: string | null;
   scheduled_at?: string | null;
   customer_note?: string | null;
   harvest_request_status?: string | null;
@@ -435,6 +439,7 @@ export type AutoControlState =
   | 'FAULT';
 
 export interface AutoControlStatus {
+  fan?: {state: import('./FanAuto').FanAutoState; enabled: boolean; runMinutes: number | null; restMinutes: number | null; remainingMs: number; lastError: string | null};
   mode: 'MANUAL' | 'AUTO';
   run: {
     id?: number;

@@ -1,7 +1,7 @@
 import { SESSION_FILTERS, GROWTH_FILTERS, sessionGroup, growthStage, compareSessions, statusLabel } from '../../../cultivation/domain/sessionWorkflow';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,7 +13,6 @@ import {
   View,
 } from 'react-native';
 import { theme } from '../../../../core/theme';
-import { formatVND } from '../../../../core/utils/currency';
 import {
   CultivationSessionAdmin,
   ProgressHistoryItem,
@@ -29,8 +28,6 @@ import {
   DailyTrayInspectionModal,
   DailyTrayInspectionHistoryModal,
 } from '../../../cultivation';
-import { CustomerOrder } from '../../domain/entities/Order';
-import { orderRepository } from '../../data/repositories/OrderRepository';
 import {
   AppButton,
   AppCard,
@@ -70,25 +67,11 @@ const StatusBadge: React.FC<{
   );
 };
 
-type AdminTab = 'rentals' | 'orders';
 
 const RENTAL_STATUS_FILTERS = SESSION_FILTERS;
 
-const ORDER_STATUS_FILTERS = [
-  { label: 'Tất cả', value: 'ALL' },
-  { label: 'Chờ xử lý', value: 'PENDING' },
-  { label: 'Đã thanh toán', value: 'PAID' },
-  { label: 'Đã xác nhận', value: 'CONFIRMED' },
-  { label: 'Đang xử lý', value: 'PROCESSING' },
-  { label: 'Hoàn thành', value: 'COMPLETED' },
-  { label: 'Đã hủy', value: 'CANCELLED' },
-];
-
 export const AdminOrdersScreen: React.FC = () => {
   const router = useRouter();
-
-  // Active Tab
-  const [activeTab, setActiveTab] = useState<AdminTab>('rentals');
 
   // Search Query
   const [searchQuery, setSearchQuery] = useState('');
@@ -96,17 +79,14 @@ export const AdminOrdersScreen: React.FC = () => {
   // Status Filters
   const [rentalFilter, setRentalFilter] = useState('ALL');
   const [growthFilter, setGrowthFilter] = useState('ALL');
-  const [orderFilter, setOrderFilter] = useState('ALL');
 
   // Data states
   const [sessions, setSessions] = useState<CultivationSessionAdmin[]>([]);
-  const [orders, setOrders] = useState<CustomerOrder[]>([]);
 
   // UI states
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
 
   // Stage Action State
   const [actionLoadingSessionId, setActionLoadingSessionId] = useState<number | null>(null);
@@ -140,22 +120,16 @@ export const AdminOrdersScreen: React.FC = () => {
   const [dailyHistorySessionTrayId, setDailyHistorySessionTrayId] = useState<number | null>(null);
   const [dailyHistoryModalVisible, setDailyHistoryModalVisible] = useState(false);
 
+  const hasLoaded = useRef(false);
+
   // Fetch data
   const fetchData = useCallback(async () => {
+    setLoading(!hasLoaded.current);
     setErrorMessage(null);
     try {
-      if (activeTab === 'rentals') {
-        // Fetch sessions from GET /api/farm/sessions
-        const sessRes = await iotRepository.getAdminCultivationSessions();
-        setSessions(sessRes);
-      } else {
-        const [adminOrders, farmSessions] = await Promise.all([
-          orderRepository.getAdminOrders(),
-          iotRepository.getAdminCultivationSessions(),
-        ]);
-        setOrders(adminOrders);
-        setSessions(farmSessions);
-      }
+      const sessions = await iotRepository.getAdminCultivationSessions();
+      setSessions(sessions);
+      hasLoaded.current = true;
     } catch (err: any) {
       setErrorMessage(
         err?.message || 'Không thể tải danh sách dữ liệu từ máy chủ. Vui lòng thử lại.'
@@ -164,20 +138,7 @@ export const AdminOrdersScreen: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeTab]);
-
-  useEffect(() => {
-    let isMounted = true;
-    void (async () => {
-      if (isMounted) {
-        setLoading(true);
-        await fetchData();
-      }
-    })();
-    return () => {
-      isMounted = false;
-    };
-  }, [fetchData]);
+  }, []);
 
   // Automatically refresh data when screen comes back into focus (e.g. after assigning trays or updating session)
   useFocusEffect(
@@ -240,26 +201,8 @@ export const AdminOrdersScreen: React.FC = () => {
     }).sort(compareSessions);
   }, [sessions, searchQuery, rentalFilter, growthFilter]);
 
-  // Filter orders by search query
-  const filteredOrders = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-    return orders.filter(
-      (o) => (orderFilter === 'ALL' || (orderFilter === 'PAID' ? o.payment_status === 'PAID' : o.order_status === orderFilter)) && (!q ||
-        String(o.order_id).includes(q) ||
-        o.package_name?.toLowerCase().includes(q) ||
-        o.mushroom_name?.toLowerCase().includes(q) ||
-        (o.items &&
-          o.items.some(
-            (item) =>
-              (item.mushroom_name && item.mushroom_name.toLowerCase().includes(q)) ||
-              (item.package_name && item.package_name.toLowerCase().includes(q))
-          )))
-    );
-  }, [orders, searchQuery, orderFilter]);
-
   // Statistics calculation
   const stats = useMemo(() => {
-    if (activeTab === 'rentals') {
       const cultivatingCount = sessions.filter((s) => sessionGroup(s) === 'CULTIVATING').length;
 
       return {
@@ -271,20 +214,7 @@ export const AdminOrdersScreen: React.FC = () => {
         highlight3: cultivatingCount,
         highlight3Label: 'Đang trồng',
       };
-    } else {
-      const pending = orders.filter((o) => o.order_status === 'PENDING').length;
-      const paid = orders.filter((o) => o.payment_status === 'PAID').length;
-      return {
-        total: orders.length,
-        highlight1: pending,
-        highlight1Label: 'Chờ xử lý',
-        highlight2: paid,
-        highlight2Label: 'Đã thanh toán',
-        highlight3: 0,
-        highlight3Label: '',
-      };
-    }
-  }, [activeTab, sessions, orders]);
+  }, [sessions]);
 
   const formatGrowthStatus = statusLabel;
   const formatHarvestStatus = statusLabel;
@@ -315,80 +245,18 @@ export const AdminOrdersScreen: React.FC = () => {
     }
   };
 
-  const renderOrderBadge = (status: string) => {
-    switch (status) {
-      case 'PENDING':
-        return <StatusBadge variant="warning" label="Chờ thanh toán" />;
-      case 'PAID':
-        return <StatusBadge variant="success" label="Đã thanh toán" />;
-      case 'PROCESSING':
-        return <StatusBadge variant="info" label="Đang xử lý" />;
-      case 'COMPLETED':
-        return <StatusBadge variant="neutral" label="Hoàn thành" />;
-      case 'CANCELLED':
-        return <StatusBadge variant="error" label="Đã hủy" />;
-      default:
-        return <StatusBadge variant="neutral" label={statusLabel(status)} />;
-    }
-  };
-
   return (
     <ScreenContainer scrollable={false} edges={['top', 'left', 'right']}>
       {/* Header */}
       <AppHeader
-        title="Quản lý Đơn & Phiên nuôi trồng"
-        subtitle="Quản lý vòng đời phôi, gán khay & đơn khách hàng"
+        title="Quản lý phiên nuôi trồng"
+        subtitle="Theo dõi phôi, xếp khay và thu hoạch"
         showBack
         onBack={() => {
           if (router.canGoBack()) router.back();
           else router.replace('/(tabs)');
         }}
       />
-
-      {/* Main Segmented Switcher */}
-      <View style={styles.segmentContainer}>
-        <Pressable
-          style={[styles.segmentBtn, activeTab === 'rentals' && styles.segmentBtnActive]}
-          onPress={() => {
-            setActiveTab('rentals');
-            setSearchQuery('');
-          }}
-        >
-          <Ionicons
-            name="cube-outline"
-            size={18}
-            color={activeTab === 'rentals' ? '#FFFFFF' : theme.colors.text.secondary}
-          />
-          <AppText
-            variant="label"
-            weight={activeTab === 'rentals' ? 'bold' : 'normal'}
-            color={activeTab === 'rentals' ? '#FFFFFF' : theme.colors.text.secondary}
-          >
-            Đơn thuê & Phiên trồng ({sessions.length})
-          </AppText>
-        </Pressable>
-
-        <Pressable
-          style={[styles.segmentBtn, activeTab === 'orders' && styles.segmentBtnActive]}
-          onPress={() => {
-            setActiveTab('orders');
-            setSearchQuery('');
-          }}
-        >
-          <Ionicons
-            name="receipt-outline"
-            size={18}
-            color={activeTab === 'orders' ? '#FFFFFF' : theme.colors.text.secondary}
-          />
-          <AppText
-            variant="label"
-            weight={activeTab === 'orders' ? 'bold' : 'normal'}
-            color={activeTab === 'orders' ? '#FFFFFF' : theme.colors.text.secondary}
-          >
-            Đơn hàng ({orders.length})
-          </AppText>
-        </Pressable>
-      </View>
 
       {/* Top Stats Overview */}
       <View style={styles.statsRow}>
@@ -423,11 +291,7 @@ export const AdminOrdersScreen: React.FC = () => {
         <Ionicons name="search" size={18} color={theme.colors.text.muted} />
         <TextInput
           style={styles.searchInput}
-          placeholder={
-            activeTab === 'rentals'
-              ? 'Tìm theo mã phiên, mã đơn, tên khách, loại nấm...'
-              : 'Tìm theo mã đơn, tên sản phẩm...'
-          }
+          placeholder="Tìm theo mã phiên, mã đơn, tên khách, loại nấm..."
           placeholderTextColor={theme.colors.text.muted}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -442,22 +306,15 @@ export const AdminOrdersScreen: React.FC = () => {
       {/* Status Filter Chips */}
       <View style={styles.chipsScrollWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContent}>
-          {(activeTab === 'rentals' ? RENTAL_STATUS_FILTERS : ORDER_STATUS_FILTERS).map((filter) => {
-            const isSelected =
-              activeTab === 'rentals'
-                ? rentalFilter === filter.value
-                : orderFilter === filter.value;
+          {RENTAL_STATUS_FILTERS.map((filter) => {
+            const isSelected = rentalFilter === filter.value;
             return (
               <Pressable
                 key={filter.value}
                 style={[styles.filterChip, isSelected && styles.filterChipActive]}
                 onPress={() => {
-                  if (activeTab === 'rentals') {
-                    setRentalFilter(filter.value);
-                    setGrowthFilter('ALL');
-                  } else {
-                    setOrderFilter(filter.value);
-                  }
+                  setRentalFilter(filter.value);
+                  setGrowthFilter('ALL');
                 }}
               >
                 <AppText
@@ -465,7 +322,7 @@ export const AdminOrdersScreen: React.FC = () => {
                   weight={isSelected ? 'bold' : 'normal'}
                   color={isSelected ? theme.colors.primary[600] : theme.colors.text.secondary}
                 >
-                  {filter.label}{activeTab === 'rentals' ? ` (${filter.value === 'ALL' ? sessions.length : sessions.filter(s => sessionGroup(s) === filter.value).length})` : ''}
+                  {filter.label} ({filter.value === 'ALL' ? sessions.length : sessions.filter(s => sessionGroup(s) === filter.value).length})
                 </AppText>
               </Pressable>
             );
@@ -473,7 +330,7 @@ export const AdminOrdersScreen: React.FC = () => {
         </ScrollView>
       </View>
 
-      {activeTab === 'rentals' && rentalFilter === 'CULTIVATING' && (
+      {rentalFilter === 'CULTIVATING' && (
         <View style={styles.chipsScrollWrapper}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContent}>
             {GROWTH_FILTERS.map(filter => (
@@ -527,7 +384,7 @@ export const AdminOrdersScreen: React.FC = () => {
               Đang tải danh sách...
             </AppText>
           </View>
-        ) : activeTab === 'rentals' ? (
+        ) : (
           filteredSessions.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="cube-outline" size={48} color={theme.colors.neutral[300]} />
@@ -878,19 +735,6 @@ export const AdminOrdersScreen: React.FC = () => {
                           />
                         </View>
 
-                        {session.harvest_status === 'HARVEST_READY' && (
-                          <AppButton
-                            title="Quản lý thu hoạch"
-                            variant="secondary"
-                            size="sm"
-                            leftIcon={<Ionicons name="leaf" size={16} color={theme.colors.success.dark} />}
-                            onPress={() => {
-                              setHarvestSession(session);
-                              setHarvestModalVisible(true);
-                            }}
-                          />
-                        )}
-
                         <View style={styles.spawnActionsSubrow}>
                           <AppButton style={styles.pairedAction} textStyle={{ flexShrink: 1 }}
                             title="Xem tầng & khay"
@@ -917,6 +761,19 @@ export const AdminOrdersScreen: React.FC = () => {
                             }}
                           />
                         </View>
+
+                        {session.harvest_status === 'HARVEST_READY' && (
+                          <AppButton
+                            title="Quản lý thu hoạch"
+                            variant="secondary"
+                            size="sm"
+                            leftIcon={<Ionicons name="leaf" size={16} color={theme.colors.success.dark} />}
+                            onPress={() => {
+                              setHarvestSession(session);
+                              setHarvestModalVisible(true);
+                            }}
+                          />
+                        )}
                       </View>
                     )}
 
@@ -965,158 +822,6 @@ export const AdminOrdersScreen: React.FC = () => {
               );
             })
           )
-        ) : filteredOrders.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="receipt-outline" size={48} color={theme.colors.neutral[300]} />
-            <AppText variant="body" weight="medium" color={theme.colors.text.secondary}>
-              Không tìm thấy đơn hàng nào
-            </AppText>
-            <AppText variant="caption" color={theme.colors.text.muted} align="center">
-              Chưa có đơn hàng nông sản nào phù hợp với điều kiện tìm kiếm.
-            </AppText>
-          </View>
-        ) : (
-          filteredOrders.map((order) => {
-            const isExpanded = expandedOrderId === order.order_id;
-            return (
-              <AppCard key={order.order_id} elevation="xs" style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <View>
-                    <AppText variant="body" weight="bold">
-                      Đơn hàng #{order.order_id}
-                    </AppText>
-                    <AppText variant="caption" color={theme.colors.text.muted}>
-                      {order.created_at ? new Date(order.created_at).toLocaleDateString('vi-VN') : 'Mới tạo'}
-                    </AppText>
-                  </View>
-                  {renderOrderBadge(order.order_status)}
-                </View>
-
-                <AppDivider spacing="xs" />
-
-                {/* Amount and summary */}
-                <View style={styles.orderAmountRow}>
-                  <View>
-                    <AppText variant="caption" color={theme.colors.text.muted}>
-                      Tổng giá trị đơn
-                    </AppText>
-                    <AppText variant="title" weight="bold" color={theme.colors.primary[600]}>
-                      {formatVND(order.total_amount)}
-                    </AppText>
-                  </View>
-                  <StatusBadge
-                    variant={order.payment_status === 'PAID' ? 'success' : 'warning'}
-                    label={statusLabel(order.payment_status)}
-                  />
-                </View>
-
-                {(order.package_name || order.mushroom_name) && (
-                  <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-                    {[order.package_name, order.mushroom_name].filter(Boolean).join(' · ')}
-                  </AppText>
-                )}
-                {/* Items preview */}
-                {order.items && order.items.length > 0 && (
-                  <View style={styles.orderItemsBox}>
-                    {order.items.slice(0, isExpanded ? order.items.length : 2).map((item, idx) => (
-                      <View key={item.order_item_id || idx} style={styles.orderItemRow}>
-                        <AppText variant="caption" style={{ flex: 1 }}>
-                          • {item.mushroom_name || item.package_name || 'Sản phẩm'} (x{item.quantity})
-                        </AppText>
-                        <AppText variant="caption" weight="medium">
-                          {formatVND(item.total_price || (item.unit_price || 0) * (item.quantity || 1))}
-                        </AppText>
-                      </View>
-                    ))}
-                    {order.items.length > 2 && (
-                      <Pressable
-                        onPress={() => setExpandedOrderId(isExpanded ? null : order.order_id)}
-                        style={styles.expandBtn}
-                      >
-                        <AppText variant="caption" color={theme.colors.primary[600]} weight="bold">
-                          {isExpanded ? 'Thu gọn chi tiết' : `Xem thêm ${order.items.length - 2} sản phẩm...`}
-                        </AppText>
-                      </Pressable>
-                    )}
-                  </View>
-                )}
-
-                {/* Cultivation Sessions belonging to this order */}
-                {(() => {
-                  const orderSessions = sessions.filter((s) => s.order_id === order.order_id);
-                  if (orderSessions.length === 0) return null;
-
-                  return (
-                    <View style={styles.orderSessionsWrap}>
-                      <AppDivider spacing="xs" />
-                      <View style={styles.orderSessionsHeader}>
-                        <Ionicons name="leaf-outline" size={14} color={theme.colors.primary[600]} />
-                        <AppText variant="caption" weight="bold" color={theme.colors.primary[700]}>
-                          Phiên nuôi trồng thuộc đơn ({orderSessions.length} phiên):
-                        </AppText>
-                      </View>
-
-                      <View style={{ gap: 6, marginTop: 4 }}>
-                        {orderSessions.map((s) => (
-                          <View key={s.session_id} style={styles.orderSessionItem}>
-                            <View style={{ flex: 1 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <AppText variant="caption" weight="bold">
-                                  Phiên #{s.session_id}
-                                </AppText>
-                                {renderSessionBadge(sessionGroup(s))}
-                              </View>
-                              <AppText variant="caption" color={theme.colors.text.secondary} numberOfLines={1}>
-                                {s.mushroom_name || 'Nấm giống'} • {s.required_trays || 1} khay
-                              </AppText>
-                            </View>
-
-                            <View style={{ flexDirection: 'row', gap: 4 }}>
-                              {(s.status === 'SPAWN_RESTING' || s.status === 'MYCELIAL_DEVELOPMENT') && (
-                                <AppButton
-                                  title="Phôi"
-                                  variant="primary"
-                                  size="sm"
-                                  leftIcon={<Ionicons name="clipboard-outline" size={13} color="#FFFFFF" />}
-                                  onPress={() => {
-                                    setInspectionSession(s);
-                                    setInspectionModalVisible(true);
-                                  }}
-                                />
-                              )}
-                              {s.status === 'CULTIVATING' && (
-                                <AppButton
-                                  title="Báo cáo"
-                                  variant="primary"
-                                  size="sm"
-                                  leftIcon={<Ionicons name="camera" size={13} color="#FFFFFF" />}
-                                  disabled={!s.trays || s.trays.length === 0}
-                                  onPress={() => {
-                                    setDailyTraySession(s);
-                                    setDailyTraySessionTrayId(null);
-                                    setDailyTrayModalVisible(true);
-                                  }}
-                                />
-                              )}
-                              <AppButton
-                                title="Chi tiết"
-                                variant="outline"
-                                size="sm"
-                                onPress={() => {
-                                  setDetailSession(s);
-                                  setDetailModalVisible(true);
-                                }}
-                              />
-                            </View>
-                          </View>
-                        ))}
-                      </View>
-                    </View>
-                  );
-                })()}
-              </AppCard>
-            );
-          })
         )}
 
         <View style={{ height: 40 }} />
@@ -1287,27 +992,6 @@ export const AdminOrdersScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  segmentContainer: {
-    flexDirection: 'row',
-    marginHorizontal: theme.spacing.screenHorizontal,
-    marginVertical: theme.spacing.xs,
-    backgroundColor: theme.colors.neutral[100],
-    borderRadius: theme.borderRadius.md,
-    padding: 3,
-    gap: 4,
-  },
-  segmentBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    borderRadius: theme.borderRadius.sm,
-  },
-  segmentBtnActive: {
-    backgroundColor: theme.colors.primary[600],
-  },
   statsRow: {
     flexDirection: 'row',
     marginHorizontal: theme.spacing.screenHorizontal,
@@ -1499,45 +1183,5 @@ const styles = StyleSheet.create({
   spawnActionsSubrow: {
     flexDirection: 'row',
     gap: 8,
-  },
-  orderAmountRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  orderItemsBox: {
-    marginTop: 8,
-    padding: 8,
-    backgroundColor: theme.colors.neutral[50],
-    borderRadius: theme.borderRadius.sm,
-    gap: 4,
-  },
-  orderItemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  expandBtn: {
-    alignSelf: 'flex-start',
-    marginTop: 4,
-  },
-  orderSessionsWrap: {
-    marginTop: 8,
-  },
-  orderSessionsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  orderSessionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: theme.colors.border.light,
-    borderRadius: theme.borderRadius.sm,
-    padding: 8,
   },
 });
