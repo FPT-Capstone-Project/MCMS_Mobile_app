@@ -1,5 +1,5 @@
 import type { HarvestItem } from '../../iot/domain/entities/Iot';
-export function receivingBlocker(harvest: HarvestItem): string | null {
+export function receivingBlocker(harvest: Partial<HarvestItem>): string | null {
   if (harvest.harvest_request_status === 'COMPLETED') return 'Yêu cầu nhận nấm đã hoàn tất. Vui lòng kiểm tra lại đợt thu hoạch.';
   if (!['PICKUP', 'DELIVERY'].includes(harvest.harvest_method || '')) return 'Chưa lưu phương thức nhận nấm. Chọn cách nhận và lưu trước khi bắt đầu thu hoạch.';
   if (harvest.harvest_method === 'PICKUP' && !harvest.scheduled_at) return 'Chưa có lịch khách đến nhận. Hãy bổ sung ngày và giờ hẹn.';

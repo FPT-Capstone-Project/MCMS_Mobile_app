@@ -35,6 +35,7 @@ import { formatMistingCode } from '../../utils/mistingI18n';
 import { FloorProfileConfigModal } from '../components/FloorProfileConfigModal';
 import { FloorTraysGrid } from '../components/FloorTraysGrid';
 import { FloorLogsTimeline } from '../components/FloorLogsTimeline';
+import { FanAutoCard } from '../components/FanAutoCard';
 
 interface FloorDetailScreenProps {
   floor: FloorMapping;
@@ -276,7 +277,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
       (statusData?.runtime?.control_state === 'FAULT' ||
         statusData?.runtime?.control_state === 'SENSOR_FAULT' ||
         statusData?.runtime?.control_state === 'DEVICE_OFFLINE'));
-  const isOffPending = statusData?.runtime?.control_state === 'OFF_PENDING';
+  const isOffPending = statusData?.runtime?.control_state === 'OFF_PENDING' || (!isRunning && statusData?.fan?.state === 'OFF_PENDING');
 
   // Cooldown countdown
   const cooldownRemainingSeconds = Math.max(
@@ -334,7 +335,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
       await loadFloorData();
       Alert.alert(
         'Đã gửi lệnh dừng',
-        'Chế độ tự động đã dừng. Hệ thống đang xác nhận ngắt van SSR an toàn.'
+        'Đã dừng AUTO của tầng. Hệ thống đang xác nhận tắt van phun và quạt được bật trong cấu hình AUTO.'
       );
     } catch (err: any) {
       Alert.alert('Lỗi dừng AUTO', err?.message || 'Không thể gửi lệnh dừng.');
@@ -557,6 +558,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
         {/* ================= TAB 1: TỔNG QUAN ================= */}
         {activeTab === 'overview' && (
           <View style={styles.tabContentWrap}>
+            {canManage && <FanAutoCard status={statusData} />}
             {/* 1. Two Big Metric Boxes */}
             <View style={styles.twoGaugesRow}>
               {/* Temperature Box */}
@@ -827,7 +829,7 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
                 </View>
               ) : (
                 <AppText variant="caption" color={theme.colors.warning.dark}>
-                  Chọn Chỉnh sửa để đặt loại nấm, độ ẩm và thời gian phun.
+                  Chọn Chỉnh sửa để đặt loại nấm, độ ẩm, thời gian phun và chu kỳ quạt.
                 </AppText>
               )}
             </AppCard>
@@ -901,6 +903,9 @@ export const FloorDetailScreen: React.FC<FloorDetailScreenProps> = ({
             <AppText variant="bodySmall" color={theme.colors.text.secondary} align="center">
               {`Van phun của ${floor.floor_name} sẽ hoạt động tự động theo cấu hình "${autoConfig?.profile_name}".`}
             </AppText>
+            {autoConfig?.fan_enabled && <AppText variant="bodySmall" align="center">
+              Quạt cũng chạy cùng AUTO: chạy {autoConfig.fan_run_minutes} phút, nghỉ {autoConfig.fan_rest_minutes} phút, rồi lặp lại.
+            </AppText>}
 
             <View style={styles.confirmBtnRow}>
               <View style={{ flex: 1 }}>

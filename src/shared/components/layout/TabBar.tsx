@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  AppState,
   Pressable,
   StyleSheet,
   View,
@@ -10,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../../core/theme';
 import { useAuth } from '../../../features/auth/presentation/hooks/useAuth';
 import { AppText } from '../primitives/AppText';
+import { useGetUnreadNotificationCountQuery } from '../../../features/notification/data/notificationApi';
 
 interface TabConfig {
   label: string;
@@ -55,7 +57,21 @@ export type TabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tab
 
 export const TabBar: React.FC<TabBarProps> = ({ state, descriptors, emitter, navigateToTab }) => {
   const insets = useSafeAreaInsets();
-  const { canControlIot } = useAuth();
+  const { canControlIot, user } = useAuth();
+  const [appActive, setAppActive] = useState(AppState.currentState === 'active');
+  const { currentData: unreadCount = 0, refetch } = useGetUnreadNotificationCountQuery(user?.id ?? '', {
+    skip: !user,
+    pollingInterval: appActive ? 30_000 : 0,
+    refetchOnMountOrArgChange: true,
+  });
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      setAppActive(nextState === 'active');
+      if (nextState === 'active' && user) void refetch();
+    });
+    return () => subscription.remove();
+  }, [refetch, user]);
 
   return (
     <View
@@ -89,10 +105,10 @@ export const TabBar: React.FC<TabBarProps> = ({ state, descriptors, emitter, nav
 
           if (route.name === 'orders' && canControlIot) {
             config = {
-              label: 'Đơn & Phiên',
+              label: 'Phiên trồng',
               activeIcon: 'albums',
               inactiveIcon: 'albums-outline',
-              accessibilityLabel: 'Tab Quản lý Đơn & Phiên nuôi trồng',
+              accessibilityLabel: 'Tab Quản lý phiên nuôi trồng',
             };
           }
 
@@ -126,7 +142,9 @@ export const TabBar: React.FC<TabBarProps> = ({ state, descriptors, emitter, nav
               key={route.key}
               accessibilityRole="tab"
               accessibilityState={{ selected: isFocused }}
-              accessibilityLabel={config.accessibilityLabel}
+              accessibilityLabel={route.name === 'notifications' && unreadCount > 0
+                ? `${config.accessibilityLabel}, ${unreadCount} thông báo chưa đọc`
+                : config.accessibilityLabel}
               testID={options.tabBarButtonTestID}
               onPress={onPress}
               onLongPress={onLongPress}
@@ -142,7 +160,16 @@ export const TabBar: React.FC<TabBarProps> = ({ state, descriptors, emitter, nav
                   isFocused && styles.pillActive,
                 ]}
               >
-                <Ionicons name={iconName} size={22} color={iconColor} />
+                <View style={styles.iconContainer}>
+                  <Ionicons name={iconName} size={22} color={iconColor} />
+                  {route.name === 'notifications' && user && unreadCount > 0 && (
+                    <View style={styles.unreadBadge} pointerEvents="none">
+                      <AppText weight="bold" color="#FFFFFF" style={styles.unreadBadgeText}>
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </AppText>
+                    </View>
+                  )}
+                </View>
                 <AppText
                   variant="caption"
                   weight={isFocused ? 'bold' : 'medium'}
@@ -166,6 +193,22 @@ export const TabBar: React.FC<TabBarProps> = ({ state, descriptors, emitter, nav
 };
 
 const styles = StyleSheet.create({
+  iconContainer: { position: 'relative' },
+  unreadBadge: {
+    position: 'absolute',
+    top: -7,
+    left: 13,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    backgroundColor: theme.colors.error.main,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.background.paper,
+  },
+  unreadBadgeText: { fontSize: 10, lineHeight: 13 },
   container: {
     backgroundColor: theme.colors.background.paper,
     borderTopWidth: 1,

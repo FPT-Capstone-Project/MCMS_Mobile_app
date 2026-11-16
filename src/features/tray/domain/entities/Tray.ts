@@ -39,7 +39,7 @@ export interface TrayRackTier {
   trays: Tray[];
 }
 
-export type CustomerTrayUsage = 'MY_CULTIVATION' | 'OTHER_CULTIVATION' | 'AVAILABLE';
+export type CustomerTrayUsage = 'MY_CULTIVATION' | 'OTHER_CULTIVATION' | 'AVAILABLE' | 'MAINTENANCE' | 'INACTIVE';
 
 export interface CustomerTrayCard {
   mushroomImageUrl?: string;

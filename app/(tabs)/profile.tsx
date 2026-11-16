@@ -314,7 +314,7 @@ export default function ProfileScreen() {
               />
               <View>
                 <AppText variant="bodyMedium" weight="medium">
-                  {isCustomer ? 'Đơn hàng của tôi' : 'Quản lý Đơn & Phiên nuôi trồng'}
+                  {isCustomer ? 'Đơn hàng của tôi' : 'Quản lý phiên nuôi trồng'}
                 </AppText>
                 <AppText variant="caption" color={theme.colors.text.muted}>
                   {isCustomer
