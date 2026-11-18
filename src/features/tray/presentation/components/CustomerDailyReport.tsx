@@ -1,10 +1,10 @@
+import { AppModal as Modal } from '../../../../shared/components/feedback/AppDialog';
 import { GROWTH_STAGE_LABELS } from '../../../../core/constants/growthStages';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,

@@ -1,10 +1,9 @@
+import { AppAlert as Alert, AppModal as Modal } from '../../../../shared/components/feedback/AppDialog';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   AppState,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,

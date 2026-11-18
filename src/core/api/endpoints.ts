@@ -4,6 +4,11 @@
  */
 
 export const API_ENDPOINTS = {
+  SHIPMENTS: {
+    BASE: '/api/shipments',
+    ORDER: (orderId: number) => `/api/shipments/orders/${orderId}`,
+    STATUS: (shipmentId: number) => `/api/shipments/${shipmentId}/status`,
+  },
   // Authentication & Profile
   AUTH: {
     LOGIN: '/api/auth/login',

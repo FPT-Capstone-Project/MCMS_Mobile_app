@@ -1,3 +1,4 @@
+import { AppModal as Modal } from '../../../../shared/components/feedback/AppDialog';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -5,7 +6,6 @@ import {
   AppState,
   Image,
   Linking,
-  Modal,
   StyleSheet,
   View,
 } from 'react-native';

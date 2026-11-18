@@ -1,3 +1,4 @@
+import { AppAlert as Alert, AppModal as Modal } from '../../src/shared/components/feedback/AppDialog';
 import { Ionicons } from '@expo/vector-icons';
 import { useReadNotificationMutation, useReadAllNotificationsMutation } from '../../src/features/notification/data/notificationApi';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -5,9 +6,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { Image } from 'expo-image';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   RefreshControl,

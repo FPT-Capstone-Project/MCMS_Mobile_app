@@ -1,7 +1,7 @@
+import { AppModal as Modal } from '../feedback/AppDialog';
 import { Ionicons } from '@expo/vector-icons';
 import React, { ReactNode } from 'react';
 import {
-  Modal,
   Pressable,
   StyleSheet,
   View,

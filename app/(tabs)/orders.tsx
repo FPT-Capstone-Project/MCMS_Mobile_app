@@ -1,9 +1,10 @@
+import { AppAlert as Alert } from '../../src/shared/components/feedback/AppDialog';
+import { ShipmentTrackingButton } from '../../src/features/order/presentation/components/ShipmentTracking';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Pressable,
   StyleSheet,
@@ -789,6 +790,8 @@ function CustomerOrdersContent() {
                       </View>
                     </View>
                   ))}
+
+                {!['PENDING', 'CANCELLED'].includes(order.order_status) && <ShipmentTrackingButton orderId={order.order_id} />}
 
                 {order.order_status === 'COMPLETED' &&
                   cultivationByOrder[order.order_id]?.data?.sessions.some((session) => session.status === 'COMPLETED') ? (

@@ -1,11 +1,10 @@
+import { AppAlert as Alert, AppModal as Modal } from '../../../../shared/components/feedback/AppDialog';
 import { GROWTH_STAGE_LABELS, GROWTH_STAGE_DESCRIPTIONS } from '../../../../core/constants/growthStages';
 import { cultivationNote } from '../../domain/cultivationNotes';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,

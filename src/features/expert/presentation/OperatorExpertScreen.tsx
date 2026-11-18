@@ -1,9 +1,9 @@
+import { AppModal as Modal } from '../../../shared/components/feedback/AppDialog';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   Image,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,

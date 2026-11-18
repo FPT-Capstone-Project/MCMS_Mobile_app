@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider as ReduxProvider } from 'react-redux';
 import { store } from '../store';
+import { AppAlertHost } from '../../shared/components/feedback/AppDialog';
 
 export interface AppProviderProps {
   children: ReactNode;
@@ -21,6 +22,7 @@ export function AppProvider({ children }: AppProviderProps) {
         <SafeAreaProvider>
           <StatusBar style="dark" />
           {children}
+          <AppAlertHost />
         </SafeAreaProvider>
       </ReduxProvider>
     </GestureHandlerRootView>
