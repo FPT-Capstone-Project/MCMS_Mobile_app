@@ -1,9 +1,9 @@
+import { AppModal as Modal } from '../../../../shared/components/feedback/AppDialog';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,

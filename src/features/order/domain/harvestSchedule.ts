@@ -66,10 +66,10 @@ export function getCustomerPickupMinuteOptions(dateKey: string, hour: string, no
   if (!Number.isInteger(hourNumber) || hourNumber < 7 || hourNumber > 17) return [];
 
   const today = getVietnamDateKey(now);
-  const latestMinute = hourNumber === 17 ? 0 : 59;
-  return Array.from({ length: latestMinute + 1 }, (_, minute) => String(minute).padStart(2, '0'))
-    .filter((minute) => dateKey !== today
-      || new Date(`${dateKey}T${hour}:${minute}:00+07:00`).getTime() > now.getTime());
+  if (!today || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey) || dateKey < today) return [];
+  const minutes = hourNumber === 17 ? ['00'] : ['00', '15', '30', '45'];
+  return minutes.filter((minute) =>
+    new Date(`${dateKey}T${String(hourNumber).padStart(2, '0')}:${minute}:00+07:00`).getTime() > now.getTime());
 }
 
 export function getCustomerPickupTimeOptions(dateKey: string, now = new Date()): string[] {

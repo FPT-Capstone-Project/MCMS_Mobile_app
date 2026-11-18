@@ -1,3 +1,4 @@
+import { AppModal as Modal } from '../../../../shared/components/feedback/AppDialog';
 import { GROWTH_STAGE_LABELS } from '../../../../core/constants/growthStages';
 import { RequestExpertModal } from '../../../expert/presentation/RequestExpertModal';
 import type { ExpertRequestContext } from '../../../expert/domain/entities/expert-consultation';
@@ -7,7 +8,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,

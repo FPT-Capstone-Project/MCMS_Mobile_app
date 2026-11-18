@@ -1,3 +1,4 @@
+import { AppAlert as Alert, AppModal as Modal } from '../../../../shared/components/feedback/AppDialog';
 import { RequestExpertModal } from '../../../expert/presentation/RequestExpertModal';
 import type { ExpertRequestContext } from '../../../expert/domain/entities/expert-consultation';
 import { cultivationNote } from '../../domain/cultivationNotes';
@@ -6,9 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,

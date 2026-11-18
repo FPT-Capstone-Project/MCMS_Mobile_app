@@ -1,11 +1,15 @@
-import { canCustomerUpdateHarvestMethod, getCustomerPickupDateKeys, getCustomerPickupHourOptions, getCustomerPickupMinuteOptions, getVietnamDateKey, formatVietnamDate } from '../../../order/domain/harvestSchedule';
+import { AppAlert as Alert, AppModal as Modal } from '../../../../shared/components/feedback/AppDialog';
+import { useAuth } from '../../../auth';
+import { useGetOrderShipmentsQuery } from '../../../order/data/shipmentApi';
+import { deliveryHandoverAllowed } from '../../../order/domain/shipment';
+import { ShipmentTracking } from '../../../order/presentation/components/ShipmentTracking';
+import { PickupSchedulePicker } from '../../../order/presentation/components/PickupSchedulePicker';
+import { canCustomerUpdateHarvestMethod, getCustomerPickupDateKeys, getCustomerPickupTimeOptions, getVietnamDateKey } from '../../../order/domain/harvestSchedule';
 import { receivingBlocker, parsePickupTime, harvestError } from '../../domain/harvestReceiving';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -114,6 +118,14 @@ const HarvestActionModalContent: React.FC<{
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [receiving, setReceiving] = useState<Partial<HarvestItem> | null>(null);
+  const { user } = useAuth();
+  const deliveryOrderId = session.order_id || harvest?.order_id;
+  const isDelivery = (receiving?.harvest_method || harvest?.harvest_method) === 'DELIVERY';
+  const shipmentQuery = useGetOrderShipmentsQuery(
+    { orderId: deliveryOrderId || 0, accountId: user?.id || '' },
+    { skip: !isDelivery || !deliveryOrderId || !user, refetchOnMountOrArgChange: true },
+  );
+  const canCompleteDelivery = !isDelivery || (!shipmentQuery.isFetching && !shipmentQuery.isError && deliveryHandoverAllowed(shipmentQuery.currentData || []));
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const canEditReceiving = !canCustomerUpdateHarvestMethod(session.harvest_ready_at);
   const dateOptions = getCustomerPickupDateKeys(new Date().toISOString());
@@ -208,8 +220,8 @@ const HarvestActionModalContent: React.FC<{
   const handleSaveReceiving = async () => {
     if (!receivingMethod || actionLoading || !canEditReceiving) return;
     const scheduledAt = receivingMethod === 'PICKUP' ? parsePickupTime(pickupDate, pickupTime) : undefined;
-    if (receivingMethod === 'PICKUP' && (!scheduledAt || !dateKey || !dateOptions.includes(dateKey) || Date.parse(scheduledAt) <= new Date().getTime() || pickupTime < '07:00' || pickupTime > '17:00')) {
-      Alert.alert('Lịch hẹn chưa hợp lệ', 'Chọn ngày từ hôm nay đến 3 ngày tới, giờ từ 07:00 đến 17:00 và sau thời điểm hiện tại.');
+    if (receivingMethod === 'PICKUP' && (!scheduledAt || !dateKey || !dateOptions.includes(dateKey) || Date.parse(scheduledAt) <= new Date().getTime() || !getCustomerPickupTimeOptions(dateKey).includes(pickupTime))) {
+      Alert.alert('Lịch hẹn chưa hợp lệ', 'Chọn ngày từ hôm nay đến 3 ngày tới, giờ từ 07:00 đến 17:00 theo mốc 15 phút và sau thời điểm hiện tại.');
       return;
     }
     if (receivingMethod === 'DELIVERY' && !deliveryAddress.trim()) { Alert.alert('Thiếu địa chỉ', 'Vui lòng nhập địa chỉ giao hàng.'); return; }
@@ -363,6 +375,14 @@ const HarvestActionModalContent: React.FC<{
         { text: 'Khách đã nhận', onPress: async () => {
           setActionLoading(true); setErrorMessage(null);
           try {
+            if (isDelivery) {
+              if (!deliveryOrderId) throw new Error('Missing delivery order');
+              const shipments = await shipmentQuery.refetch().unwrap();
+              if (!deliveryHandoverAllowed(shipments)) {
+                setErrorMessage('Chỉ hoàn tất bàn giao khi vận đơn mới nhất đã giao hàng thành công. Vui lòng kiểm tra phần Vận đơn giao hàng.');
+                return;
+              }
+            }
             await iotRepository.completeHarvestReceiving(requestId);
             await fetchHarvestInfo();
             await onSuccess();
@@ -480,20 +500,17 @@ const HarvestActionModalContent: React.FC<{
                         <AppButton title="Khách đến nhận tại nông trại" variant={receivingMethod === 'PICKUP' ? 'primary' : 'outline'} disabled={actionLoading} onPress={() => setReceivingMethod('PICKUP')} />
                         <AppButton title="Giao hàng tận nơi" variant={receivingMethod === 'DELIVERY' ? 'primary' : 'outline'} disabled={actionLoading} onPress={() => setReceivingMethod('DELIVERY')} />
                         {receivingMethod === 'PICKUP' && <>
-                          <AppText variant="caption">Chọn ngày trong 3 ngày tới · 07:00–17:00 (giờ Việt Nam)</AppText>
-                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                            {dateOptions.map((date) => <AppButton key={date} title={formatVietnamDate(date)} size="sm" variant={dateKey === date ? 'primary' : 'outline'} disabled={actionLoading} onPress={() => { setPickupDate(date.split('-').reverse().join('/')); setPickupTime(''); }} />)}
-                          </View>
-                          <AppText variant="caption">Giờ</AppText>
-                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                            {(dateKey ? getCustomerPickupHourOptions(dateKey) : []).map((hour) => <AppButton key={hour} title={hour} size="sm" variant={pickupTime.split(':')[0] === hour ? 'primary' : 'outline'} disabled={actionLoading} onPress={() => setPickupTime(`${hour}:${getCustomerPickupMinuteOptions(dateKey!, hour)[0]}`)} />)}
-                          </View>
-                          <AppText variant="caption">Phút</AppText>
-                          <ScrollView horizontal>
-                            <View style={{ flexDirection: 'row', gap: 8 }}>
-                              {(dateKey && pickupTime ? getCustomerPickupMinuteOptions(dateKey, pickupTime.split(':')[0]) : []).map((minute) => <AppButton key={minute} title={minute} size="sm" variant={pickupTime.split(':')[1] === minute ? 'primary' : 'outline'} disabled={actionLoading} onPress={() => setPickupTime(`${pickupTime.split(':')[0]}:${minute}`)} />)}
-                            </View>
-                          </ScrollView>
+                          <AppText variant="caption">Chọn ngày từ hôm nay đến 3 ngày tới.</AppText>
+                          <PickupSchedulePicker
+                            dates={dateOptions}
+                            date={dateKey || ''}
+                            time={pickupTime}
+                            disabled={actionLoading}
+                            onChange={(date, time) => {
+                              setPickupDate(date.split('-').reverse().join('/'));
+                              setPickupTime(time);
+                            }}
+                          />
                         </>}
                         {receivingMethod === 'DELIVERY' && <AppInput label="Địa chỉ giao hàng" placeholder="Số nhà, đường, phường, tỉnh/thành phố" value={deliveryAddress} onChangeText={setDeliveryAddress} multiline editable={!actionLoading} />}
                         <AppInput label="Ghi chú nhận nấm" value={receivingNote} onChangeText={setReceivingNote} multiline maxLength={2000} editable={!actionLoading} />
@@ -768,7 +785,7 @@ const HarvestActionModalContent: React.FC<{
                         </View>
 
                         {!handoverCompleted && harvest.harvest_request_id && currentSessionStatus === 'HARVESTING' && (
-                          <AppButton title="Xác nhận khách đã nhận nấm" loading={actionLoading} disabled={actionLoading} onPress={handleCompleteHandover} />
+                          <AppButton title="Xác nhận khách đã nhận nấm" loading={actionLoading} disabled={actionLoading || !canCompleteDelivery} onPress={handleCompleteHandover} />
                         )}
                         {!handoverCompleted && !harvest.harvest_request_id && (
                           <AppText color={theme.colors.warning.dark}>Chưa có mã yêu cầu nhận nấm. Hãy tải lại thông tin bằng nút ở góc tiêu đề.</AppText>
@@ -786,6 +803,12 @@ const HarvestActionModalContent: React.FC<{
               </>
             )}
 
+            {isDelivery && deliveryOrderId ? (
+              <View style={{ marginTop: 16 }}>
+                <ShipmentTracking orderId={deliveryOrderId} disabled={actionLoading} />
+                {!handoverCompleted && !canCompleteDelivery && <AppText variant="caption" color={theme.colors.warning.dark} style={{ marginTop: 8 }}>Cần xác nhận vận đơn đã giao hàng thành công trước khi hoàn tất bàn giao phiên này.</AppText>}
+              </View>
+            ) : null}
             <View style={{ height: 20 }} />
           </ScrollView>
 

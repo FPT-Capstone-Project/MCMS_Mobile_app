@@ -1,7 +1,15 @@
+import { AppModal as Modal } from '../../../../shared/components/feedback/AppDialog';
+import { ShipmentTrackingButton } from './ShipmentTracking';
 import { GROWTH_STAGE_DESCRIPTIONS } from '../../../../core/constants/growthStages';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { theme } from '../../../../core/theme';
 import { AppButton, AppCard, AppText } from '../../../../shared/components';
 import { MushroomImage } from '../../../../shared/components/MushroomImage';
@@ -276,6 +284,7 @@ export function CompletedOrderReportModal({
                     <ReportSection title="06 · Bàn giao" description="Kết quả cuối cùng, bàn giao" expanded={expandedSections[session.session_id] === 6} onPress={() => toggleSection(session, 6)}>
                       <ReportRow label="Phương thức" value={harvest?.harvest_method === 'PICKUP' ? 'Khách nhận tại trại' : harvest?.harvest_method === 'DELIVERY' ? 'Giao hàng' : 'Chưa ghi nhận'} />
                       <ReportRow label="Trạng thái" value={session.harvest_request_status === 'COMPLETED' ? 'Đã xác nhận hoàn tất' : 'Chưa có xác nhận bàn giao'} />
+                      {harvest?.harvest_method === 'DELIVERY' && orderId && <ShipmentTrackingButton orderId={orderId} />}
                     </ReportSection>
                   </AppCard>
                 );

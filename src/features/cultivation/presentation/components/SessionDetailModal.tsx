@@ -1,10 +1,10 @@
+import { AppModal as Modal } from '../../../../shared/components/feedback/AppDialog';
 import { cultivationNote } from '../../domain/cultivationNotes';
 import { statusLabel } from '../../domain/sessionWorkflow';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,

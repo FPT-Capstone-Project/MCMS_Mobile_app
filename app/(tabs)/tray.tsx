@@ -1,3 +1,4 @@
+import { AppAlert as Alert, AppModal as Modal } from '../../src/shared/components/feedback/AppDialog';
 import { GROWTH_STAGE_LABELS } from '../../src/core/constants/growthStages';
 import { TrayMushroomImage } from '../../src/features/iot/presentation/components/TrayMushroomImage';
 import { Ionicons } from '@expo/vector-icons';
@@ -5,8 +6,6 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,

@@ -18,6 +18,7 @@ export const baseApi = createApi({
     'Condition',
     'RentalPackage',
     'Order',
+    'Shipment',
     'Payment',
     'IoT',
     'Automatic',

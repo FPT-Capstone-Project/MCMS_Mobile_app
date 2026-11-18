@@ -1,6 +1,12 @@
+import { AppModal as Modal } from '../../../shared/components/feedback/AppDialog';
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { AppButton, AppInput, AppText } from '../../../shared/components';
 import { theme } from '../../../core/theme';
 import { operatorConsultationRepository as repository } from '../data/repositories/operator-consultation-repository';

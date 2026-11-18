@@ -1,10 +1,11 @@
+import { AppAlert as Alert } from '../../../../shared/components/feedback/AppDialog';
+import { ShipmentTrackingButton } from '../components/ShipmentTracking';
 import { SESSION_FILTERS, GROWTH_FILTERS, sessionGroup, growthStage, compareSessions, statusLabel } from '../../../cultivation/domain/sessionWorkflow';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -817,6 +818,7 @@ export const AdminOrdersScreen: React.FC = () => {
                       />
                     )}
                   </View>
+                  {session.order_id && <ShipmentTrackingButton orderId={session.order_id} />}
                 </AppCard>
                 </React.Fragment>
               );
