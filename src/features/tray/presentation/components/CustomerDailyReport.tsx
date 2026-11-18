@@ -1,3 +1,4 @@
+import { GROWTH_STAGE_LABELS } from '../../../../core/constants/growthStages';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -18,10 +19,10 @@ import {
 import { AppButton, AppCard, AppText } from '../../../../shared/components';
 
 const STAGE_LABELS: Record<string, string> = {
-  FRUITING_INITIATION: 'Bắt đầu tạo quả thể',
-  PINNING: 'Ra nụ',
-  YOUNG_FRUITING: 'Nấm non',
-  MATURATION: 'Trưởng thành',
+  FRUITING_INITIATION: GROWTH_STAGE_LABELS.FRUITING_INITIATION,
+  PINNING: GROWTH_STAGE_LABELS.PINNING,
+  YOUNG_FRUITING: GROWTH_STAGE_LABELS.YOUNG_FRUITING,
+  MATURATION: GROWTH_STAGE_LABELS.MATURATION,
 };
 
 interface CustomerDailyReportProps {

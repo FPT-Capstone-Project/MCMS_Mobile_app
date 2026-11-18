@@ -1,3 +1,4 @@
+import { GROWTH_STAGE_DESCRIPTIONS } from '../../../../core/constants/growthStages';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -14,10 +15,10 @@ const LIFECYCLE_STAGES = [
   { code: 'RESTING', description: 'Phôi đang nghỉ và ổn định' },
   { code: 'DEVELOPING', description: 'Tơ nấm phát triển' },
   { code: 'READY_FOR_CULTIVATION', description: 'Phôi khỏe mạnh, tơ đạt yêu cầu' },
-  { code: 'FRUITING_INITIATION', description: 'Phôi được bố trí bắt đầu ra quả thể.' },
-  { code: 'PINNING', description: 'Mầm nấm xuất hiện.' },
-  { code: 'YOUNG_FRUITING', description: 'Nấm non phát triển' },
-  { code: 'MATURATION', description: 'Nấm trưởng thành' },
+  { code: 'FRUITING_INITIATION', description: GROWTH_STAGE_DESCRIPTIONS.FRUITING_INITIATION },
+  { code: 'PINNING', description: GROWTH_STAGE_DESCRIPTIONS.PINNING },
+  { code: 'YOUNG_FRUITING', description: GROWTH_STAGE_DESCRIPTIONS.YOUNG_FRUITING },
+  { code: 'MATURATION', description: GROWTH_STAGE_DESCRIPTIONS.MATURATION },
   { code: 'HARVEST_READY', description: 'Sẵn sàng thu hoạch' },
 ] as const;
 

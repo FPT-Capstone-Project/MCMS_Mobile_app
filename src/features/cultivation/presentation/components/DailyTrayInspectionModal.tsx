@@ -56,7 +56,7 @@ const MUSHROOM_CONDITION_PRESETS = [
   'Nấm phát triển đều, không phát hiện sâu bệnh',
   'Mũ nấm dày, màu sắc tự nhiên, mọc cụm đẹp',
   'Tai nấm non mọc nhiều, phát triển nhanh',
-  'Nấm mọc thưa, cần tăng ẩm kích nụ',
+  'Nấm mọc thưa, cần kiểm tra điều kiện ra quả thể',
 ];
 
 function sanitizeConditionToVietnamese(

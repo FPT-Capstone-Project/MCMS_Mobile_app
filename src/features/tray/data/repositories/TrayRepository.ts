@@ -1,3 +1,4 @@
+import { GROWTH_STAGE_LABELS } from '../../../../core/constants/growthStages';
 import { getMushroomImages, findMushroomImage } from '../../../../core/api/mushroomImages';
 import { axiosClient } from '../../../../core/api/axiosClient';
 import { API_ENDPOINTS } from '../../../../core/api/endpoints';
@@ -482,10 +483,10 @@ function localizeGrowthDescription(value: unknown): string | null {
       SPAWN_RESTING: 'ủ phôi',
       MYCELIAL_DEVELOPMENT: 'phát triển tơ nấm',
       READY_FOR_CULTIVATION: 'sẵn sàng nuôi trồng',
-      FRUITING_INITIATION: 'bắt đầu tạo quả thể',
-      PINNING: 'ra nụ',
-      YOUNG_FRUITING: 'nấm non',
-      MATURATION: 'trưởng thành',
+      FRUITING_INITIATION: GROWTH_STAGE_LABELS.FRUITING_INITIATION,
+      PINNING: GROWTH_STAGE_LABELS.PINNING,
+      YOUNG_FRUITING: GROWTH_STAGE_LABELS.YOUNG_FRUITING,
+      MATURATION: GROWTH_STAGE_LABELS.MATURATION,
     };
     const stageLabel = stageLabels[stageChange[1].toUpperCase()];
     if (stageLabel) return `Giai đoạn phôi đã chuyển sang ${stageLabel}.`;
@@ -495,7 +496,7 @@ function localizeGrowthDescription(value: unknown): string | null {
     'Spawn allocated after payment; awaiting farm acceptance':
       'Phôi đã được phân bổ sau khi thanh toán và đang chờ trang trại tiếp nhận.',
     'Spawn has been placed on the assigned trays and fruiting initiation has started.':
-      'Phôi đã được đặt vào các khay được phân bổ và bắt đầu giai đoạn tạo quả thể.',
+      'Phôi đã được đặt vào các khay được phân bổ và bắt đầu giai đoạn kích thích ra quả thể.',
     'Cultivation started after tray assignment':
       'Quá trình nuôi trồng bắt đầu sau khi khay được phân bổ.',
   };
