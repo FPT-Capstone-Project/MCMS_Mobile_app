@@ -1,3 +1,4 @@
+import { GROWTH_STAGE_LABELS } from '../../src/core/constants/growthStages';
 import { TrayMushroomImage } from '../../src/features/iot/presentation/components/TrayMushroomImage';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -81,10 +82,10 @@ function getGrowthStageLabel(stage: string): string {
     SPAWN_RESTING: 'Đang ủ phôi',
     MYCELIAL_DEVELOPMENT: 'Đang phát triển tơ nấm',
     READY_FOR_CULTIVATION: 'Sẵn sàng nuôi trồng',
-    FRUITING_INITIATION: 'Bắt đầu tạo quả thể',
-    PINNING: 'Ra nấm non',
-    YOUNG_FRUITING: 'Nấm non đang phát triển',
-    MATURATION: 'Trưởng thành',
+    FRUITING_INITIATION: GROWTH_STAGE_LABELS.FRUITING_INITIATION,
+    PINNING: GROWTH_STAGE_LABELS.PINNING,
+    YOUNG_FRUITING: GROWTH_STAGE_LABELS.YOUNG_FRUITING,
+    MATURATION: GROWTH_STAGE_LABELS.MATURATION,
     HARVEST_READY: 'Sẵn sàng thu hoạch',
   };
   return labels[normalizedStage] ?? 'Giai đoạn đang được cập nhật';

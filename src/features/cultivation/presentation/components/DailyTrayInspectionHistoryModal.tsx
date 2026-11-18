@@ -1,3 +1,4 @@
+import { GROWTH_STAGE_LABELS } from '../../../../core/constants/growthStages';
 import { RequestExpertModal } from '../../../expert/presentation/RequestExpertModal';
 import type { ExpertRequestContext } from '../../../expert/domain/entities/expert-consultation';
 import { cultivationNote } from '../../domain/cultivationNotes';
@@ -37,22 +38,22 @@ interface DailyTrayInspectionHistoryModalProps {
 
 const STAGE_LABELS: Record<GrowthStage, { label: string; color: string; bg: string }> = {
   FRUITING_INITIATION: {
-    label: 'Bật mầm',
+    label: GROWTH_STAGE_LABELS.FRUITING_INITIATION,
     color: '#0284C7',
     bg: 'rgba(2, 132, 199, 0.12)',
   },
   PINNING: {
-    label: 'Ghim nụ',
+    label: GROWTH_STAGE_LABELS.PINNING,
     color: '#D97706',
     bg: 'rgba(217, 119, 6, 0.12)',
   },
   YOUNG_FRUITING: {
-    label: 'Nấm non',
+    label: GROWTH_STAGE_LABELS.YOUNG_FRUITING,
     color: '#059669',
     bg: 'rgba(5, 150, 105, 0.12)',
   },
   MATURATION: {
-    label: 'Trưởng thành',
+    label: GROWTH_STAGE_LABELS.MATURATION,
     color: '#7C3AED',
     bg: 'rgba(124, 58, 237, 0.12)',
   },

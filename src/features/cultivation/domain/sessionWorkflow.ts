@@ -1,3 +1,4 @@
+import { GROWTH_STAGE_LABELS } from '../../../core/constants/growthStages';
 import type { CultivationSessionAdmin } from '../../iot/domain/entities/Iot';
 
 export const SESSION_FILTERS = [
@@ -13,10 +14,10 @@ export const SESSION_FILTERS = [
 ];
 export const GROWTH_FILTERS = [
   { value: 'ALL', label: 'Mọi giai đoạn' },
-  { value: 'FRUITING_INITIATION', label: 'Bật mầm' },
-  { value: 'PINNING', label: 'Ra nụ' },
-  { value: 'YOUNG_FRUITING', label: 'Nấm non' },
-  { value: 'MATURATION', label: 'Trưởng thành' },
+  { value: 'FRUITING_INITIATION', label: GROWTH_STAGE_LABELS.FRUITING_INITIATION },
+  { value: 'PINNING', label: GROWTH_STAGE_LABELS.PINNING },
+  { value: 'YOUNG_FRUITING', label: GROWTH_STAGE_LABELS.YOUNG_FRUITING },
+  { value: 'MATURATION', label: GROWTH_STAGE_LABELS.MATURATION },
   { value: 'UNRECORDED', label: 'Chưa ghi nhận' },
 ];
 const labels: Record<string, string> = {
@@ -39,10 +40,10 @@ const lifecycleLabels: Record<string, string> = {
   DEVELOPING: 'Tơ nấm đang phát triển',
   MYCELIAL_DEVELOPMENT: 'Tơ nấm đang phát triển',
   READY_FOR_CULTIVATION: 'Sẵn sàng đưa vào khay trồng',
-  FRUITING_INITIATION: 'Bắt đầu kích hoạt ra quả thể',
-  PINNING: 'Mầm nấm bắt đầu xuất hiện',
-  YOUNG_FRUITING: 'Nấm non đang phát triển',
-  MATURATION: 'Nấm trưởng thành, đang kiểm tra chất lượng',
+  FRUITING_INITIATION: GROWTH_STAGE_LABELS.FRUITING_INITIATION,
+  PINNING: GROWTH_STAGE_LABELS.PINNING,
+  YOUNG_FRUITING: GROWTH_STAGE_LABELS.YOUNG_FRUITING,
+  MATURATION: GROWTH_STAGE_LABELS.MATURATION,
   HARVEST_READY: 'Sẵn sàng thu hoạch',
   HARVESTING: 'Đang thu hoạch',
   COMPLETED: 'Đã hoàn thành',

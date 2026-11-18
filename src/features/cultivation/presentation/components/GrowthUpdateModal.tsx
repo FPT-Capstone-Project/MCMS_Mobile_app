@@ -1,3 +1,4 @@
+import { GROWTH_STAGE_LABELS, GROWTH_STAGE_DESCRIPTIONS } from '../../../../core/constants/growthStages';
 import { cultivationNote } from '../../domain/cultivationNotes';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
@@ -120,29 +121,29 @@ export function getDaysUntil(dateStr?: string | null): string {
 const GROWTH_STAGE_OPTIONS: { stage: GrowthStage; label: string; desc: string }[] = [
   {
     stage: 'FRUITING_INITIATION',
-    label: '1. Kích nụ',
-    desc: 'Bắt đầu kích thích mầm quả thể nấm phát triển',
+    label: `1. ${GROWTH_STAGE_LABELS.FRUITING_INITIATION}`,
+    desc: GROWTH_STAGE_DESCRIPTIONS.FRUITING_INITIATION,
   },
   {
     stage: 'PINNING',
-    label: '2. Hình thành mũ nấm',
-    desc: 'Đầu đinh ghim, mũ nấm non li ti bắt đầu xuất hiện',
+    label: `2. ${GROWTH_STAGE_LABELS.PINNING}`,
+    desc: GROWTH_STAGE_DESCRIPTIONS.PINNING,
   },
   {
     stage: 'YOUNG_FRUITING',
-    label: '3. Thể quả non',
-    desc: 'Quả thể nấm tăng trưởng nhanh, cuống dài ra',
+    label: `3. ${GROWTH_STAGE_LABELS.YOUNG_FRUITING}`,
+    desc: GROWTH_STAGE_DESCRIPTIONS.YOUNG_FRUITING,
   },
   {
     stage: 'MATURATION',
-    label: '4. Trưởng thành',
-    desc: 'Mũ nấm căng rộng, viền mỏng, sẵn sàng cho thu hoạch',
+    label: `4. ${GROWTH_STAGE_LABELS.MATURATION}`,
+    desc: GROWTH_STAGE_DESCRIPTIONS.MATURATION,
   },
 ];
 
 const CONDITION_PRESETS = [
   { label: 'Bình thường', value: 'Bình thường, phát triển ổn định' },
-  { label: 'Phát triển tốt', value: 'Phát triển đồng đều, nụ khỏe mạnh' },
+  { label: 'Phát triển tốt', value: 'Phát triển đồng đều, mầm nấm khỏe mạnh' },
   { label: 'Chậm lớn', value: 'Tốc độ phát triển chậm hơn thông thường' },
   { label: 'Cần lưu ý ẩm độ', value: 'Độ ẩm chưa tối ưu, cần theo dõi phun sương' },
 ];
@@ -153,7 +154,7 @@ function sanitizeGrowthConditionToVietnamese(val?: string | null): string {
   const upper = trimmed.toUpperCase();
   if (upper === 'NORMAL') return 'Bình thường, phát triển ổn định';
   if (upper === 'GOOD' || upper === 'OPTIMAL' || upper === 'HEALTHY')
-    return 'Phát triển đồng đều, nụ khỏe mạnh';
+    return 'Phát triển đồng đều, mầm nấm khỏe mạnh';
   if (upper === 'WARNING') return 'Cần theo dõi, độ ẩm chưa tối ưu';
   if (upper === 'ABNORMAL') return 'Bất thường, cần can thiệp xử lý';
   if (upper === 'POOR') return 'Tốc độ phát triển chậm hơn thông thường';

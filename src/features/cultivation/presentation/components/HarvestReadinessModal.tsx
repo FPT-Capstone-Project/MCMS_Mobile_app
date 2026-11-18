@@ -1,3 +1,4 @@
+import { GROWTH_STAGE_LABELS } from '../../../../core/constants/growthStages';
 import { cultivationNote } from '../../domain/cultivationNotes';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
@@ -61,13 +62,13 @@ const formatStageInReadiness = (stage?: string | null): string => {
     case 'MYCELIAL_DEVELOPMENT':
       return 'Phát triển tơ';
     case 'FRUITING_INITIATION':
-      return 'Bật mầm';
+      return GROWTH_STAGE_LABELS.FRUITING_INITIATION;
     case 'PINNING':
-      return 'Ghim nụ';
+      return GROWTH_STAGE_LABELS.PINNING;
     case 'YOUNG_FRUITING':
-      return 'Nấm non';
+      return GROWTH_STAGE_LABELS.YOUNG_FRUITING;
     case 'MATURATION':
-      return 'Trưởng thành';
+      return GROWTH_STAGE_LABELS.MATURATION;
     default:
       return stage;
   }
