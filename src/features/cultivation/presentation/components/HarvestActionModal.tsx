@@ -1,8 +1,6 @@
 import { AppAlert as Alert, AppModal as Modal } from '../../../../shared/components/feedback/AppDialog';
-import { useAuth } from '../../../auth';
-import { useGetOrderShipmentsQuery } from '../../../order/data/shipmentApi';
-import { deliveryHandoverAllowed } from '../../../order/domain/shipment';
 import { ShipmentTracking } from '../../../order/presentation/components/ShipmentTracking';
+import { canTrackSessionShipment } from '../../../order/domain/shipment';
 import { PickupSchedulePicker } from '../../../order/presentation/components/PickupSchedulePicker';
 import { canCustomerUpdateHarvestMethod, getCustomerPickupDateKeys, getCustomerPickupTimeOptions, getVietnamDateKey } from '../../../order/domain/harvestSchedule';
 import { receivingBlocker, parsePickupTime, harvestError } from '../../domain/harvestReceiving';
@@ -118,14 +116,9 @@ const HarvestActionModalContent: React.FC<{
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [receiving, setReceiving] = useState<Partial<HarvestItem> | null>(null);
-  const { user } = useAuth();
   const deliveryOrderId = session.order_id || harvest?.order_id;
+  const isPickup = (receiving?.harvest_method || harvest?.harvest_method) === 'PICKUP';
   const isDelivery = (receiving?.harvest_method || harvest?.harvest_method) === 'DELIVERY';
-  const shipmentQuery = useGetOrderShipmentsQuery(
-    { orderId: deliveryOrderId || 0, accountId: user?.id || '' },
-    { skip: !isDelivery || !deliveryOrderId || !user, refetchOnMountOrArgChange: true },
-  );
-  const canCompleteDelivery = !isDelivery || (!shipmentQuery.isFetching && !shipmentQuery.isError && deliveryHandoverAllowed(shipmentQuery.currentData || []));
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const canEditReceiving = !canCustomerUpdateHarvestMethod(session.harvest_ready_at);
   const dateOptions = getCustomerPickupDateKeys(new Date().toISOString());
@@ -363,26 +356,16 @@ const HarvestActionModalContent: React.FC<{
   };
 
   const handleCompleteHandover = () => {
-    if (!harvest?.harvest_request_id || actionLoading || handoverCompleted) return;
+    if (!isPickup || !harvest?.harvest_request_id || actionLoading || handoverCompleted) return;
     const requestId = harvest.harvest_request_id;
     Alert.alert(
       'Xác nhận khách đã nhận nấm',
-      harvest.harvest_method === 'DELIVERY'
-        ? 'Chỉ xác nhận khi nấm đã giao đến khách thành công, không phải lúc gửi cho đơn vị vận chuyển. Phiên sẽ hoàn thành và khay chuyển sang chờ vệ sinh.'
-        : 'Khách đã nhận đủ nấm tại nông trại? Xác nhận sẽ hoàn thành phiên và chuyển khay sang chờ vệ sinh.',
+      'Khách đã nhận đủ nấm tại nông trại? Xác nhận sẽ hoàn thành phiên và chuyển khay sang chờ vệ sinh.',
       [
         { text: 'Chưa nhận', style: 'cancel' },
         { text: 'Khách đã nhận', onPress: async () => {
           setActionLoading(true); setErrorMessage(null);
           try {
-            if (isDelivery) {
-              if (!deliveryOrderId) throw new Error('Missing delivery order');
-              const shipments = await shipmentQuery.refetch().unwrap();
-              if (!deliveryHandoverAllowed(shipments)) {
-                setErrorMessage('Chỉ hoàn tất bàn giao khi vận đơn mới nhất đã giao hàng thành công. Vui lòng kiểm tra phần Vận đơn giao hàng.');
-                return;
-              }
-            }
             await iotRepository.completeHarvestReceiving(requestId);
             await fetchHarvestInfo();
             await onSuccess();
@@ -784,8 +767,8 @@ const HarvestActionModalContent: React.FC<{
                           </View>
                         </View>
 
-                        {!handoverCompleted && harvest.harvest_request_id && currentSessionStatus === 'HARVESTING' && (
-                          <AppButton title="Xác nhận khách đã nhận nấm" loading={actionLoading} disabled={actionLoading || !canCompleteDelivery} onPress={handleCompleteHandover} />
+                        {isPickup && !handoverCompleted && harvest.harvest_request_id && currentSessionStatus === 'HARVESTING' && (
+                          <AppButton title="Xác nhận khách đã nhận nấm" loading={actionLoading} disabled={actionLoading} onPress={handleCompleteHandover} />
                         )}
                         {!handoverCompleted && !harvest.harvest_request_id && (
                           <AppText color={theme.colors.warning.dark}>Chưa có mã yêu cầu nhận nấm. Hãy tải lại thông tin bằng nút ở góc tiêu đề.</AppText>
@@ -803,10 +786,9 @@ const HarvestActionModalContent: React.FC<{
               </>
             )}
 
-            {isDelivery && deliveryOrderId ? (
+            {isDelivery && deliveryOrderId && canTrackSessionShipment({ ...session, status: currentSessionStatus, harvest_status: harvest?.harvest_status ?? session.harvest_status }) ? (
               <View style={{ marginTop: 16 }}>
-                <ShipmentTracking orderId={deliveryOrderId} disabled={actionLoading} />
-                {!handoverCompleted && !canCompleteDelivery && <AppText variant="caption" color={theme.colors.warning.dark} style={{ marginTop: 8 }}>Cần xác nhận vận đơn đã giao hàng thành công trước khi hoàn tất bàn giao phiên này.</AppText>}
+                <ShipmentTracking orderId={deliveryOrderId} disabled={actionLoading} onCompleted={async () => { await fetchHarvestInfo(); await onSuccess(); }} />
               </View>
             ) : null}
             <View style={{ height: 20 }} />

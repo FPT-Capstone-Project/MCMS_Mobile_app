@@ -419,17 +419,29 @@ export default function TrayScreen() {
     }
   };
 
+  const [deviceLoading, setDeviceLoading] = useState(false);
+  const deviceInFlight = useRef<number | null>(null);
+
   const refreshSensorHistory = useCallback(async (sessionId: number, requestId: number) => {
+    if (deviceInFlight.current === requestId) return;
+    deviceInFlight.current = requestId;
+    setDeviceLoading(true);
     try {
-      const readings = await trayRepository.getCustomerSensorHistory(sessionId);
+      const [readings, logs] = await Promise.all([
+        trayRepository.getCustomerSensorHistory(sessionId),
+        trayRepository.getCustomerDeviceLogs(sessionId),
+      ]);
       if (requestId !== detailRequestId.current) return;
       setDetails((current) =>
-        current?.session_id === sessionId ? { ...current, sensor_readings: readings } : current
+        current?.session_id === sessionId ? { ...current, sensor_readings: readings, device_logs: logs } : current
       );
       setSensorRefreshError(null);
     } catch (error: unknown) {
       if (requestId !== detailRequestId.current) return;
       setSensorRefreshError(getErrorMessage(error, 'Không thể làm mới dữ liệu cảm biến.'));
+    } finally {
+      if (deviceInFlight.current === requestId) deviceInFlight.current = null;
+      if (requestId === detailRequestId.current) setDeviceLoading(false);
     }
   }, []);
 
@@ -452,13 +464,19 @@ export default function TrayScreen() {
     return () => clearInterval(intervalId);
   }, [selectedTray, detailTab, detailLoadState, details?.session_id, refreshSensorHistory]);
 
+  const environmentRequestId = useRef(0);
+  const environmentInFlight = useRef<number | null>(null);
+
   const refreshEnvironmentHistory = useCallback(async (
     sessionId: number,
     floorId: number,
     rangeHours: EnvironmentHistoryRange,
     requestId: number,
-    silent: boolean
+    silent: boolean,
+    generation: number
   ) => {
+    if (environmentInFlight.current === generation) return;
+    environmentInFlight.current = generation;
     if (!silent) setEnvironmentLoading(true);
     try {
       const to = new Date();
@@ -469,14 +487,15 @@ export default function TrayScreen() {
         from.toISOString(),
         to.toISOString()
       );
-      if (requestId !== detailRequestId.current) return;
+      if (requestId !== detailRequestId.current || generation !== environmentRequestId.current) return;
       setEnvironmentPoints(points);
       setEnvironmentError(null);
     } catch (error: unknown) {
-      if (requestId !== detailRequestId.current) return;
+      if (requestId !== detailRequestId.current || generation !== environmentRequestId.current) return;
       setEnvironmentError(getErrorMessage(error, 'Không thể tải lịch sử nhiệt độ và độ ẩm.'));
     } finally {
-      if (requestId === detailRequestId.current) setEnvironmentLoading(false);
+      if (environmentInFlight.current === generation) environmentInFlight.current = null;
+      if (requestId === detailRequestId.current && generation === environmentRequestId.current) setEnvironmentLoading(false);
     }
   }, []);
 
@@ -489,11 +508,12 @@ export default function TrayScreen() {
     ) return;
 
     const requestId = detailRequestId.current;
-    void refreshEnvironmentHistory(sessionId, floorId, environmentRange, requestId, false);
+    const generation = ++environmentRequestId.current;
+    void refreshEnvironmentHistory(sessionId, floorId, environmentRange, requestId, false, generation);
     const intervalId = setInterval(() => {
-      void refreshEnvironmentHistory(sessionId, floorId, environmentRange, requestId, true);
+      void refreshEnvironmentHistory(sessionId, floorId, environmentRange, requestId, true, generation);
     }, 60_000);
-    return () => clearInterval(intervalId);
+    return () => { clearInterval(intervalId); environmentRequestId.current += 1; };
   }, [
     selectedTray,
     detailTab,
@@ -1172,16 +1192,19 @@ export default function TrayScreen() {
                     ) : null}
                   </>
                 ) : (
-                  <DeviceHistory
-                    logs={details?.device_logs ?? []}
-                    readings={details?.sensor_readings ?? []}
-                    refreshError={sensorRefreshError}
-                    environmentPoints={environmentPoints}
-                    environmentRange={environmentRange}
-                    onEnvironmentRangeChange={setEnvironmentRange}
-                    environmentLoading={environmentLoading}
-                    environmentError={environmentError}
-                  />
+                  <>
+                    {deviceLoading && <ActivityIndicator color={theme.colors.primary[500]} />}
+                    <DeviceHistory
+                      logs={details?.device_logs ?? []}
+                      readings={details?.sensor_readings ?? []}
+                      refreshError={sensorRefreshError}
+                      environmentPoints={environmentPoints}
+                      environmentRange={environmentRange}
+                      onEnvironmentRangeChange={setEnvironmentRange}
+                      environmentLoading={environmentLoading}
+                      environmentError={environmentError}
+                    />
+                  </>
                 )}
               </ScrollView>
             )}

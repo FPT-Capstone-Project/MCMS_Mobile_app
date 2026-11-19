@@ -96,8 +96,12 @@ export const SensorDetailScreen: React.FC = () => {
     [floors]
   );
 
+  const environmentInFlight = useRef(false);
+
   // Load 24h environment history from backend analytics endpoint
   const loadEnvironmentHistory = useCallback(async (isSilent = false) => {
+    if (environmentInFlight.current) return;
+    environmentInFlight.current = true;
     if (!isSilent) {
       setEnvLoading(true);
     } else {
@@ -113,6 +117,7 @@ export const SensorDetailScreen: React.FC = () => {
         err instanceof Error ? err.message : 'Không thể tải lịch sử vi khí hậu.'
       );
     } finally {
+      environmentInFlight.current = false;
       setEnvLoading(false);
       setEnvRefreshing(false);
     }
@@ -176,6 +181,11 @@ export const SensorDetailScreen: React.FC = () => {
       loadMasters();
       loadEnvironmentHistory(false);
 
+    }, [loadMasters, loadEnvironmentHistory])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
       const intervalId = setInterval(() => {
         if (appStateRef.current === 'active') {
           loadEnvironmentHistory(true);
@@ -185,7 +195,7 @@ export const SensorDetailScreen: React.FC = () => {
       return () => {
         clearInterval(intervalId);
       };
-    }, [loadMasters, loadEnvironmentHistory, refreshIntervalMs])
+    }, [loadEnvironmentHistory, refreshIntervalMs])
   );
 
   // Manual pull-to-refresh
@@ -223,27 +233,6 @@ export const SensorDetailScreen: React.FC = () => {
     setSelectedSensor(s);
   };
 
-  if (loading && !envHistory) {
-    return (
-      <ScreenContainer edges={['top', 'left', 'right']}>
-        <AppHeader
-          title="Cảm biến & Biểu đồ"
-          subtitle="Giám sát vi khí hậu & Lịch sử 24h theo tầng"
-          showBack
-          onBack={() => {
-            if (router.canGoBack()) router.back();
-            else router.replace('/(tabs)');
-          }}
-        />
-        <View style={styles.centerLoading}>
-          <ActivityIndicator size="large" color={theme.colors.primary[500]} />
-          <AppText variant="bodySmall" color={theme.colors.text.secondary} style={styles.loadingText}>
-            Đang tải dữ liệu cảm biến & biểu đồ vi khí hậu...
-          </AppText>
-        </View>
-      </ScreenContainer>
-    );
-  }
 
   return (
     <ScreenContainer
@@ -345,6 +334,7 @@ export const SensorDetailScreen: React.FC = () => {
             </AppText>
           </View>
 
+          {loading && <ActivityIndicator color={theme.colors.primary[500]} />}
           {/* Master Selector */}
           <View style={styles.selectorGroup}>
             <AppText variant="label" color={theme.colors.text.muted}>

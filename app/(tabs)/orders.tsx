@@ -26,7 +26,7 @@ import { cultivationRepository, MushroomType } from '../../src/features/cultivat
 import { HarvestReceivingModal } from '../../src/features/order/presentation/components/HarvestReceivingModal';
 import { canCustomerUpdateHarvestMethod } from '../../src/features/order/domain/harvestSchedule';
 import { useGetOrderShipmentsQuery } from '../../src/features/order/data/shipmentApi';
-import { latestShipment, shipmentLabel } from '../../src/features/order/domain/shipment';
+import { canTrackSessionShipment, latestShipment, shipmentLabel } from '../../src/features/order/domain/shipment';
 import { ABOUT_US_INFO } from '../../src/features/profile/data/policiesData';
 import {
   AppButton,
@@ -1095,7 +1095,7 @@ function CustomerOrdersContent() {
                       orderId={order.order_id}
                       deliverySelected={
                         cultivationByOrder[order.order_id]?.data?.sessions.some(
-                          (session) => session.harvest_method === 'DELIVERY'
+                          (session) => session.harvest_method === 'DELIVERY' && canTrackSessionShipment(session)
                         ) ?? false
                       }
                     />

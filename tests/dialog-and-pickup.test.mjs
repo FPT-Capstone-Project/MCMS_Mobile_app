@@ -126,3 +126,43 @@ test('nested sheets remain above parents even with child-first React effects', (
   removeParent();
   assert.equal(appAlertStore.getSnapshot().hosts.length, 0);
 });
+
+const { completeDeliveryReceiving } = loadTypeScript('../src/features/order/domain/completeDelivery.ts');
+
+test('shipment transitions move forward and terminal attempts cannot be reopened', () => {
+  assert.deepEqual(shipmentDomain.nextShipmentStatuses('PENDING'), ['SHIPPED', 'CANCELLED']);
+  assert.deepEqual(shipmentDomain.nextShipmentStatuses('SHIPPED'), ['IN_TRANSIT', 'RETURNED']);
+  assert.deepEqual(shipmentDomain.nextShipmentStatuses('IN_TRANSIT'), ['DELIVERED', 'RETURNED']);
+  assert.deepEqual(shipmentDomain.nextShipmentStatuses('DELIVERED'), ['RETURNED']);
+  for (const status of ['CANCELLED', 'RETURNED', 'UNKNOWN', 'toString']) {
+    assert.deepEqual(shipmentDomain.nextShipmentStatuses(status), []);
+  }
+});
+
+test('delivery completes eligible sessions only and retries skip already completed requests', async () => {
+  const base = { order_id: 8, harvest_method: 'DELIVERY', status: 'COMPLETED', cultivation_status: 'HARVESTING', harvest_request_status: 'CONFIRMED' };
+  const rows = [
+    { ...base, harvest_request_id: 1 },
+    { ...base, harvest_request_id: 2 },
+    { ...base, harvest_request_id: 3, harvest_method: 'PICKUP' },
+    { ...base, harvest_request_id: 4, status: 'IN_PROGRESS' },
+    { ...base, harvest_request_id: 5, order_id: 9 },
+    { ...base, harvest_request_id: 6, harvest_request_status: 'COMPLETED' },
+    { ...base, harvest_request_id: 7, harvest_request_status: 'CANCELLED' },
+  ];
+  const calls = [];
+  let fail = true;
+  const repository = {
+    getAdminHarvests: async ({ orderId }) => { assert.equal(orderId, 8); return rows; },
+    completeHarvestReceiving: async (id) => {
+      calls.push(id);
+      if (id === 2 && fail) throw new Error('network');
+      rows.find(row => row.harvest_request_id === id).harvest_request_status = 'COMPLETED';
+    },
+  };
+  await assert.rejects(completeDeliveryReceiving(8, repository), /network/);
+  fail = false;
+  assert.equal(await completeDeliveryReceiving(8, repository), 1);
+  assert.deepEqual(calls, [1, 2, 2]);
+  assert.equal(await completeDeliveryReceiving(8, repository), 0);
+});
