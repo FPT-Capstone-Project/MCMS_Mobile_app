@@ -44,6 +44,22 @@ export function deliveryHandoverAllowed(shipments: readonly Shipment[]): boolean
   return latestShipment(shipments)?.status === 'DELIVERED';
 }
 
+const COMPLAINT_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+
+export function canComplainAboutShipment(
+  shipment: Shipment | undefined,
+  now = Date.now()
+): boolean {
+  if (shipment?.status !== 'DELIVERED' || !shipment.delivered_at) return false;
+
+  const deliveredAt = new Date(shipment.delivered_at).getTime();
+  return (
+    Number.isFinite(deliveredAt) &&
+    deliveredAt <= now &&
+    now - deliveredAt <= COMPLAINT_WINDOW_MS
+  );
+}
+
 export function shipmentError(error: unknown): string {
   const message = typeof error === 'object' && error !== null && 'message' in error
     ? String(error.message) : '';

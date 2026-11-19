@@ -9,6 +9,10 @@ export const API_ENDPOINTS = {
     ORDER: (orderId: number) => `/api/shipments/orders/${orderId}`,
     STATUS: (shipmentId: number) => `/api/shipments/${shipmentId}/status`,
   },
+  COMPLAINTS: {
+    MY: '/api/complaints/my',
+    ORDER: (orderId: number) => `/api/orders/${orderId}/complaints`,
+  },
   // Authentication & Profile
   AUTH: {
     LOGIN: '/api/auth/login',

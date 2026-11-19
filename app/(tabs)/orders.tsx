@@ -1,5 +1,5 @@
 import { AppAlert as Alert } from '../../src/shared/components/feedback/AppDialog';
-import { ShipmentTrackingButton } from '../../src/features/order/presentation/components/ShipmentTracking';
+import { OrderDeliveryActions } from '../../src/features/order/presentation/components/OrderDeliveryActions';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { theme } from '../../src/core/theme';
+import { GROWTH_STAGE_LABELS } from '../../src/core/constants/growthStages';
 import { formatVND } from '../../src/core/utils/currency';
 import { useAuth } from '../../src/features/auth';
 import {
@@ -24,6 +25,8 @@ import {
 import { cultivationRepository, MushroomType } from '../../src/features/cultivation';
 import { HarvestReceivingModal } from '../../src/features/order/presentation/components/HarvestReceivingModal';
 import { canCustomerUpdateHarvestMethod } from '../../src/features/order/domain/harvestSchedule';
+import { useGetOrderShipmentsQuery } from '../../src/features/order/data/shipmentApi';
+import { latestShipment, shipmentLabel } from '../../src/features/order/domain/shipment';
 import { ABOUT_US_INFO } from '../../src/features/profile/data/policiesData';
 import {
   AppButton,
@@ -135,21 +138,40 @@ function normalizeMushroomName(name?: string) {
     .trim();
 }
 
-function getOrderSpawnProgressLabel(
+function getCustomerSessionStatusLabel(
   session: CustomerCultivationStatus['sessions'][number]
 ): string | null {
-  if (session.assigned_trays?.some((tray) => tray.status === 'ACTIVE')) return null;
+  const status = session.status.trim().toUpperCase();
   const labels: Record<string, string> = {
-    RECEIVED: 'Đã tiếp nhận phôi',
-    PENDING: 'Đã tiếp nhận phôi',
-    SPAWN_PENDING: 'Đã tiếp nhận phôi',
-    RESTING: 'Phôi đang nghỉ',
-    SPAWN_RESTING: 'Phôi đang nghỉ',
-    DEVELOPING: 'Đang phát triển tơ nấm',
-    MYCELIAL_DEVELOPMENT: 'Đang phát triển tơ nấm',
-    READY_FOR_CULTIVATION: 'Sẵn sàng đưa lên khay',
+    RECEIVED: 'Chưa ủ tơ',
+    PENDING: 'Chưa ủ tơ',
+    SPAWN_PENDING: 'Chưa ủ tơ',
+    RESTING: 'Đang ủ tơ',
+    SPAWN_RESTING: 'Đang ủ tơ',
+    DEVELOPING: 'Phát triển tơ',
+    MYCELIAL_DEVELOPMENT: 'Phát triển tơ',
+    READY_FOR_CULTIVATION: 'Chờ gán khay',
+    CULTIVATING: 'Đang trồng',
+    HARVEST_READY: 'Sẵn sàng thu hoạch',
+    HARVESTING: 'Đang thu hoạch',
+    COMPLETED: 'Hoàn thành',
+    CANCELLED: 'Đã hủy',
   };
-  return labels[session.status.trim().toUpperCase()] ?? null;
+
+  if (status !== 'HARVESTING' && isHarvestReady(session)) {
+    return 'Sẵn sàng thu hoạch';
+  }
+
+  if (status === 'CULTIVATING' && session.current_stage) {
+    const stage = session.current_stage.trim().toUpperCase();
+    if (stage in GROWTH_STAGE_LABELS) {
+      return GROWTH_STAGE_LABELS[
+        stage as keyof typeof GROWTH_STAGE_LABELS
+      ];
+    }
+  }
+
+  return labels[status] ?? null;
 }
 
 type CustomerOrderFilter =
@@ -187,8 +209,270 @@ function hasHandoverProgress(cultivation?: CustomerCultivationStatus): boolean {
   );
 }
 
+function getHandoverProgressLabel(
+  cultivation?: CustomerCultivationStatus
+): string | null {
+  const activeSessions = (cultivation?.sessions ?? []).filter(
+    (session) => session.harvest_request_status !== 'COMPLETED'
+  );
+  const methods = [...new Set(
+    activeSessions
+      .map((session) => session.harvest_method)
+      .filter(
+        (method): method is 'PICKUP' | 'DELIVERY' => method !== null && method !== undefined
+      )
+  )];
+
+  if (methods.length > 1) return 'Đang giao / đến hái';
+  if (methods[0] === 'DELIVERY') return 'Đang giao hàng';
+  if (methods[0] === 'PICKUP') return 'Chờ khách đến hái';
+  return null;
+}
+
 function isHarvestReady(session: CustomerCultivationStatus['sessions'][number]): boolean {
   return session.status === 'HARVEST_READY' || session.harvest_status === 'HARVEST_READY';
+}
+
+function HarvestMethodUpdateButton({
+  orderId,
+  session,
+  onPress,
+}: {
+  orderId: number;
+  session: CustomerCultivationStatus['sessions'][number];
+  onPress: () => void;
+}) {
+  const { user } = useAuth();
+  const isDelivery = session.harvest_method === 'DELIVERY';
+  const shipmentQuery = useGetOrderShipmentsQuery(
+    { orderId, accountId: user?.id || '' },
+    {
+      skip: !isDelivery || !user,
+      refetchOnMountOrArgChange: true,
+    }
+  );
+
+  if (
+    session.harvest_request_status === 'COMPLETED' ||
+    !canCustomerUpdateHarvestMethod(session.harvest_ready_at)
+  ) {
+    return null;
+  }
+
+  if (
+    isDelivery &&
+    (shipmentQuery.isFetching ||
+      shipmentQuery.isError ||
+      latestShipment(shipmentQuery.currentData || [])?.status !== 'PENDING')
+  ) {
+    return null;
+  }
+
+  return (
+    <AppButton
+      title="Cập nhật phương thức giao hàng"
+      variant="outline"
+      size="sm"
+      onPress={onPress}
+    />
+  );
+}
+
+function HandoverDetails({
+  orderId,
+  session,
+}: {
+  orderId: number;
+  session: CustomerCultivationStatus['sessions'][number];
+}) {
+  const { user } = useAuth();
+  const [expanded, setExpanded] = useState(false);
+  const isDelivery = session.harvest_method === 'DELIVERY';
+  const shipmentQuery = useGetOrderShipmentsQuery(
+    { orderId, accountId: user?.id || '' },
+    {
+      skip: !isDelivery || !user,
+      refetchOnMountOrArgChange: true,
+    }
+  );
+  const shipment = latestShipment(shipmentQuery.currentData || []);
+
+  if (!session.harvest_method) return null;
+
+  return (
+    <>
+      <AppButton
+        title={expanded ? 'Ẩn thông tin giao nhận' : 'Xem thông tin giao nhận'}
+        variant="ghost"
+        size="sm"
+        rightIcon={
+          <Ionicons
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={16}
+            color={theme.colors.primary[600]}
+          />
+        }
+        onPress={() => setExpanded((current) => !current)}
+      />
+      {expanded ? (
+        <HandoverDetailsContent
+          session={session}
+          shipment={shipment}
+          shipmentLoading={shipmentQuery.isFetching}
+          shipmentError={shipmentQuery.isError}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function HandoverDetailsContent({
+  session,
+  shipment,
+  shipmentLoading,
+  shipmentError,
+}: {
+  session: CustomerCultivationStatus['sessions'][number];
+  shipment: ReturnType<typeof latestShipment>;
+  shipmentLoading: boolean;
+  shipmentError: boolean;
+}) {
+  if (session.harvest_method === 'PICKUP') {
+    return (
+      <View style={styles.handoverDetails}>
+        <AppText variant="captionMedium" weight="bold">
+          Thông tin đến trang trại hái nấm
+        </AppText>
+        <DetailLine
+          icon="calendar-outline"
+          label="Thời gian"
+          value={
+            session.scheduled_at
+              ? new Date(session.scheduled_at).toLocaleString('vi-VN', {
+                  timeZone: 'Asia/Ho_Chi_Minh',
+                })
+              : 'Chưa chọn thời gian'
+          }
+        />
+        <DetailLine
+          icon="location-outline"
+          label="Địa chỉ"
+          value={ABOUT_US_INFO.contact.address}
+        />
+        <DetailLine
+          icon="call-outline"
+          label="Liên hệ trang trại"
+          value={ABOUT_US_INFO.contact.phone}
+        />
+      </View>
+    );
+  }
+
+  if (session.harvest_method !== 'DELIVERY') return null;
+
+  if (shipmentLoading && !shipment) {
+    return (
+      <AppText variant="caption" color={theme.colors.text.secondary}>
+        Đang tải thông tin giao hàng...
+      </AppText>
+    );
+  }
+  if (shipmentError) {
+    return (
+      <AppText variant="caption" color={theme.colors.error.main}>
+        Chưa tải được thông tin giao hàng. Vui lòng thử lại.
+      </AppText>
+    );
+  }
+  if (!shipment) {
+    return (
+      <AppText variant="caption" color={theme.colors.text.secondary}>
+        Trang trại đang chuẩn bị thông tin vận đơn.
+      </AppText>
+    );
+  }
+
+  return (
+    <View style={styles.handoverDetails}>
+      <AppText variant="captionMedium" weight="bold">
+        Thông tin giao hàng
+      </AppText>
+      <DetailLine
+        icon="navigate-outline"
+        label="Trạng thái"
+        value={shipmentLabel(shipment.status)}
+      />
+      <DetailLine
+        icon="person-outline"
+        label="Người nhận"
+        value={`${shipment.recipient_name} · ${shipment.recipient_phone}`}
+      />
+      <DetailLine
+        icon="location-outline"
+        label="Địa chỉ"
+        value={shipment.address || session.delivery_address || 'Chưa cập nhật'}
+      />
+      <DetailLine
+        icon="business-outline"
+        label="Đơn vị vận chuyển"
+        value={shipment.carrier || 'Chờ trang trại cập nhật'}
+      />
+      <DetailLine
+        icon="barcode-outline"
+        label="Mã vận đơn"
+        value={shipment.tracking_code || 'Chờ trang trại cập nhật'}
+      />
+      {shipment.shipped_at ? (
+        <DetailLine
+          icon="time-outline"
+          label="Bàn giao vận chuyển"
+          value={new Date(shipment.shipped_at).toLocaleString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+          })}
+        />
+      ) : null}
+      {shipment.delivered_at ? (
+        <DetailLine
+          icon="checkmark-circle-outline"
+          label="Giao thành công"
+          value={new Date(shipment.delivered_at).toLocaleString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+          })}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+function DetailLine({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={styles.handoverDetailLine}>
+      <Ionicons
+        name={icon}
+        size={15}
+        color={theme.colors.primary[600]}
+        style={styles.handoverDetailIcon}
+      />
+      <AppText
+        variant="caption"
+        color={theme.colors.text.secondary}
+        style={styles.handoverDetailText}
+      >
+        <AppText variant="captionMedium" weight="bold">
+          {label}:{' '}
+        </AppText>
+        {value}
+      </AppText>
+    </View>
+  );
 }
 
 function matchesOrderFilter(
@@ -485,14 +769,17 @@ function CustomerOrdersContent() {
       const cultivation = cultivationByOrder[order.order_id];
       const labels = [...new Set(
         (cultivation?.data?.sessions ?? []).map((session) =>
-          getOrderSpawnProgressLabel(session)
+          getCustomerSessionStatusLabel(session)
         ).filter((label): label is string => label !== null)
       )];
       const hasSessions = Boolean(cultivation?.data?.sessions.length);
+      const handoverLabel = getHandoverProgressLabel(cultivation?.data);
       badgeText = cultivation?.loading
         ? 'Đang tải tiến độ'
         : cultivation?.error
         ? 'Chưa tải được tiến độ'
+        : handoverLabel
+        ? handoverLabel
         : labels.length === 1
         ? labels[0]
         : labels.length > 1
@@ -731,11 +1018,11 @@ function CustomerOrdersContent() {
                 </View>
 
                 {cultivationByOrder[order.order_id]?.data?.sessions.some(
-                  (session) => getOrderSpawnProgressLabel(session) !== null
+                  (session) => getCustomerSessionStatusLabel(session) !== null
                 ) ? (
                   <View style={styles.orderProgressList}>
                     {cultivationByOrder[order.order_id].data?.sessions
-                      .filter((session) => getOrderSpawnProgressLabel(session) !== null)
+                      .filter((session) => getCustomerSessionStatusLabel(session) !== null)
                       .map((session) => (
                       <AppText
                         key={session.session_id}
@@ -745,7 +1032,7 @@ function CustomerOrdersContent() {
                         {session.mushroom_name
                           ? `${session.mushroom_name}: `
                           : 'Tiến độ nuôi trồng: '}
-                        {getOrderSpawnProgressLabel(session)}
+                        {getCustomerSessionStatusLabel(session)}
                       </AppText>
                     ))}
                   </View>
@@ -757,7 +1044,13 @@ function CustomerOrdersContent() {
                 ) : null}
 
                 {(cultivationByOrder[order.order_id]?.data?.sessions ?? [])
-                  .filter(isHarvestReady)
+                  .filter(
+                    (session) =>
+                      session.harvest_request_status !== 'COMPLETED' &&
+                      (isHarvestReady(session) ||
+                        session.status === 'HARVESTING' ||
+                        Boolean(session.harvest_method))
+                  )
                   .map((session) => (
                     <View key={`harvest-receiving-${session.session_id}`} style={styles.harvestReceivingRow}>
                       <View style={styles.harvestReceivingCopy}>
@@ -768,15 +1061,20 @@ function CustomerOrdersContent() {
                             <AppText variant="caption" color={theme.colors.text.secondary}>
                               Phương thức giao nhận: {session.harvest_method === 'PICKUP' ? 'Đến trang trại hái nấm' : 'Giao hàng'}
                             </AppText>
-                            {session.harvest_request_status !== 'COMPLETED' &&
-                              canCustomerUpdateHarvestMethod(session.harvest_ready_at) ? (
-                                <AppButton
-                                  title="Cập nhật phương thức giao hàng"
-                                  variant="outline"
-                                  size="sm"
-                                  onPress={() => setReceivingContext({ orderId: order.order_id, session })}
-                                />
-                              ) : null}
+                            <HarvestMethodUpdateButton
+                              orderId={order.order_id}
+                              session={session}
+                              onPress={() =>
+                                setReceivingContext({
+                                  orderId: order.order_id,
+                                  session,
+                                })
+                              }
+                            />
+                            <HandoverDetails
+                              orderId={order.order_id}
+                              session={session}
+                            />
                           </>
                         ) : null}
                         {!session.harvest_method ? (
@@ -791,7 +1089,17 @@ function CustomerOrdersContent() {
                     </View>
                   ))}
 
-                {!['PENDING', 'CANCELLED'].includes(order.order_status) && <ShipmentTrackingButton orderId={order.order_id} />}
+                {order.payment_status === 'PAID' &&
+                  !['PENDING', 'CANCELLED'].includes(order.order_status) ? (
+                    <OrderDeliveryActions
+                      orderId={order.order_id}
+                      deliverySelected={
+                        cultivationByOrder[order.order_id]?.data?.sessions.some(
+                          (session) => session.harvest_method === 'DELIVERY'
+                        ) ?? false
+                      }
+                    />
+                  ) : null}
 
                 {order.order_status === 'COMPLETED' &&
                   cultivationByOrder[order.order_id]?.data?.sessions.some((session) => session.status === 'COMPLETED') ? (
@@ -1075,6 +1383,24 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.success.light,
   },
   harvestReceivingCopy: { flex: 1, gap: 2 },
+  handoverDetails: {
+    gap: theme.spacing.xs,
+    marginTop: theme.spacing.xs,
+    paddingTop: theme.spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.primary[200],
+  },
+  handoverDetailLine: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing.xs,
+  },
+  handoverDetailIcon: {
+    marginTop: 1,
+  },
+  handoverDetailText: {
+    flex: 1,
+  },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',

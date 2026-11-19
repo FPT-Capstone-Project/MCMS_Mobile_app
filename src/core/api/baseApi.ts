@@ -19,6 +19,7 @@ export const baseApi = createApi({
     'RentalPackage',
     'Order',
     'Shipment',
+    'Complaint',
     'Payment',
     'IoT',
     'Automatic',
