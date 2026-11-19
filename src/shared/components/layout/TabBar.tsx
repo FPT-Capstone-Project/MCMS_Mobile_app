@@ -112,6 +112,15 @@ export const TabBar: React.FC<TabBarProps> = ({ state, descriptors, emitter, nav
             };
           }
 
+          if (route.name === 'index' && user?.role === 'EXPERT') {
+            config = {
+              label: 'Tư vấn',
+              activeIcon: 'chatbubbles',
+              inactiveIcon: 'chatbubbles-outline',
+              accessibilityLabel: 'Tab Tư vấn chuyên gia',
+            };
+          }
+
           const onPress = () => {
             const event = emitter.emit({
               type: 'tabPress',

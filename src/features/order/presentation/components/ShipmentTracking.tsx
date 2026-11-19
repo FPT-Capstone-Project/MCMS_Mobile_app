@@ -113,7 +113,9 @@ export function ShipmentTracking({ orderId, disabled = false }: { orderId: numbe
         <AppText weight="bold" style={{ flex: 1 }}>Vận đơn giao hàng</AppText>
         <AppButton title="Tải lại" variant="ghost" size="sm" disabled={busy} onPress={() => { void refetch(); }} />
       </View>
-      <AppText variant="caption" color={theme.colors.text.secondary}>Theo dõi theo đơn hàng; một vận đơn có thể dùng chung cho nhiều phiên.</AppText>
+      {canManage ? (
+        <AppText variant="caption" color={theme.colors.text.secondary}>Theo dõi theo đơn hàng; một vận đơn có thể dùng chung cho nhiều phiên.</AppText>
+      ) : null}
       {isFetching && <ActivityIndicator color={theme.colors.primary[600]} />}
       {isError ? (
         <AppText color={theme.colors.error.main}>Chưa tải được trạng thái giao hàng. Bấm Tải lại để thử lại.</AppText>

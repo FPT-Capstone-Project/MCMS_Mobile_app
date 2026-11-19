@@ -9,6 +9,10 @@ export const API_ENDPOINTS = {
     ORDER: (orderId: number) => `/api/shipments/orders/${orderId}`,
     STATUS: (shipmentId: number) => `/api/shipments/${shipmentId}/status`,
   },
+  COMPLAINTS: {
+    MY: '/api/complaints/my',
+    ORDER: (orderId: number) => `/api/orders/${orderId}/complaints`,
+  },
   // Authentication & Profile
   AUTH: {
     LOGIN: '/api/auth/login',
@@ -93,7 +97,6 @@ export const API_ENDPOINTS = {
   EXPERT: {
     ISSUES: '/api/issues',
     REQUEST: (id: number | string) => `/api/issues/${id}/consultations`,
-    ISSUE_STATUS: (id: number | string) => `/api/issues/${id}/status`,
     MESSAGES: (id: number | string) => `/api/consultations/${id}/messages`,
     TREATMENTS: (id: number | string) => `/api/consultations/${id}/treatments`,
     CONSULTATIONS: '/api/consultations',
@@ -103,10 +106,10 @@ export const API_ENDPOINTS = {
       `/api/consultations/${consultationId}/assign`,
     RESPOND_TO_CONSULTATION: (consultationId: number | string) =>
       `/api/consultations/${consultationId}/respond`,
-    CLOSE_CONSULTATION: (consultationId: number | string) =>
-      `/api/consultations/${consultationId}/close`,
     ISSUE: (issueId: number | string) => `/api/issues/${issueId}`,
     RESOLVE_ISSUE: (issueId: number | string) => `/api/issues/${issueId}/resolve`,
+    REVIEW_TREATMENT: (treatmentLogId: number | string) =>
+      `/api/treatments/${treatmentLogId}/review`,
   },
   // Payments (PayOS)
   PAYMENTS: {

@@ -1,15 +1,17 @@
-import { Stack } from 'expo-router';
+import { Tabs } from 'expo-router';
 import React from 'react';
+import { TabBar } from '../../src/shared/components/layout/TabBar';
 
 export default function ExpertLayout() {
   return (
-    <Stack
+    <Tabs
+      tabBar={(props) => <TabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        animation: 'slide_from_right',
       }}
     >
-      <Stack.Screen name="index" />
-    </Stack>
+      <Tabs.Screen name="index" options={{ title: 'Tư vấn' }} />
+      <Tabs.Screen name="profile" options={{ title: 'Hồ sơ' }} />
+    </Tabs>
   );
 }

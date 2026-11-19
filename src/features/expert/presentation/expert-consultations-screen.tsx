@@ -51,7 +51,8 @@ function formatStatus(status: string, expertId?: number | string | null): string
     CLOSED: 'Đã đóng',
     OPEN: 'Mới báo cáo',
     WAITING_EXPERT: 'Chờ chuyên gia',
-    MONITORING: 'Chờ chuyên gia duyệt',
+    WAITING_REVIEW: 'Chờ chuyên gia duyệt',
+    MONITORING: 'Đang theo dõi',
     RESOLVED: 'Đã giải quyết',
   };
   if (status === 'PENDING') {
@@ -67,7 +68,11 @@ function getStatusColors(status: string) {
       color: theme.colors.success.dark,
     };
   }
-  if (status === 'IN_PROGRESS' || status === 'MONITORING') {
+  if (
+    status === 'IN_PROGRESS' ||
+    status === 'WAITING_REVIEW' ||
+    status === 'MONITORING'
+  ) {
     return {
       backgroundColor: theme.colors.warning.light,
       color: theme.colors.warning.dark,
@@ -95,11 +100,15 @@ function isAssignedTo(consultation: ExpertConsultation, userId?: number): boolea
   return consultation.expert_id != null && String(consultation.expert_id) === String(userId);
 }
 
-function shouldShowResolution(issue?: ExpertIssue | null, userId?: number): boolean {
+function shouldShowResolution(
+  issue?: ExpertIssue | null,
+  consultation?: ExpertConsultation | null,
+  userId?: number,
+): boolean {
   return Boolean(
     issue?.status === 'MONITORING' &&
-      issue.assigned_expert_id != null &&
-      String(issue.assigned_expert_id) === String(userId)
+      consultation?.expert_id != null &&
+      String(consultation.expert_id) === String(userId)
   );
 }
 
@@ -123,6 +132,7 @@ export function ExpertConsultationsScreen() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [diagnosis, setDiagnosis] = useState('');
   const [solution, setSolution] = useState('');
+  const [reviewComment, setReviewComment] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
   const loadConsultations = useCallback(async (refresh = false, append = false) => {
@@ -172,6 +182,7 @@ export function ExpertConsultationsScreen() {
     setSelectedIssue(null);
     setDiagnosis('');
     setSolution('');
+    setReviewComment('');
     try {
       const [detail, issue] = await Promise.all([
         expertConsultationRepository.getConsultation(consultation.consultation_id),
@@ -245,20 +256,29 @@ export function ExpertConsultationsScreen() {
     }
   };
 
-  const handleCloseConsultation = async () => {
-    if (!selectedConsultation) return;
+  const handleReviewTreatment = async (
+    result: 'APPROVED' | 'NEEDS_MORE_ACTION'
+  ) => {
+    const treatment =
+      selectedConsultation?.treatments?.[
+        (selectedConsultation?.treatments?.length ?? 0) - 1
+      ];
+    if (!treatment) return;
     setActionLoading(true);
     setDetailError(null);
     try {
-      await expertConsultationRepository.close(
-        selectedConsultation.consultation_id
+      await expertConsultationRepository.reviewTreatment(
+        treatment.treatment_log_id,
+        result,
+        reviewComment.trim() || undefined,
       );
+      setReviewComment('');
       await Promise.all([
         refreshSelectedDetails(),
         loadConsultations(true),
       ]);
     } catch (error: unknown) {
-      setDetailError(getErrorMessage(error, 'Không thể đóng yêu cầu tư vấn.'));
+      setDetailError(getErrorMessage(error, 'Không thể duyệt kết quả xử lý.'));
     } finally {
       setActionLoading(false);
     }
@@ -307,8 +327,16 @@ export function ExpertConsultationsScreen() {
     : false;
   const canRespond =
     selectedConsultation?.status === 'IN_PROGRESS' && assignedToCurrentUser;
-  const canClose =
-    selectedConsultation?.status === 'ANSWERED' && assignedToCurrentUser;
+  const latestTreatment =
+    selectedConsultation?.treatments?.[
+      (selectedConsultation?.treatments?.length ?? 0) - 1
+    ];
+  const canReviewTreatment =
+    selectedIssue?.status === 'WAITING_REVIEW' &&
+    selectedConsultation?.status === 'ANSWERED' &&
+    assignedToCurrentUser &&
+    latestTreatment != null &&
+    !latestTreatment.reviews?.length;
 
   return (
     <>
@@ -563,7 +591,10 @@ export function ExpertConsultationsScreen() {
                         weight="bold"
                         color={getStatusColors(selectedIssue.status).color}
                       >
-                        {formatStatus(selectedIssue.status)}
+                        {selectedIssue.status === 'WAITING_EXPERT' &&
+                        selectedConsultation.expert_id != null
+                          ? 'Chờ trang trại bổ sung'
+                          : formatStatus(selectedIssue.status)}
                       </AppText>
                     </View>
                   </View>
@@ -641,7 +672,9 @@ export function ExpertConsultationsScreen() {
                 {selectedConsultation.diagnosis ? (
                   <AppCard elevation="xs" style={styles.detailCard}>
                     <AppText variant="label" weight="bold">
-                      Chẩn đoán đã gửi
+                      {selectedConsultation.status === 'IN_PROGRESS'
+                        ? 'Thông tin đã yêu cầu bổ sung'
+                        : 'Chẩn đoán đã gửi'}
                     </AppText>
                     <AppText variant="bodySmall" selectable>
                       {selectedConsultation.diagnosis}
@@ -681,6 +714,43 @@ export function ExpertConsultationsScreen() {
                           {treatment.performed_by_name} ·{' '}
                           {formatDate(treatment.performed_at)}
                         </AppText>
+                        {treatment.media?.length ? (
+                          <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.evidenceList}
+                          >
+                            {treatment.media.map((media) => (
+                              <Image
+                                key={media.media_id}
+                                source={{ uri: media.media_url }}
+                                contentFit="cover"
+                                accessibilityLabel={media.caption || 'Ảnh kết quả xử lý'}
+                                style={styles.evidenceImage}
+                              />
+                            ))}
+                          </ScrollView>
+                        ) : null}
+                        {treatment.reviews?.map((review) => (
+                          <View key={review.review_id} style={styles.reviewCard}>
+                            <AppText variant="captionMedium" weight="bold">
+                              {review.review_result === 'APPROVED'
+                                ? 'Đã duyệt xử lý'
+                                : review.review_result === 'NEEDS_MORE_ACTION'
+                                ? 'Cần xử lý bổ sung'
+                                : 'Đã giải quyết'}
+                            </AppText>
+                            {review.review_comment ? (
+                              <AppText variant="caption" selectable>
+                                {review.review_comment}
+                              </AppText>
+                            ) : null}
+                            <AppText variant="caption" color={theme.colors.text.muted}>
+                              {review.reviewed_by_name || 'Chuyên gia'} ·{' '}
+                              {formatDate(review.created_at)}
+                            </AppText>
+                          </View>
+                        ))}
                       </View>
                     ))}
                   </AppCard>
@@ -734,17 +804,39 @@ export function ExpertConsultationsScreen() {
                   </AppCard>
                 ) : null}
 
-                {canClose ? (
-                  <AppButton
-                    title="Đóng yêu cầu tư vấn"
-                    variant="outline"
-                    fullWidth
-                    loading={actionLoading}
-                    onPress={() => void handleCloseConsultation()}
-                  />
+                {canReviewTreatment ? (
+                  <AppCard elevation="xs" style={styles.detailCard}>
+                    <AppText variant="label" weight="bold">
+                      Duyệt kết quả xử lý
+                    </AppText>
+                    <AppText variant="caption" color={theme.colors.text.secondary}>
+                      Kiểm tra mô tả và hình ảnh của bản cập nhật mới nhất trước khi quyết định.
+                    </AppText>
+                    <AppInput
+                      label="Nhận xét"
+                      placeholder="Nhập nhận xét hoặc yêu cầu xử lý tiếp theo"
+                      value={reviewComment}
+                      onChangeText={setReviewComment}
+                      multiline
+                      inputStyle={styles.multilineInput}
+                    />
+                    <AppButton
+                      title="Duyệt và chuyển sang theo dõi"
+                      fullWidth
+                      loading={actionLoading}
+                      onPress={() => void handleReviewTreatment('APPROVED')}
+                    />
+                    <AppButton
+                      title="Yêu cầu xử lý bổ sung"
+                      variant="outline"
+                      fullWidth
+                      disabled={actionLoading}
+                      onPress={() => void handleReviewTreatment('NEEDS_MORE_ACTION')}
+                    />
+                  </AppCard>
                 ) : null}
 
-                {shouldShowResolution(selectedIssue, userId) ? (
+                {shouldShowResolution(selectedIssue, selectedConsultation, userId) ? (
                   <AppButton
                     title="Xác nhận đã giải quyết sự cố"
                     fullWidth
@@ -872,6 +964,12 @@ const styles = StyleSheet.create({
   },
   evidenceList: {
     gap: theme.spacing.sm,
+  },
+  reviewCard: {
+    gap: 4,
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.neutral[50],
   },
   evidenceItem: {
     width: 144,

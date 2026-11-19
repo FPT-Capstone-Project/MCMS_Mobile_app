@@ -28,7 +28,8 @@ const filters = [
   ['OPEN', 'Chưa gửi'],
   ['WAITING_EXPERT', 'Chờ tư vấn'],
   ['IN_PROGRESS', 'Đang xử lý'],
-  ['MONITORING', 'Chờ duyệt'],
+  ['WAITING_REVIEW', 'Chờ chuyên gia duyệt'],
+  ['MONITORING', 'Đang theo dõi'],
   ['RESOLVED', 'Hoàn tất'],
 ];
 function issueStatus(status: string) {
@@ -244,16 +245,16 @@ function IssueDetail({ id, onClose }: { id: string; onClose: () => void }) {
   };
   const canRequest =
     issue &&
-    ['OPEN', 'IN_PROGRESS'].includes(issue.status) &&
+    issue.status === 'OPEN' &&
     (!consultation || consultation.status === 'CLOSED');
   const canSupplement =
     issue?.status === 'WAITING_EXPERT' &&
-    consultation?.status === 'PENDING' &&
+    consultation?.status === 'IN_PROGRESS' &&
     consultation.expert_id != null;
   const canTreat =
     issue?.status === 'IN_PROGRESS' &&
     consultation &&
-    ['ANSWERED', 'CLOSED'].includes(consultation.status) &&
+    consultation.status === 'ANSWERED' &&
     !!consultation.solution;
   return (
     <Modal
@@ -422,23 +423,10 @@ function IssueDetail({ id, onClose }: { id: string; onClose: () => void }) {
                               action.trim(),
                               result.trim()
                             ),
-                          'Đã lưu kết quả. Bạn có thể gửi chuyên gia duyệt.'
+                          'Đã gửi kết quả xử lý cho chuyên gia duyệt.'
                         )
                       }
                     />
-                    {!!consultation.treatments?.some((item) => item.result_description?.trim()) && (
-                      <AppButton
-                        title="Gửi kết quả để chuyên gia duyệt"
-                        variant="outline"
-                        disabled={busy}
-                        onPress={() =>
-                          run(
-                            () => repository.submitForReview(id),
-                            'Đã gửi kết quả để chuyên gia kiểm tra.'
-                          )
-                        }
-                      />
-                    )}
                   </AppCard>
                 )}
               </>

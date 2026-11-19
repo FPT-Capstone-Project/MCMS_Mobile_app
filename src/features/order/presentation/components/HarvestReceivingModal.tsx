@@ -216,7 +216,6 @@ export function HarvestReceivingModal({ visible, session, profileAddress, profil
           {step === 'schedule' && method === 'PICKUP' ? (
             <AppCard variant="outlined" style={styles.panel}>
               <AppText variant="bodySmall" weight="bold">Chọn ngày và giờ đến hái nấm</AppText>
-              <AppText variant="caption" color={theme.colors.text.secondary}>Ngày nhận từ ngày sẵn sàng thu hoạch đến tối đa 3 ngày sau đó.</AppText>
               <AppText variant="caption" weight="bold">Địa chỉ trang trại</AppText>
               <AppText variant="bodySmall">{farmAddress}</AppText>
 
