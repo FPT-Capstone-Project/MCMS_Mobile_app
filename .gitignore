@@ -42,3 +42,8 @@ yarn-error.*
 /android
 
 Backend/
+
+# Local Android signing and generated installers
+.local-build/
+*.apk
+*.aab

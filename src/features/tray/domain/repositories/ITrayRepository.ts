@@ -25,9 +25,11 @@ export interface ITrayRepository {
   getMyRentedTrays(): Promise<Tray[]>;
 
   /**
-   * Retrieves cultivation progress and device command history for an owned session
+   * Retrieves cultivation progress; device data is loaded separately when its tab opens.
    */
   getCustomerCultivationDetails(sessionId: number, orderId?: number | null): Promise<CustomerTrayDetails>;
+
+  getCustomerDeviceLogs(sessionId: number): Promise<CustomerTrayDetails['device_logs']>;
 
   /**
    * Retrieves recent sensor readings for an owned cultivation session.

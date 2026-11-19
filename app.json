@@ -11,6 +11,8 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.smartmush.mcms",
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#147C3E",
         "foregroundImage": "./assets/mcms-mark.png"

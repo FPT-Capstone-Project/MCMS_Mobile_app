@@ -51,7 +51,10 @@ export class TrayRepository implements ITrayRepository {
         ReturnType<typeof orderRepository.getCustomerCultivationStatus>
       >['sessions'][number] | undefined;
       if (orderId && orderId > 0) {
-        const cultivationStatus = await orderRepository.getCustomerCultivationStatus(orderId);
+        const [cultivationStatus, progressResponse] = await Promise.all([
+          orderRepository.getCustomerCultivationStatus(orderId),
+          axiosClient.get<{ data: any[] }>(API_ENDPOINTS.CUSTOMER.CULTIVATION_PROGRESS(orderId)).catch(() => null),
+        ]);
         sessionStatus = cultivationStatus.sessions.find(
           (session) => Number(session.session_id) === sessionId
         );
@@ -63,15 +66,8 @@ export class TrayRepository implements ITrayRepository {
           );
         }
 
-        try {
-          const pRes = await axiosClient.get<{ data: any[] }>(
-            API_ENDPOINTS.CUSTOMER.CULTIVATION_PROGRESS(orderId)
-          );
-          if (Array.isArray(pRes.data?.data)) {
-            progress = pRes.data.data;
-          }
-        } catch {
-          // Fall through to admin progress
+        if (Array.isArray(progressResponse?.data?.data)) {
+          progress = progressResponse.data.data;
         }
       }
 
@@ -88,20 +84,6 @@ export class TrayRepository implements ITrayRepository {
           // Ignore
         }
       }
-
-      const [iotResponse, sensorResponse] = await Promise.allSettled([
-        axiosClient.get<{ data: CustomerSessionIotHistory }>(
-          API_ENDPOINTS.CUSTOMER.IOT_HISTORY(sessionId),
-          { params: { page: 1, pageSize: 100 } }
-        ),
-        axiosClient.get<{ data: CustomerSensorHistory }>(
-          API_ENDPOINTS.CUSTOMER.IOT_SENSOR_HISTORY(sessionId),
-          { params: { page: 1, pageSize: 100 } }
-        ),
-      ]);
-
-      const iotHistory = iotResponse.status === 'fulfilled' ? iotResponse.value.data?.data : null;
-      const sensorHistory = sensorResponse.status === 'fulfilled' ? sensorResponse.value.data?.data : null;
 
       return {
         session_id: sessionId,
@@ -131,18 +113,20 @@ export class TrayRepository implements ITrayRepository {
                 new Date().toISOString(),
             };
           }),
-        device_logs: Array.isArray(iotHistory?.deviceEvents) ? iotHistory.deviceEvents : [],
-        sensor_readings: Array.isArray(sensorHistory?.readings)
-          ? sensorHistory.readings.map((reading) => ({
-              ...reading,
-              temperature: toNullableNumber(reading.temperature),
-              humidity: toNullableNumber(reading.humidity),
-            }))
-          : [],
+        device_logs: [],
+        sensor_readings: [],
       };
     } catch (error) {
       throw error instanceof AppError ? error : handleApiError(error);
     }
+  }
+
+  async getCustomerDeviceLogs(sessionId: number): Promise<CustomerDeviceLogItem[]> {
+    const response = await axiosClient.get<{ data: CustomerSessionIotHistory }>(
+      API_ENDPOINTS.CUSTOMER.IOT_HISTORY(sessionId),
+      { params: { page: 1, pageSize: 100 } }
+    );
+    return response.data?.data?.deviceEvents || [];
   }
 
   async getCustomerSensorHistory(sessionId: number): Promise<CustomerSensorReading[]> {
@@ -166,74 +150,35 @@ export class TrayRepository implements ITrayRepository {
 
   async getCustomerEnvironmentHistory(
     sessionId: number,
-    floorId: number,
+    _floorId: number,
     from: string,
     to: string
   ): Promise<CustomerEnvironmentHistoryPoint[]> {
+    // The session endpoint already includes every floor occupied by this session.
+    // Fetching floor-wide history duplicates rows and scales with unrelated sessions.
     const params = { from, to, page: 1, pageSize: 100 };
-    const [sessionResult, latestResult, floorResult] = await Promise.allSettled([
-      axiosClient.get<{ data?: CustomerEnvironmentHistoryPoint[] }>(
-        API_ENDPOINTS.ENVIRONMENT_HISTORY.SESSION(sessionId),
-        { params }
-      ),
-      axiosClient.get<{ data?: CustomerEnvironmentHistoryPoint | null }>(
-        API_ENDPOINTS.ENVIRONMENT_HISTORY.SESSION_LATEST(sessionId)
-      ),
-      axiosClient.get<{ data?: CustomerEnvironmentHistoryPoint[] }>(
-        API_ENDPOINTS.ENVIRONMENT_HISTORY.FLOOR(floorId),
-        { params }
-      ),
-    ]);
-
-    if (sessionResult.status === 'rejected') {
-      throw handleApiError(sessionResult.reason);
-    }
-
-    const records = new Map<string, CustomerEnvironmentHistoryPoint>();
-    const addRecord = (record: CustomerEnvironmentHistoryPoint) => {
-      if (Number(record.session_id) !== sessionId) return;
-      const timestamp = Date.parse(record.period_start);
-      if (!Number.isFinite(timestamp) || timestamp < Date.parse(from) || timestamp >= Date.parse(to)) {
-        return;
-      }
-      records.set(`${record.session_id}:${record.floor_id}:${record.period_start}`, record);
+    type HistoryPage = {
+      data?: CustomerEnvironmentHistoryPoint[];
+      pagination?: { totalPages?: number };
     };
-
-    const sessionRecords = sessionResult.value.data?.data;
-    if (Array.isArray(sessionRecords)) sessionRecords.forEach(addRecord);
-
-    const floorRecords = floorResult.status === 'fulfilled' ? floorResult.value.data?.data : undefined;
-    if (Array.isArray(floorRecords)) floorRecords.forEach(addRecord);
-
-    const sessionPages = Number((sessionResult.value.data as any)?.pagination?.totalPages) || 1;
-    const floorPages = floorResult.status === 'fulfilled'
-      ? Number((floorResult.value.data as any)?.pagination?.totalPages) || 1
-      : 1;
-    const extraPages = Array.from({ length: Math.max(sessionPages, floorPages) - 1 }, (_, index) => index + 2);
-    const pagedResults = await Promise.allSettled(
-      extraPages.flatMap((page) => [
-        axiosClient.get<{ data?: CustomerEnvironmentHistoryPoint[] }>(
-          API_ENDPOINTS.ENVIRONMENT_HISTORY.SESSION(sessionId),
-          { params: { ...params, page } }
-        ),
-        axiosClient.get<{ data?: CustomerEnvironmentHistoryPoint[] }>(
-          API_ENDPOINTS.ENVIRONMENT_HISTORY.FLOOR(floorId),
-          { params: { ...params, page } }
-        ),
-      ])
+    const first = await axiosClient.get<HistoryPage>(
+      API_ENDPOINTS.ENVIRONMENT_HISTORY.SESSION(sessionId), { params }
     );
-    for (const result of pagedResults) {
-      if (result.status === 'fulfilled' && Array.isArray(result.value.data?.data)) {
-        result.value.data.data.forEach(addRecord);
-      }
+    const records = [...(first.data.data || [])];
+    const totalPages = Number(first.data.pagination?.totalPages) || 1;
+    // Bound concurrency for larger windows instead of flooding the API.
+    for (let page = 2; page <= totalPages; page += 3) {
+      const pages = await Promise.all(
+        Array.from({ length: Math.min(3, totalPages - page + 1) }, (_, offset) =>
+          axiosClient.get<HistoryPage>(API_ENDPOINTS.ENVIRONMENT_HISTORY.SESSION(sessionId), {
+            params: { ...params, page: page + offset },
+          })
+        )
+      );
+      pages.forEach((response) => records.push(...(response.data.data || [])));
     }
-
-    const latestRecord = latestResult.status === 'fulfilled' ? latestResult.value.data?.data : null;
-    if (latestRecord) addRecord(latestRecord);
-
-    return [...records.values()].sort(
-      (left, right) => Date.parse(left.period_start) - Date.parse(right.period_start)
-    );
+    return records.filter((record) => Number(record.session_id) === sessionId)
+      .sort((left, right) => Date.parse(left.period_start) - Date.parse(right.period_start));
   }
 
   async getCustomerFloorRacks(): Promise<CustomerFloorRack[]> {

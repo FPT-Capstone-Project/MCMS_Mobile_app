@@ -1,0 +1,25 @@
+gradle.beforeProject { project ->
+    project.afterEvaluate {
+        // Ninja on Windows can hit MAX_PATH in deeply nested node_modules sources.
+        // Ask CMake to hash long object paths before they reach that limit.
+        def android = project.extensions.findByName('android')
+        if (android != null && android.hasProperty('defaultConfig')) {
+            android.defaultConfig.externalNativeBuild.cmake.arguments.add('-DCMAKE_OBJECT_PATH_MAX=240')
+        }
+    }
+    if (project.path == ':app') {
+        project.afterEvaluate {
+            if (project.plugins.hasPlugin('com.android.application')) {
+                def android = project.extensions.getByName('android')
+                def workspaceId = Integer.toHexString(project.rootDir.absolutePath.hashCode())
+                android.externalNativeBuild.cmake.buildStagingDirectory = new File("C:/mcms-build/${workspaceId}")
+                def signing = android.signingConfigs.maybeCreate('localRelease')
+                signing.storeFile = new File(System.getenv('MCMS_KEYSTORE_PATH'))
+                signing.storePassword = System.getenv('MCMS_KEYSTORE_PASSWORD')
+                signing.keyAlias = 'mcms-release'
+                signing.keyPassword = System.getenv('MCMS_KEYSTORE_PASSWORD')
+                android.buildTypes.getByName('release').signingConfig = signing
+            }
+        }
+    }
+}

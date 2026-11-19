@@ -1,13 +1,38 @@
 export const SHIPMENT_LABELS = {
   PENDING: 'Chờ giao hàng',
-  SHIPPED: 'Đã bàn giao vận chuyển',
+  SHIPPED: 'Đã bàn giao cho đơn vị vận chuyển',
   IN_TRANSIT: 'Đang vận chuyển',
-  DELIVERED: 'Đã giao hàng',
+  DELIVERED: 'Đã giao hàng thành công',
   CANCELLED: 'Đã hủy giao hàng',
   RETURNED: 'Đã hoàn hàng',
 } as const;
 
 export type ShipmentStatus = keyof typeof SHIPMENT_LABELS;
+
+export function canTrackSessionShipment(session: {
+  status?: string;
+  harvest_status?: string | null;
+  harvest_ready?: boolean;
+}): boolean {
+  if (session.status === 'CANCELLED') return false;
+  return session.status === 'HARVEST_READY' || session.status === 'HARVESTING' ||
+    session.status === 'COMPLETED' || session.harvest_status === 'HARVEST_READY' ||
+    session.harvest_ready === true;
+}
+
+const NEXT_SHIPMENT_STATUSES: Record<ShipmentStatus, readonly ShipmentStatus[]> = {
+  PENDING: ['SHIPPED', 'CANCELLED'],
+  SHIPPED: ['IN_TRANSIT', 'RETURNED'],
+  IN_TRANSIT: ['DELIVERED', 'RETURNED'],
+  DELIVERED: ['RETURNED'],
+  CANCELLED: [],
+  RETURNED: [],
+};
+
+export function nextShipmentStatuses(status: string): readonly ShipmentStatus[] {
+  return Object.prototype.hasOwnProperty.call(NEXT_SHIPMENT_STATUSES, status)
+    ? NEXT_SHIPMENT_STATUSES[status as ShipmentStatus] : [];
+}
 export interface CreateShipment {
   orderId: number;
   address: string;
