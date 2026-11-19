@@ -63,15 +63,19 @@ export class ExpertConsultationRepository {
     return response.data.data;
   }
 
-  async close(consultationId: number | string): Promise<ExpertConsultation> {
-    const response = await axiosClient.patch<{ data: ExpertConsultation }>(
-      API_ENDPOINTS.EXPERT.CLOSE_CONSULTATION(consultationId)
-    );
-    return response.data.data;
-  }
-
   async resolveIssue(issueId: number | string): Promise<void> {
     await axiosClient.patch(API_ENDPOINTS.EXPERT.RESOLVE_ISSUE(issueId));
+  }
+
+  async reviewTreatment(
+    treatmentLogId: number | string,
+    reviewResult: 'APPROVED' | 'NEEDS_MORE_ACTION',
+    reviewComment?: string,
+  ): Promise<void> {
+    await axiosClient.post(
+      API_ENDPOINTS.EXPERT.REVIEW_TREATMENT(treatmentLogId),
+      { reviewResult, reviewComment },
+    );
   }
 }
 

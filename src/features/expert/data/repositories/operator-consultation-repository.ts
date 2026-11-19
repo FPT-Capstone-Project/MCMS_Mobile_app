@@ -31,7 +31,4 @@ export const operatorConsultationRepository = {
   async recordTreatment(id: number | string, actionDescription: string, resultDescription: string) {
     await axiosClient.post(endpoints.TREATMENTS(id), { actionDescription, resultDescription });
   },
-  async submitForReview(id: number | string) {
-    await axiosClient.patch(endpoints.ISSUE_STATUS(id), { status: 'MONITORING' });
-  },
 };

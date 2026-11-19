@@ -8,6 +8,7 @@ export type CultivationIssueStatus =
   | 'OPEN'
   | 'WAITING_EXPERT'
   | 'IN_PROGRESS'
+  | 'WAITING_REVIEW'
   | 'MONITORING'
   | 'RESOLVED';
 
@@ -25,6 +26,16 @@ export interface ConsultationTreatment {
   result_description?: string | null;
   performed_at: string;
   performed_by_name: string;
+  media?: ExpertIssueMedia[];
+  reviews?: TreatmentReview[];
+}
+
+export interface TreatmentReview {
+  review_id: number | string;
+  review_result: 'APPROVED' | 'NEEDS_MORE_ACTION' | 'NEEDS_MORE_INFORMATION' | 'RESOLVED';
+  review_comment?: string | null;
+  reviewed_by_name?: string | null;
+  created_at: string;
 }
 
 export interface ExpertConsultation {
@@ -73,6 +84,7 @@ export interface ExpertIssue {
   reported_by_name?: string | null;
   reported_stage?: string | null;
   assigned_expert_id?: number | string | null;
+  responding_expert_id?: number | string | null;
   growth_stage?: string | null;
   growth_progress?: number | string | null;
   spawn_stage?: string | null;
