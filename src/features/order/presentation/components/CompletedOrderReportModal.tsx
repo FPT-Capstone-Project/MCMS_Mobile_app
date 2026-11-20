@@ -10,10 +10,14 @@ import {
   View,
 } from 'react-native';
 import { theme } from '../../../../core/theme';
+import { formatVND } from '../../../../core/utils/currency';
 import { AppButton, AppCard, AppText } from '../../../../shared/components';
 import { MushroomImage } from '../../../../shared/components/MushroomImage';
+import { useAuth } from '../../../auth';
 import { CompletedSessionReportData, CultivationProgressEntry, CustomerCultivationStatus, OrderHarvestHistory } from '../../domain/entities/Order';
 import { orderRepository } from '../../data/repositories/OrderRepository';
+import { useGetOrderShipmentsQuery } from '../../data/shipmentApi';
+import { latestShipment, shipmentLabel } from '../../domain/shipment';
 import { lifecycleStatusLabel } from '../../../cultivation/domain/sessionWorkflow';
 import { CustomerEnvironmentHistoryChart } from '../../../tray/presentation/components/CustomerEnvironmentHistoryChart';
 
@@ -48,6 +52,14 @@ function formatDate(value?: string | null): string {
   if (!value) return 'Chưa có dữ liệu';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('vi-VN');
+}
+
+function formatTimestamp(value?: string | null): string {
+  if (!value) return 'Chưa ghi nhận';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? 'Chưa ghi nhận'
+    : date.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 }
 
 function kg(value: number | string | null | undefined): string {
@@ -104,6 +116,7 @@ export function CompletedOrderReportModal({
   const totalTrays = completedSessions.reduce((sum, session) => sum + getTrayQuantity(session), 0);
 
   const loadSection = (session: CustomerCultivationStatus['sessions'][number], section: number) => {
+    if (section !== 2 && section !== 3 && section !== 4) return;
     const key = section === 2 ? `progress:${orderId}` : `${section}:${session.session_id}`;
     if (requestedSections.current.has(key) || orderId === null) return;
     requestedSections.current.add(key);
@@ -193,6 +206,7 @@ export function CompletedOrderReportModal({
               {completedSessions.map((session) => {
                 const item = completedReports.find((record) => record.session_id === session.session_id);
                 const harvest = item?.harvest;
+                const handoverMethod = session.harvest_method ?? harvest?.harvest_method;
                 const details = sessionData[session.session_id];
                 const environment = details?.environmentReport;
                 return (
@@ -281,8 +295,7 @@ export function CompletedOrderReportModal({
                       <ReportRow label="Xếp loại" value={harvest?.quality_grade || 'Chưa phân loại'} />
                     </ReportSection>
                     <ReportSection title="06 · Bàn giao" description="Kết quả cuối cùng, bàn giao" expanded={expandedSections[session.session_id] === 6} onPress={() => toggleSection(session, 6)}>
-                      <ReportRow label="Phương thức" value={harvest?.harvest_method === 'PICKUP' ? 'Khách nhận tại trại' : harvest?.harvest_method === 'DELIVERY' ? 'Giao hàng' : 'Chưa ghi nhận'} />
-                      <ReportRow label="Trạng thái" value={session.harvest_request_status === 'COMPLETED' ? 'Đã xác nhận hoàn tất' : 'Chưa có xác nhận bàn giao'} />
+                      <HandoverDetails orderId={orderId} session={session} method={handoverMethod} />
                     </ReportSection>
                   </AppCard>
                 );
@@ -293,6 +306,68 @@ export function CompletedOrderReportModal({
         </ScrollView>
       </View>
     </Modal>
+  );
+}
+
+function HandoverDetails({ orderId, session, method }: {
+  orderId: number | null;
+  session: CustomerCultivationStatus['sessions'][number];
+  method?: 'PICKUP' | 'DELIVERY' | null;
+}) {
+  const { user } = useAuth();
+  const { currentData, isFetching, isError, refetch } = useGetOrderShipmentsQuery(
+    { orderId: orderId ?? 0, accountId: user?.id || '' },
+    { skip: !user || orderId === null || method !== 'DELIVERY', refetchOnMountOrArgChange: true }
+  );
+  const shipment = currentData ? latestShipment(currentData) : undefined;
+  const fee = shipment?.shipping_fee;
+  const feeValue = fee != null && String(fee).trim() !== '' && Number.isFinite(Number(fee))
+    ? formatVND(Number(fee))
+    : 'Chưa ghi nhận';
+
+  return (
+    <>
+      <ReportRow label="Phương thức" value={method === 'PICKUP' ? 'Khách nhận tại trại' : method === 'DELIVERY' ? 'Giao hàng tận nơi' : 'Chưa ghi nhận'} />
+      <ReportRow label="Trạng thái" value={session.harvest_request_status === 'COMPLETED' ? 'Đã xác nhận hoàn tất' : 'Chưa có xác nhận bàn giao'} />
+      {method === 'PICKUP' ? (
+        <ReportRow label="Lịch hẹn nhận" value={formatTimestamp(session.scheduled_at)} />
+      ) : method === 'DELIVERY' ? (
+        <>
+          <ReportRow label="Địa chỉ đã chọn" value={session.delivery_address || 'Chưa ghi nhận'} />
+          <AppText variant="captionMedium" weight="bold" style={styles.shipmentHeading}>Vận đơn mới nhất của đơn hàng</AppText>
+          <AppText variant="caption" color={theme.colors.text.secondary}>
+            Vận đơn thuộc đơn hàng, có thể dùng chung cho nhiều phiên và không xác định riêng cho phiên này.
+          </AppText>
+          {!user ? (
+            <AppText variant="caption" color={theme.colors.error.main}>Vui lòng đăng nhập để xem vận đơn.</AppText>
+          ) : orderId === null ? (
+            <AppText variant="caption" color={theme.colors.error.main}>Không xác định được đơn hàng để xem vận đơn.</AppText>
+          ) : isError ? (
+            <>
+              <AppText variant="caption" color={theme.colors.error.main}>Không tải được thông tin vận đơn.</AppText>
+              <AppButton title="Thử lại" variant="outline" size="sm" onPress={() => void refetch()} />
+            </>
+          ) : isFetching && !currentData ? (
+            <ActivityIndicator color={theme.colors.primary[600]} />
+          ) : !shipment ? (
+            <AppText variant="caption" color={theme.colors.text.secondary}>Chưa có vận đơn cho đơn hàng.</AppText>
+          ) : (
+            <>
+              <ReportRow label="Trạng thái giao" value={shipmentLabel(shipment.status)} />
+              <ReportRow label="Người nhận" value={shipment.recipient_name || 'Chưa ghi nhận'} />
+              <ReportRow label="Số điện thoại" value={shipment.recipient_phone || 'Chưa ghi nhận'} />
+              <ReportRow label="Địa chỉ vận đơn" value={shipment.address || 'Chưa ghi nhận'} />
+              <ReportRow label="Đơn vị vận chuyển" value={shipment.carrier || 'Chưa ghi nhận'} />
+              <ReportRow label="Phí giao hàng" value={feeValue} />
+              <ReportRow label="Gửi vận chuyển" value={formatTimestamp(shipment.shipped_at)} />
+              {shipment.status === 'DELIVERED' || shipment.status === 'RETURNED' ? (
+                <ReportRow label={shipment.status === 'RETURNED' ? 'Lần giao trước' : 'Đã giao lúc'} value={formatTimestamp(shipment.delivered_at)} />
+              ) : null}
+            </>
+          )}
+        </>
+      ) : null}
+    </>
   );
 }
 
@@ -345,6 +420,7 @@ const styles = StyleSheet.create({
   sectionNumber: { width: 24, height: 24, borderRadius: theme.borderRadius.sm, backgroundColor: theme.colors.background.subtle, alignItems: 'center', justifyContent: 'center' },
   sectionHeading: { flex: 1, gap: 1 },
   sectionContent: { gap: theme.spacing.xs, paddingBottom: theme.spacing.sm, paddingLeft: 32 },
+  shipmentHeading: { marginTop: theme.spacing.sm },
   lifecycleList: { gap: theme.spacing.sm, paddingTop: theme.spacing.xs },
   lifecycleItem: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm },
   lifecycleMarker: { width: 24, height: 24, borderRadius: theme.borderRadius.full, backgroundColor: theme.colors.success.light, alignItems: 'center', justifyContent: 'center' },

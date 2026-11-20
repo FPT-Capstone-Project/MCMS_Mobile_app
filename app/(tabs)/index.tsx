@@ -149,6 +149,15 @@ const customerActions: QuickActionItem[] = [
     route: '/(tabs)/tray',
   },
   {
+    id: 'my-sessions',
+    title: 'Phiên của tôi',
+    desc: 'Xem phiên và vị trí khay',
+    icon: 'layers-outline',
+    iconColor: theme.colors.primary[700],
+    iconBg: 'rgba(34, 197, 94, 0.1)',
+    route: '/customer-sessions',
+  },
+  {
     id: 'orders',
     title: 'Đơn hàng & QR',
     desc: 'PayOS VietQR thanh toán',
@@ -446,22 +455,21 @@ export default function HomeScreen() {
               accessibilityLabel="Hình ảnh nấm"
               style={styles.rentalCtaImage}
             />
-            <View pointerEvents="none" style={styles.rentalCtaImageTint} />
             <View style={styles.rentalCtaForeground}>
               <View style={styles.ctaHeader}>
-                <View style={styles.ctaBadge}>
-                  <Ionicons name="sparkles" size={16} color="#FFFFFF" />
-                  <AppText variant="overline" color="#FFFFFF">
+                <View style={[styles.ctaBadge, styles.rentalCtaBadge]}>
+                  <Ionicons name="sparkles" size={16} color={theme.colors.primary[700]} />
+                  <AppText variant="overline" color={theme.colors.primary[700]}>
                     Trang trại nấm thông minh
                   </AppText>
                 </View>
               </View>
 
               <View style={styles.ctaContent}>
-                <AppText variant="h2" weight="bold" color="#FFFFFF">
+                <AppText variant="h2" weight="bold" color={theme.colors.text.primary}>
                   Nuôi trồng chuẩn xác, theo dõi từng khay.
                 </AppText>
-                <AppText variant="bodySmall" color="rgba(255, 255, 255, 0.9)" style={styles.ctaSubtitle}>
+                <AppText variant="bodySmall" color={theme.colors.text.secondary} style={styles.ctaSubtitle}>
                   Nền tảng giám sát IoT chuyên sâu: tự động hoá vi khí hậu buồng nuôi, quản lý giống nấm và gói thuê khay trong một hệ thống duy nhất.
                 </AppText>
               </View>
@@ -588,7 +596,7 @@ export default function HomeScreen() {
         {/* Quick Action Navigation Grid */}
         <View style={styles.quickActionsSection}>
           <AppText variant="label" color={theme.colors.text.muted}>
-            {isStaff ? 'CÔNG CỤ ĐIỀU KHIỂN & VẬN HÀNH (ADMIN & FARM OPERATOR)' : 'TRUY CẬP NHANH CHỨC NĂNG HỆ THỐNG'}
+            {isStaff ? 'CÔNG CỤ ĐIỀU KHIỂN & VẬN HÀNH (ADMIN & FARM OPERATOR)' : 'CHỨC NĂNG HỆ THỐNG'}
           </AppText>
 
           <View style={styles.actionGrid}>
@@ -640,26 +648,22 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
   },
   rentalCtaCard: {
-    position: 'relative',
-    backgroundColor: theme.colors.primary[600],
+    backgroundColor: theme.colors.background.paper,
     borderRadius: theme.borderRadius.xl,
-    height: 300,
+    padding: 0,
+  },
+  rentalCtaImage: {
+    width: '100%',
+    height: 164,
+    borderTopLeftRadius: theme.borderRadius.xl,
+    borderTopRightRadius: theme.borderRadius.xl,
+  },
+  rentalCtaForeground: {
     padding: theme.spacing.lg,
     gap: theme.spacing.sm,
   },
-  rentalCtaImage: {
-    ...StyleSheet.absoluteFill,
-    borderRadius: theme.borderRadius.xl,
-  },
-  rentalCtaImageTint: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(20, 92, 39, 0.78)',
-    borderRadius: theme.borderRadius.xl,
-  },
-  rentalCtaForeground: {
-    flex: 1,
-    gap: theme.spacing.sm,
-    justifyContent: 'space-between',
+  rentalCtaBadge: {
+    backgroundColor: theme.colors.neutral[100],
   },
   ctaHeader: {
     flexDirection: 'row',

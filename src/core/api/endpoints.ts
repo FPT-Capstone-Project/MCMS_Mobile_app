@@ -11,6 +11,7 @@ export const API_ENDPOINTS = {
   },
   COMPLAINTS: {
     MY: '/api/complaints/my',
+    MY_DETAIL: (complaintId: number) => `/api/complaints/my/${complaintId}`,
     ORDER: (orderId: number) => `/api/orders/${orderId}/complaints`,
   },
   // Authentication & Profile
@@ -76,8 +77,9 @@ export const API_ENDPOINTS = {
     CANCEL: (orderId: string | number) => `/api/orders/${orderId}/cancel`,
   },
   CUSTOMER: {
+    SESSIONS: '/api/customer/sessions',
     HARVEST_HISTORY: (orderId: string | number) =>
-      `/api/orders/${orderId}/harvest-history`,
+      `/api/customer/orders/${orderId}/harvest-history`,
     CULTIVATION_STATUS: (orderId: string | number) =>
       `/api/customer/orders/${orderId}/cultivation-status`,
     CULTIVATION_PROGRESS: (orderId: string | number) =>

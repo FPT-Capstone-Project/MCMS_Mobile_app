@@ -35,6 +35,14 @@
       "expo-asset",
       "expo-image",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cho phép ứng dụng truy cập ảnh để đính kèm minh chứng.",
+          "cameraPermission": "Cho phép ứng dụng sử dụng máy ảnh để chụp ảnh minh chứng.",
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#FFFFFF",

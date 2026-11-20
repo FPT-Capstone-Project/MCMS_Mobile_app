@@ -35,6 +35,7 @@ function NavigationGuard() {
     const inCustomerRoutes =
       currentSegment === '(tabs)' ||
       currentSegment === 'rental' ||
+      currentSegment === 'customer-sessions' ||
       currentSegment === 'camera' ||
       currentSegment === 'control' ||
       currentSegment === 'automatic' ||
@@ -111,6 +112,12 @@ function NavigationGuard() {
       />
       <Stack.Screen
         name="rental/index"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="customer-sessions/index"
         options={{
           headerShown: false,
         }}
