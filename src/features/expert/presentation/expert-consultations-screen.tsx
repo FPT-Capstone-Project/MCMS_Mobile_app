@@ -1,3 +1,5 @@
+import { ConsultationChat } from './ConsultationChat';
+import { ExpertSessionContext } from './ExpertSessionContext';
 import { AppAlert as Alert, AppModal as Modal } from '../../../shared/components/feedback/AppDialog';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -36,7 +38,7 @@ const consultationFilters: { value: ConsultationFilter; label: string }[] = [
   { value: 'ALL', label: 'Tất cả' },
   { value: 'PENDING', label: 'Đang chờ' },
   { value: 'IN_PROGRESS', label: 'Đang xử lý' },
-  { value: 'ANSWERED', label: 'Đã trả lời' },
+  { value: 'ANSWERED', label: 'Đang xử lý sau tư vấn' },
   { value: 'CLOSED', label: 'Đã đóng' },
 ];
 
@@ -47,7 +49,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 function formatStatus(status: string, expertId?: number | string | null): string {
   const labels: Record<string, string> = {
     IN_PROGRESS: 'Đang xử lý',
-    ANSWERED: 'Đã trả lời',
+    ANSWERED: 'Đang xử lý sau tư vấn',
     CLOSED: 'Đã đóng',
     OPEN: 'Mới báo cáo',
     WAITING_EXPERT: 'Chờ chuyên gia',
@@ -134,6 +136,10 @@ export function ExpertConsultationsScreen() {
   const [solution, setSolution] = useState('');
   const [reviewComment, setReviewComment] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const updateConversation = useCallback((data: ExpertConsultation) => {
+    setSelectedConsultation(data);
+    setSelectedIssue((current) => current ? { ...current, status: data.issue_status } : current);
+  }, []);
 
   const loadConsultations = useCallback(async (refresh = false, append = false) => {
     if (append) setLoadingMore(true);
@@ -605,6 +611,7 @@ export function ExpertConsultationsScreen() {
                       : ''}
                     {selectedIssue.tray_id ? ` · Khay #${selectedIssue.tray_id}` : ''}
                   </AppText>
+                  <ExpertSessionContext key={selectedIssue.issue_id} issueId={selectedIssue.issue_id} />
                   <AppText variant="bodySmall" selectable>
                     {selectedIssue.description || 'Không có mô tả chi tiết.'}
                   </AppText>
@@ -648,26 +655,7 @@ export function ExpertConsultationsScreen() {
                   ) : null}
                 </AppCard>
 
-                <AppCard elevation="xs" style={styles.detailCard}>
-                  <AppText variant="label" weight="bold">
-                    Trao đổi với trang trại
-                  </AppText>
-                  {(selectedConsultation.messages ?? []).map((message) => (
-                    <View key={message.message_id} style={styles.messageCard}>
-                      <View style={styles.cardFooter}>
-                        <AppText variant="captionMedium" weight="bold">
-                          {message.sender_name}
-                        </AppText>
-                        <AppText variant="caption" color={theme.colors.text.muted}>
-                          {formatDate(message.created_at)}
-                        </AppText>
-                      </View>
-                      <AppText variant="bodySmall" selectable>
-                        {message.message}
-                      </AppText>
-                    </View>
-                  ))}
-                </AppCard>
+                <ConsultationChat key={selectedConsultation.consultation_id} id={selectedConsultation.consultation_id} expert onUpdate={updateConversation} />
 
                 {selectedConsultation.diagnosis ? (
                   <AppCard elevation="xs" style={styles.detailCard}>
@@ -838,7 +826,7 @@ export function ExpertConsultationsScreen() {
 
                 {shouldShowResolution(selectedIssue, selectedConsultation, userId) ? (
                   <AppButton
-                    title="Xác nhận đã giải quyết sự cố"
+                    title="Đã ổn — Hoàn tất yêu cầu"
                     fullWidth
                     loading={actionLoading}
                     onPress={handleResolveIssue}

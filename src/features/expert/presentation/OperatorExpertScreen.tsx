@@ -1,3 +1,6 @@
+import { ConsultationChat } from './ConsultationChat';
+import { ConsultationPhotoPicker } from './ConsultationPhotoPicker';
+import type { ImagePickerAsset } from 'expo-image-picker';
 import { AppModal as Modal } from '../../../shared/components/feedback/AppDialog';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -196,6 +199,7 @@ function IssueDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const [action, setAction] = useState('');
   const [result, setResult] = useState('');
   const [notice, setNotice] = useState('');
+  const [requestPhoto, setRequestPhoto] = useState<ImagePickerAsset | null>(null);
   const refresh = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -247,12 +251,8 @@ function IssueDetail({ id, onClose }: { id: string; onClose: () => void }) {
     issue &&
     issue.status === 'OPEN' &&
     (!consultation || consultation.status === 'CLOSED');
-  const canSupplement =
-    issue?.status === 'WAITING_EXPERT' &&
-    consultation?.status === 'IN_PROGRESS' &&
-    consultation.expert_id != null;
   const canTreat =
-    issue?.status === 'IN_PROGRESS' &&
+    ['IN_PROGRESS', 'MONITORING'].includes(consultation?.issue_status ?? '') &&
     consultation &&
     consultation.status === 'ANSWERED' &&
     !!consultation.solution;
@@ -287,7 +287,7 @@ function IssueDetail({ id, onClose }: { id: string; onClose: () => void }) {
                 {issue.title}
               </AppText>
               <AppText>
-                {issueStatus(issue.status)} · Phiên #{issue.session_id}
+                {issueStatus(consultation?.issue_status ?? issue.status)} · Phiên #{issue.session_id}
               </AppText>
               <AppText>{issue.description}</AppText>
               <ScrollView horizontal contentContainerStyle={styles.row}>
@@ -318,18 +318,6 @@ function IssueDetail({ id, onClose }: { id: string; onClose: () => void }) {
                       ? `Chuyên gia #${consultation.expert_id}`
                       : 'Chưa có chuyên gia tiếp nhận')}
                 </AppText>
-                {consultation.messages?.length ? (
-                  consultation.messages.map((item) => (
-                    <View key={item.message_id} style={styles.block}>
-                      <AppText variant="caption" color={theme.colors.text.secondary}>
-                        {item.sender_name} · {new Date(item.created_at).toLocaleString('vi-VN')}
-                      </AppText>
-                      <AppText>{item.message}</AppText>
-                    </View>
-                  ))
-                ) : (
-                  <AppText>{consultation.question}</AppText>
-                )}
                 {!!consultation.diagnosis && (
                   <>
                     <AppText weight="bold">Chẩn đoán / phản hồi</AppText>
@@ -344,6 +332,7 @@ function IssueDetail({ id, onClose }: { id: string; onClose: () => void }) {
                 )}
               </AppCard>
             )}
+            {consultation && <ConsultationChat key={consultation.consultation_id} id={consultation.consultation_id} onUpdate={setConsultation} />}
             {!loading && !error && (
               <>
                 {canRequest && (
@@ -356,37 +345,21 @@ function IssueDetail({ id, onClose }: { id: string; onClose: () => void }) {
                       maxLength={5000}
                       editable={!busy}
                     />
+                    <ConsultationPhotoPicker photo={requestPhoto} onChange={setRequestPhoto} disabled={busy} />
                     <AppButton
                       title="Gửi yêu cầu tư vấn"
                       loading={busy}
                       disabled={!message.trim()}
                       onPress={() =>
                         run(
-                          () => repository.request(id, message.trim()),
+                          async () => {
+                            if (requestPhoto) {
+                              await repository.uploadIssuePhoto(id, requestPhoto);
+                              setRequestPhoto(null);
+                            }
+                            await repository.request(id, message.trim());
+                          },
                           'Đã gửi yêu cầu đến chuyên gia.'
-                        )
-                      }
-                    />
-                  </AppCard>
-                )}
-                {canSupplement && consultation && (
-                  <AppCard style={styles.card}>
-                    <AppInput
-                      label="Thông tin chuyên gia cần bổ sung"
-                      value={message}
-                      onChangeText={setMessage}
-                      multiline
-                      maxLength={5000}
-                      editable={!busy}
-                    />
-                    <AppButton
-                      title="Gửi thông tin bổ sung"
-                      loading={busy}
-                      disabled={!message.trim()}
-                      onPress={() =>
-                        run(
-                          () => repository.addMessage(consultation.consultation_id, message.trim()),
-                          'Đã chuyển thông tin bổ sung cho chuyên gia.'
                         )
                       }
                     />
@@ -442,6 +415,14 @@ function IssueDetail({ id, onClose }: { id: string; onClose: () => void }) {
                     </AppText>
                     <AppText>{item.action_description}</AppText>
                     <AppText>{item.result_description}</AppText>
+                    {item.reviews?.map((review) => (
+                      <View key={review.review_id} style={styles.block}>
+                        <AppText weight="semibold">
+                          {review.review_result === 'APPROVED' ? 'Chuyên gia đã duyệt — tiếp tục theo dõi' : review.review_result === 'NEEDS_MORE_ACTION' ? 'Cần xử lý thêm' : 'Nhận xét của chuyên gia'}
+                        </AppText>
+                        {!!review.review_comment && <AppText>{review.review_comment}</AppText>}
+                      </View>
+                    ))}
                   </View>
                 ))}
               </AppCard>

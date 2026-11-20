@@ -1,4 +1,6 @@
 import { axiosClient } from '../../../../core/api/axiosClient';
+import type { ImagePickerAsset } from 'expo-image-picker';
+import { photoForm } from '../consultation-chat-api';
 import { API_ENDPOINTS } from '../../../../core/api/endpoints';
 import type {
   CreateIssueInput,
@@ -7,6 +9,9 @@ import type {
 } from '../../domain/entities/expert-consultation';
 const endpoints = API_ENDPOINTS.EXPERT;
 export const operatorConsultationRepository = {
+  async uploadIssuePhoto(issueId: number | string, photo: ImagePickerAsset) {
+    await axiosClient.post(`${endpoints.ISSUE(issueId)}/media`, await photoForm(photo));
+  },
   async listIssues(page = 1, status?: string, sessionId?: number) {
     const response = await axiosClient.get<{
       data: ExpertIssue[];
