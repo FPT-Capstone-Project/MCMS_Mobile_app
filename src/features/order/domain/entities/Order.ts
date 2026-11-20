@@ -107,9 +107,10 @@ export interface CustomerCultivationStatus {
     harvest_request_status?: string | null;
     scheduled_at?: string | null;
     delivery_address?: string | null;
+    handover_completed_at?: string | null;
     harvest_date?: string | null;
     current_stage?: string | null;
-    progress_percent?: number | null;
+    progress_percent?: number | string | null;
     mushroom_name: string;
     assigned_trays: {
       tray_id: number;
@@ -117,6 +118,39 @@ export interface CustomerCultivationStatus {
       status: string;
     }[];
   }[];
+}
+
+export interface CustomerSessionTray {
+  session_tray_id: number;
+  tray_id: number;
+  tray_code: string;
+  assignment_status: string;
+  tray_status: string | null;
+  room_name: string | null;
+  floor_id: number | null;
+  floor_name: string | null;
+  floor_number: number | null;
+  row_number: number | null;
+  column_number: number | null;
+}
+
+export type CustomerSessionFilter = 'ALL' | 'GROWING' | 'COMPLETED';
+
+export interface CustomerSession {
+  session_id: number;
+  order_id: number;
+  status: string;
+  harvest_status: string | null;
+  start_at: string | null;
+  end_at: string | null;
+  mushroom_name: string;
+  tray_quantity: number;
+  trays: CustomerSessionTray[];
+}
+
+export interface CustomerSessionsPage {
+  data: CustomerSession[];
+  pagination: { page: number; pageSize: number; total: number; totalPages: number };
 }
 
 export interface OrderHarvestHistory {

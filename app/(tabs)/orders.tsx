@@ -1,5 +1,7 @@
 import { AppAlert as Alert } from '../../src/shared/components/feedback/AppDialog';
 import { OrderDeliveryActions } from '../../src/features/order/presentation/components/OrderDeliveryActions';
+import { OrderComplaintHistory } from '../../src/features/order/presentation/components/OrderComplaintHistory';
+import { useGetMyComplaintsQuery } from '../../src/features/order/data/complaintApi';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -496,6 +498,16 @@ function matchesOrderFilter(
 function CustomerOrdersContent() {
   const router = useRouter();
   const { user, updateProfile } = useAuth();
+  const {
+    currentData: complaints,
+    isError: complaintsError,
+    isFetching: complaintsFetching,
+    isUninitialized: complaintsUninitialized,
+    refetch: refetchComplaints,
+  } = useGetMyComplaintsQuery(
+    { accountId: user?.id || '' },
+    { skip: !user, refetchOnMountOrArgChange: true }
+  );
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [orderFilter, setOrderFilter] = useState<CustomerOrderFilter>('all');
   const [cultivationByOrder, setCultivationByOrder] = useState<
@@ -518,6 +530,16 @@ function CustomerOrdersContent() {
     orderId: number;
     session: CustomerCultivationStatus['sessions'][number];
   } | null>(null);
+
+  const complaintsByOrder = useMemo(() => {
+    const grouped = new Map<number, NonNullable<typeof complaints>>();
+    for (const complaint of complaints ?? []) {
+      const current = grouped.get(complaint.order_id) ?? [];
+      current.push(complaint);
+      grouped.set(complaint.order_id, current);
+    }
+    return grouped;
+  }, [complaints]);
 
   const mushroomImagesById = useMemo(
     () => new Map(mushroomTypes.map((mushroom) => [mushroom.mushroom_type_id, mushroom.image_url])),
@@ -655,6 +677,12 @@ function CustomerOrdersContent() {
     useCallback(() => {
       loadOrders();
     }, [loadOrders])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!complaintsUninitialized) void refetchComplaints();
+    }, [complaintsUninitialized, refetchComplaints])
   );
 
   const handleOpenPayment = (orderId: number) => {
@@ -825,6 +853,14 @@ function CustomerOrdersContent() {
       />
 
       <View style={styles.content}>
+        {complaintsError ? (
+          <View>
+            <AppText variant="caption" color={theme.colors.error.main}>
+              Không thể tải danh sách khiếu nại. Vui lòng thử lại.
+            </AppText>
+            <AppButton title="Tải lại khiếu nại" variant="outline" size="sm" onPress={() => void refetchComplaints()} />
+          </View>
+        ) : null}
         {mushroomLoadError ? (
           <AppText variant="caption" color={theme.colors.warning.dark}>
             Chưa tải được ảnh nấm: {mushroomLoadError}
@@ -1093,6 +1129,8 @@ function CustomerOrdersContent() {
                   !['PENDING', 'CANCELLED'].includes(order.order_status) ? (
                     <OrderDeliveryActions
                       orderId={order.order_id}
+                      alreadySubmitted={complaintsByOrder.has(order.order_id)}
+                      complaintsReady={Boolean(complaints) && !complaintsError && !complaintsFetching}
                       deliverySelected={
                         cultivationByOrder[order.order_id]?.data?.sessions.some(
                           (session) => session.harvest_method === 'DELIVERY' && canTrackSessionShipment(session)
@@ -1100,6 +1138,14 @@ function CustomerOrdersContent() {
                       }
                     />
                   ) : null}
+
+                {user && complaintsByOrder.has(order.order_id) ? (
+                  <OrderComplaintHistory
+                    orderId={order.order_id}
+                    accountId={user.id}
+                    complaints={complaintsByOrder.get(order.order_id) ?? []}
+                  />
+                ) : null}
 
                 {order.order_status === 'COMPLETED' &&
                   cultivationByOrder[order.order_id]?.data?.sessions.some((session) => session.status === 'COMPLETED') ? (

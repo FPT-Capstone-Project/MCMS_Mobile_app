@@ -1,4 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { theme } from '../../../../core/theme';
@@ -12,7 +14,6 @@ import { AppAlert } from '../../../../shared/components/feedback/AppDialog';
 import { useAuth } from '../../../auth';
 import {
   useCreateOrderComplaintMutation,
-  useGetMyComplaintsQuery,
 } from '../../data/complaintApi';
 import { useGetOrderShipmentsQuery } from '../../data/shipmentApi';
 import {
@@ -28,12 +29,19 @@ const COMPLAINT_TYPES = [
   { value: 'OTHER', label: 'Lý do khác' },
 ] as const;
 
+const MAX_IMAGES = 10;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
 export function OrderDeliveryActions({
   orderId,
   deliverySelected,
+  alreadySubmitted,
+  complaintsReady,
 }: {
   orderId: number;
   deliverySelected: boolean;
+  alreadySubmitted: boolean;
+  complaintsReady: boolean;
 }) {
   const { user } = useAuth();
   const [submitted, setSubmitted] = useState(false);
@@ -64,17 +72,9 @@ export function OrderDeliveryActions({
     return () => clearTimeout(timer);
   }, [latest?.delivered_at, latest?.status]);
 
-  const { currentData: complaints } = useGetMyComplaintsQuery(
-    { accountId: user?.id || '', pageSize: 100 },
-    { skip: !user || !complaintWindowOpen }
-  );
-  const alreadySubmitted = complaints?.some(
-    (complaint) => complaint.order_id === orderId
-  );
-
   if (!deliverySelected || submitted || alreadySubmitted) return null;
   if (latest?.status === 'DELIVERED') {
-    return complaintWindowOpen ? (
+    return complaintWindowOpen && complaintsReady ? (
       <ComplaintButton
         orderId={orderId}
         deliveredAt={latest.delivered_at}
@@ -100,7 +100,46 @@ function ComplaintButton({
     COMPLAINT_TYPES[0].value
   );
   const [description, setDescription] = useState('');
+  const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
+  const [selectingImage, setSelectingImage] = useState(false);
   const [createComplaint, { isLoading }] = useCreateOrderComplaintMutation();
+
+  const selectImages = async (source: 'camera' | 'library') => {
+    if (selectingImage || isLoading || images.length >= MAX_IMAGES) return;
+    setSelectingImage(true);
+    try {
+      if (source === 'camera') {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          AppAlert.alert('Cần cấp quyền', 'Vui lòng cấp quyền sử dụng máy ảnh để chụp ảnh khiếu nại.');
+          return;
+        }
+      }
+
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 })
+        : await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            quality: 0.8,
+            allowsMultipleSelection: true,
+            selectionLimit: MAX_IMAGES - images.length,
+          });
+      if (result.canceled) return;
+
+      const valid = result.assets.filter((asset) => (asset.fileSize ?? asset.file?.size ?? 0) <= MAX_IMAGE_SIZE);
+      const remaining = MAX_IMAGES - images.length;
+      setImages((current) => [...current, ...valid.slice(0, remaining)]);
+      if (valid.length !== result.assets.length) {
+        AppAlert.alert('Ảnh quá lớn', 'Ảnh vượt quá 5 MB đã được bỏ qua. Vui lòng chọn ảnh nhỏ hơn.');
+      } else if (valid.length > remaining) {
+        AppAlert.alert('Giới hạn ảnh', `Mỗi khiếu nại chỉ được đính kèm tối đa ${MAX_IMAGES} ảnh.`);
+      }
+    } catch {
+      AppAlert.alert('Không thể chọn ảnh', 'Không thể mở máy ảnh hoặc thư viện. Vui lòng thử lại.');
+    } finally {
+      setSelectingImage(false);
+    }
+  };
 
   const submit = async () => {
     const normalizedDescription = description.trim();
@@ -117,6 +156,7 @@ function ComplaintButton({
         orderId,
         complaintType,
         description: normalizedDescription,
+        images,
       }).unwrap();
       setVisible(false);
       onSubmitted();
@@ -153,9 +193,11 @@ function ComplaintButton({
       />
       <AppBottomSheet
         visible={visible}
-        onClose={() => !isLoading && setVisible(false)}
+        onClose={() => !isLoading && !selectingImage && setVisible(false)}
         title="Khiếu nại giao hàng"
         subtitle={`Đơn hàng #${orderId}`}
+        style={styles.sheet}
+        contentStyle={styles.sheetContent}
       >
         <ScrollView
           keyboardShouldPersistTaps="handled"
@@ -215,20 +257,69 @@ function ComplaintButton({
             disabled={isLoading}
             inputStyle={styles.descriptionInput}
           />
+          <View style={styles.imageSection}>
+            <AppText variant="bodySmall" weight="bold">Ảnh minh chứng ({images.length}/{MAX_IMAGES})</AppText>
+            <AppText variant="caption" color={theme.colors.text.secondary}>
+              Không bắt buộc. Tối đa 5 MB mỗi ảnh.
+            </AppText>
+            <View style={styles.imageActions}>
+              <AppButton
+                title="Chụp ảnh"
+                variant="outline"
+                size="sm"
+                disabled={isLoading || selectingImage || images.length >= MAX_IMAGES}
+                leftIcon={<Ionicons name="camera-outline" size={18} color={theme.colors.primary[600]} />}
+                onPress={() => void selectImages('camera')}
+              />
+              <AppButton
+                title="Tải ảnh lên"
+                variant="outline"
+                size="sm"
+                disabled={isLoading || selectingImage || images.length >= MAX_IMAGES}
+                leftIcon={<Ionicons name="image-outline" size={18} color={theme.colors.primary[600]} />}
+                onPress={() => void selectImages('library')}
+              />
+            </View>
+            {images.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imageList}>
+                {images.map((image, index) => (
+                  <View key={`${image.uri}-${index}`} style={styles.imageItem}>
+                    <Image source={{ uri: image.uri }} style={styles.thumbnail} contentFit="cover" />
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Xóa ảnh minh chứng ${index + 1}`}
+                      accessibilityState={{ disabled: isLoading || selectingImage }}
+                      disabled={isLoading || selectingImage}
+                      onPress={() => setImages((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                      style={styles.removeImage}
+                      hitSlop={8}
+                    >
+                      <Ionicons name="close" size={16} color={theme.colors.background.paper} />
+                    </Pressable>
+                  </View>
+                ))}
+              </ScrollView>
+            ) : null}
+          </View>
+        </ScrollView>
+        <View style={styles.submit}>
           <AppButton
             title="Gửi khiếu nại"
             loading={isLoading}
-            disabled={isLoading || !description.trim()}
+            disabled={isLoading || selectingImage || !description.trim()}
             onPress={() => void submit()}
           />
-        </ScrollView>
+        </View>
       </AppBottomSheet>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { maxHeight: 520 },
+  sheet: { height: '85%' },
+  sheetContent: { flex: 1 },
+  scroll: { flex: 1 },
+  submit: { paddingTop: theme.spacing.sm },
   content: { gap: 12, paddingBottom: 16 },
   typeList: { gap: 8 },
   typeOption: {
@@ -249,5 +340,21 @@ const styles = StyleSheet.create({
     minHeight: 120,
     textAlignVertical: 'top',
     paddingTop: 12,
+  },
+  imageSection: { gap: theme.spacing.xs },
+  imageActions: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
+  imageList: { gap: theme.spacing.sm, paddingTop: theme.spacing.xs, paddingRight: theme.spacing.xs },
+  imageItem: { width: 88, height: 88 },
+  thumbnail: { width: '100%', height: '100%', borderRadius: theme.borderRadius.md },
+  removeImage: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.overlay,
   },
 });

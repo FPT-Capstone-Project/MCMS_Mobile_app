@@ -42,6 +42,36 @@ test('growth detail starts status and progress together without waiting for devi
   assert.deepEqual(calls, ['progress/4']);
 });
 
+test('growth detail reads the latest progress of the selected session, including numeric strings', async () => {
+  const repo = repository(
+    async () => ({ data: { data: [
+      { session_id: 7, progress_percent: '20' },
+      { session_id: 8, progress_percent: '99' },
+    ] } }),
+    async () => ({ sessions: [
+      { session_id: 8, progress_percent: '99' },
+      { session_id: 7, progress_percent: '37.5' },
+    ] }),
+  );
+  assert.equal((await repo.getCustomerCultivationDetails(7, 4)).progress_percent, 37.5);
+});
+
+test('growth detail preserves zero and reports invalid progress instead of inventing a value', async () => {
+  const get = async () => ({ data: { data: [{ session_id: 7 }] } });
+  const zero = repository(get, async () => ({ sessions: [{ session_id: 7, progress_percent: '0' }] }));
+  assert.equal((await zero.getCustomerCultivationDetails(7, 4)).progress_percent, 0);
+  const invalid = repository(get, async () => ({ sessions: [{ session_id: 7, progress_percent: '101' }] }));
+  await assert.rejects(invalid.getCustomerCultivationDetails(7, 4), /Tiến độ nuôi trồng.*không hợp lệ/);
+});
+
+test('staff tray detail uses the latest progress record for the selected session', async () => {
+  const repo = repository(async () => ({ data: { data: { progress_history: [
+    { session_id: 7, progress_percent: '12' },
+    { session_id: 7, progress_percent: '58.5' },
+  ] } } }));
+  assert.equal((await repo.getCustomerCultivationDetails(7)).progress_percent, 58.5);
+});
+
 test('session chart loads all pages without floor-wide or latest requests', async () => {
   const calls = [];
   const repo = repository(async (url, { params }) => {
@@ -61,4 +91,224 @@ test('a failed history page is reported instead of returning an incomplete chart
     return { data: { data: [], pagination: { totalPages: 2 } } };
   });
   await assert.rejects(repo.getCustomerEnvironmentHistory(7, 2, 'from', 'to'), /timeout/);
+});
+
+function trayDetailHarness(sensorRequest, deviceRequest, detail = {}) {
+  const slots = [];
+  let index = 0;
+  let effects = [];
+  const same = (left, right) => left && right && left.length === right.length &&
+    left.every((value, i) => Object.is(value, right[i]));
+  const react = {
+    __esModule: true,
+    createElement: (type, props, ...children) => ({ type, props: { ...props, children } }),
+    useState(initial) {
+      const current = index++;
+      if (!(current in slots)) slots[current] = initial;
+      return [slots[current], (value) => {
+        slots[current] = typeof value === 'function' ? value(slots[current]) : value;
+      }];
+    },
+    useRef(initial) {
+      const current = index++;
+      if (!(current in slots)) slots[current] = { current: initial };
+      return slots[current];
+    },
+    useCallback(callback, deps) {
+      const current = index++;
+      if (!slots[current] || !same(slots[current].deps, deps)) slots[current] = { value: callback, deps };
+      return slots[current].value;
+    },
+    useEffect(effect, deps) {
+      const current = index++;
+      if (!slots[current] || !same(slots[current].deps, deps)) {
+        effects.push(() => {
+          slots[current]?.cleanup?.();
+          slots[current] = { deps, cleanup: effect() };
+        });
+      }
+    },
+  };
+  react.default = react;
+  const token = new Proxy({}, { get: () => token });
+  const placeholder = () => null;
+  const repositoryMock = {
+    getCustomerCultivationDetails: async () => ({
+      session_id: 7, growth_history: [], sensor_readings: [], device_logs: [], ...detail,
+    }),
+    getCustomerSensorHistory: sensorRequest,
+    getCustomerDeviceLogs: deviceRequest,
+  };
+  const source = readFileSync(new URL('../src/features/tray/presentation/components/CustomerTrayDetail.tsx', import.meta.url), 'utf8');
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React },
+  });
+  const loaded = new Module('tray-detail-test');
+  loaded.require = (name) => {
+    if (name === 'react') return react;
+    if (name === 'react-native') return {
+      ActivityIndicator: placeholder, Pressable: placeholder, ScrollView: placeholder,
+      View: placeholder, StyleSheet: { create: (styles) => styles, hairlineWidth: 1 },
+    };
+    if (name === '@expo/vector-icons') return { Ionicons: placeholder };
+    if (name.endsWith('/growthStages')) return { GROWTH_STAGE_LABELS: {
+      FRUITING_INITIATION: 'Khởi đầu', PINNING: 'Ra nụ',
+      YOUNG_FRUITING: 'Nấm non', MATURATION: 'Trưởng thành',
+    } };
+    if (name.endsWith('/appError')) return { AppError: Error };
+    if (name.endsWith('/theme')) return { theme: token };
+    if (name.endsWith('/shared/components')) return { AppButton: placeholder, AppText: placeholder };
+    if (name.endsWith('/TrayRepository')) return { trayRepository: repositoryMock };
+    if (name.endsWith('/CustomerEnvironmentHistoryChart')) return { CustomerEnvironmentHistoryChart: placeholder };
+    if (name.endsWith('/CustomerDailyReport')) return { CustomerDailyReport: placeholder };
+    throw new Error(`Unexpected dependency: ${name}`);
+  };
+  loaded._compile(compiled.outputText, 'tray-detail-test');
+  const selectedTray = { id: 1, code: 'K1', usage: 'MY_CULTIVATION', sessionId: 7, orderId: 3 };
+  function render() {
+    index = 0;
+    effects = [];
+    const tree = loaded.exports.CustomerTrayDetail({ selectedTray, onClose: () => {} });
+    effects.forEach((effect) => effect());
+    return tree;
+  }
+  function find(node, name, predicate = () => true) {
+    if (Array.isArray(node)) {
+      for (const child of node) {
+        const found = find(child, name, predicate);
+        if (found) return found;
+      }
+      return undefined;
+    }
+    if (!node || typeof node !== 'object') return undefined;
+    if (node.type?.name === name && predicate(node.props)) return node;
+    return find(node.props?.children, name, predicate);
+  }
+  return {
+    async openGrowth() {
+      render();
+      await new Promise(setImmediate);
+      return find(render(), 'GrowthHistory');
+    },
+    async openDevices() {
+      render();
+      await new Promise(setImmediate);
+      const ready = render();
+      find(ready, 'DetailTabButton', (props) => props.label === 'Nhật ký thiết bị').props.onPress();
+      render();
+      await new Promise(setImmediate);
+      return find(render(), 'DeviceHistory');
+    },
+    close() {
+      slots.forEach((slot) => slot?.cleanup?.());
+    },
+  };
+}
+
+test('growth percentage and bar use the database value instead of the stage position', async () => {
+  const harness = trayDetailHarness(async () => [], async () => [], {
+    current_stage: 'MATURATION', progress_percent: 37.5,
+  });
+  try {
+    const growth = await harness.openGrowth();
+    const tree = growth.type(growth.props);
+    assert.ok(renderedText(tree).includes('37.5%'));
+    const bar = findElement(tree, (node) => node.props?.accessibilityRole === 'progressbar');
+    assert.equal(bar.props.accessibilityValue.now, 37.5);
+    assert.ok(bar.props.children.some((node) =>
+      Array.isArray(node?.props?.style) && node.props.style.some((style) => style?.width === '37.5%')));
+  } finally {
+    harness.close();
+  }
+});
+
+test('missing progress is shown as unavailable, not a calculated stage percentage', async () => {
+  const harness = trayDetailHarness(async () => [], async () => [], { current_stage: 'MATURATION' });
+  try {
+    const growth = await harness.openGrowth();
+    const tree = growth.type(growth.props);
+    assert.ok(renderedText(tree).includes('Chưa cập nhật'));
+    const bar = findElement(tree, (node) => node.props?.accessibilityRole === 'progressbar');
+    assert.equal(bar.props.accessibilityValue.text, 'Chưa cập nhật tiến độ');
+  } finally {
+    harness.close();
+  }
+});
+
+test('zero progress remains visible', async () => {
+  const harness = trayDetailHarness(async () => [], async () => [], {
+    current_stage: 'MATURATION', progress_percent: 0,
+  });
+  try {
+    const growth = await harness.openGrowth();
+    const tree = growth.type(growth.props);
+    assert.ok(renderedText(tree).includes('0%'));
+    assert.equal(findElement(tree, (node) => node.props?.accessibilityRole === 'progressbar').props.accessibilityValue.now, 0);
+  } finally {
+    harness.close();
+  }
+});
+
+function findElement(node, predicate) {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findElement(child, predicate);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  if (!node || typeof node !== 'object') return undefined;
+  if (predicate(node)) return node;
+  return findElement(node.props?.children, predicate);
+}
+
+function renderedText(node) {
+  if (Array.isArray(node)) return node.flatMap(renderedText);
+  if (typeof node === 'string') return [node];
+  return node && typeof node === 'object' ? renderedText(node.props?.children) : [];
+}
+
+test('sensor readings remain visible when device history fails', async () => {
+  const readings = [{ sensorId: 1, temperature: 25.5, humidity: 80, ok: true }];
+  const harness = trayDetailHarness(async () => readings, async () => { throw new Error('device timeout'); });
+  try {
+    const history = await harness.openDevices();
+    const props = history.props;
+    assert.deepEqual(props.readings, readings);
+    assert.equal(props.refreshError, null);
+    assert.equal(props.deviceRefreshError, 'device timeout');
+    const text = renderedText(history.type(props));
+    assert.ok(text.includes('25.5°C'));
+    assert.ok(text.includes('80%'));
+  } finally {
+    harness.close();
+  }
+});
+
+test('stale sensor readings are not presented as current', async () => {
+  const harness = trayDetailHarness(
+    async () => [{ sensorId: 1, temperature: 25.5, humidity: 80, ok: false }],
+    async () => [],
+  );
+  try {
+    const history = await harness.openDevices();
+    const text = renderedText(history.type(history.props));
+    assert.ok(text.includes('Chưa có dữ liệu cảm biến hợp lệ trong 60 giây gần nhất.'));
+    assert.ok(!text.includes('25.5°C'));
+  } finally {
+    harness.close();
+  }
+});
+
+test('device history remains visible when sensor readings fail', async () => {
+  const logs = [{ commandId: 1 }];
+  const harness = trayDetailHarness(async () => { throw new Error('sensor timeout'); }, async () => logs);
+  try {
+    const props = (await harness.openDevices()).props;
+    assert.deepEqual(props.logs, logs);
+    assert.equal(props.refreshError, 'sensor timeout');
+    assert.equal(props.deviceRefreshError, null);
+  } finally {
+    harness.close();
+  }
 });

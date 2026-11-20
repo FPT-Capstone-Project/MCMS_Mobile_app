@@ -28,6 +28,7 @@ const STAGE_LABELS: Record<string, string> = {
 interface CustomerDailyReportProps {
   sessionId: number;
   trayId: number;
+  sessionTrayId?: number;
 }
 
 interface ReportPhoto {
@@ -51,7 +52,7 @@ function getDateLabel(dateKey: string, options: Intl.DateTimeFormatOptions): str
   return parseLocalDateKey(dateKey).toLocaleDateString('vi-VN', options);
 }
 
-function getDateRange(startAt?: string): string[] {
+function getDateRange(startAt?: string, endAt?: string | null): string[] {
   if (!startAt) return [];
   const start = new Date(startAt);
   if (Number.isNaN(start.getTime())) return [];
@@ -59,18 +60,23 @@ function getDateRange(startAt?: string): string[] {
   start.setHours(0, 0, 0, 0);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  if (start > today) return [];
+  const end = endAt ? new Date(endAt) : today;
+  if (Number.isNaN(end.getTime())) return [];
+  end.setHours(0, 0, 0, 0);
+  const lastDate = end < today ? end : today;
+  if (start > lastDate) return [];
 
   const dates: string[] = [];
-  for (const date = new Date(today); date >= start; date.setDate(date.getDate() - 1)) {
+  for (const date = new Date(lastDate); date >= start; date.setDate(date.getDate() - 1)) {
     dates.push(getLocalDateKey(date));
   }
   return dates;
 }
 
-export const CustomerDailyReport: React.FC<CustomerDailyReportProps> = ({ sessionId, trayId }) => {
+export const CustomerDailyReport: React.FC<CustomerDailyReportProps> = ({ sessionId, trayId, sessionTrayId }) => {
   const [inspections, setInspections] = useState<DailyTrayInspection[]>([]);
   const [startAt, setStartAt] = useState<string>();
+  const [endAt, setEndAt] = useState<string | null>();
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(getLocalDateKey(new Date()));
@@ -87,6 +93,7 @@ export const CustomerDailyReport: React.FC<CustomerDailyReportProps> = ({ sessio
         if (!active) return;
         setInspections(history.inspections ?? []);
         setStartAt(history.session?.startAt);
+        setEndAt(history.session?.endAt);
       })
       .catch((error: unknown) => {
         if (!active) return;
@@ -103,14 +110,16 @@ export const CustomerDailyReport: React.FC<CustomerDailyReportProps> = ({ sessio
     };
   }, [sessionId, retryCount]);
 
-  const availableDates = useMemo(() => getDateRange(startAt), [startAt]);
+  const availableDates = useMemo(() => getDateRange(startAt, endAt), [startAt, endAt]);
   const activeSelectedDate =
     availableDates.length > 0 && !availableDates.includes(selectedDate)
       ? availableDates[0]
       : selectedDate;
   const trayInspections = useMemo(
-    () => inspections.filter((inspection) => inspection.trayId === trayId),
-    [inspections, trayId]
+    () => inspections.filter((inspection) => sessionTrayId != null
+      ? inspection.sessionTrayId === sessionTrayId
+      : inspection.trayId === trayId),
+    [inspections, sessionTrayId, trayId]
   );
   const inspectionCountByDate = useMemo(() => {
     const counts = new Map<string, number>();
@@ -305,7 +314,7 @@ const DatePickerModal: React.FC<{
           <View>
             <AppText variant="bodyMedium" weight="bold">Chọn ngày báo cáo</AppText>
             <AppText variant="caption" color={theme.colors.text.secondary}>
-              Từ ngày bắt đầu trồng đến hôm nay
+              Trong thời gian của phiên trồng
             </AppText>
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel="Đóng chọn ngày" onPress={onClose} hitSlop={8}>

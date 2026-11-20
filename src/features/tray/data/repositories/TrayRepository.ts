@@ -85,34 +85,50 @@ export class TrayRepository implements ITrayRepository {
         }
       }
 
+      const sessionProgress = progress.filter(
+        (item) => Number(item.session_id) === sessionId || !item.session_id
+      );
+      const growthHistory = sessionProgress.map((item): CustomerGrowthHistoryItem => {
+        const progressPercent =
+          item.progress_percent == null ? null : Number(item.progress_percent);
+        return {
+          progress_id: item.progress_id ?? item.id ?? 0,
+          session_id: sessionId,
+          current_stage: item.current_stage || item.growth_status || 'UNKNOWN',
+          progress_percent:
+            progressPercent !== null && Number.isFinite(progressPercent)
+              ? progressPercent
+              : null,
+          condition: item.condition ?? null,
+          description: localizeGrowthDescription(item.description ?? item.notes),
+          updated_at:
+            item.updated_at ||
+            item.created_at ||
+            item.recorded_at ||
+            new Date().toISOString(),
+        };
+      });
+      const rawProgress: unknown = sessionStatus
+        ? sessionStatus.progress_percent
+        : sessionProgress[sessionProgress.length - 1]?.progress_percent;
+      if (rawProgress != null && typeof rawProgress !== 'number' && typeof rawProgress !== 'string') {
+        throw new AppError('Tiến độ nuôi trồng từ máy chủ không hợp lệ.', 'API_ERROR', 500);
+      }
+      const progressPercent = rawProgress == null ? null : Number(rawProgress);
+      if (progressPercent !== null && (
+        (typeof rawProgress === 'string' && !rawProgress.trim()) ||
+        !Number.isFinite(progressPercent) || progressPercent < 0 || progressPercent > 100
+      )) {
+        throw new AppError('Tiến độ nuôi trồng từ máy chủ không hợp lệ.', 'API_ERROR', 500);
+      }
+
       return {
         session_id: sessionId,
         cultivation_status: sessionStatus?.status,
         harvest_status: sessionStatus?.harvest_status,
         current_stage: sessionStatus?.current_stage,
-        progress_percent: sessionStatus?.progress_percent,
-        growth_history: progress
-          .filter((item) => Number(item.session_id) === sessionId || !item.session_id)
-          .map((item): CustomerGrowthHistoryItem => {
-            const progressPercent =
-              item.progress_percent == null ? null : Number(item.progress_percent);
-            return {
-              progress_id: item.progress_id ?? item.id ?? 0,
-              session_id: sessionId,
-              current_stage: item.current_stage || item.growth_status || 'UNKNOWN',
-              progress_percent:
-                progressPercent !== null && Number.isFinite(progressPercent)
-                  ? progressPercent
-                  : null,
-              condition: item.condition ?? null,
-              description: localizeGrowthDescription(item.description ?? item.notes),
-              updated_at:
-                item.updated_at ||
-                item.created_at ||
-                item.recorded_at ||
-                new Date().toISOString(),
-            };
-          }),
+        progress_percent: progressPercent,
+        growth_history: growthHistory,
         device_logs: [],
         sensor_readings: [],
       };

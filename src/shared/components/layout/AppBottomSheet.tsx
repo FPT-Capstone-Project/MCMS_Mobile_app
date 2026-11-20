@@ -20,6 +20,7 @@ export interface AppBottomSheetProps {
   children: ReactNode;
   showHandle?: boolean;
   style?: ViewStyle;
+  contentStyle?: ViewStyle;
 }
 
 export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
@@ -30,6 +31,7 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
   children,
   showHandle = true,
   style,
+  contentStyle,
 }) => {
   const insets = useSafeAreaInsets();
 
@@ -86,7 +88,7 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
             </View>
           ) : null}
 
-          <View style={styles.content}>{children}</View>
+          <View style={[styles.content, contentStyle]}>{children}</View>
         </View>
       </View>
     </Modal>
