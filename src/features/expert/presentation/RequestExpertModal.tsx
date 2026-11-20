@@ -1,5 +1,7 @@
 import { AppModal as Modal } from '../../../shared/components/feedback/AppDialog';
 import React, { useEffect, useRef, useState } from 'react';
+import type { ImagePickerAsset } from 'expo-image-picker';
+import { ConsultationPhotoPicker } from './ConsultationPhotoPicker';
 import { useRouter } from 'expo-router';
 import {
   ActivityIndicator,
@@ -23,6 +25,7 @@ export function RequestExpertModal({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [question, setQuestion] = useState('');
+  const [photo, setPhoto] = useState<ImagePickerAsset | null>(null);
   const [severity, setSeverity] = useState('MEDIUM');
   const [issueType, setIssueType] = useState('DISEASE');
   const [issue, setIssue] = useState<ExpertIssue | null>(null);
@@ -96,6 +99,10 @@ export function RequestExpertModal({
           severity,
         }));
       setIssue(created); // Keep the saved issue if the consultation request fails.
+      if (photo) {
+        await repository.uploadIssuePhoto(created.issue_id, photo);
+        setPhoto(null);
+      }
       await repository.request(created.issue_id, question.trim());
       openIssue(created.issue_id);
     } catch {
@@ -131,6 +138,9 @@ export function RequestExpertModal({
         ) : issue ? (
           <>
             <AppText variant="body">Đã có sự cố: {issue.title}</AppText>
+            {issue.status === 'OPEN' && !!question.trim() && (
+              <AppButton title="Tiếp tục gửi yêu cầu đã lưu" loading={busy} onPress={submit} />
+            )}
             <AppButton
               title="Mở yêu cầu đã lưu"
               onPress={() => openIssue(issue.issue_id)}
@@ -197,6 +207,7 @@ export function RequestExpertModal({
               maxLength={5000}
               placeholder="Bạn cần chẩn đoán hoặc hướng dẫn xử lý điều gì?"
             />
+            <ConsultationPhotoPicker photo={photo} onChange={setPhoto} disabled={busy} />
             <AppButton
               title="Gửi yêu cầu"
               loading={busy}

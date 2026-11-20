@@ -13,6 +13,7 @@ export type CultivationIssueStatus =
   | 'RESOLVED';
 
 export interface ConsultationMessage {
+  media_url?: string | null;
   message_id: number | string;
   sender_id: number | string;
   sender_name: string;
@@ -68,6 +69,23 @@ export interface ExpertIssueMedia {
 }
 
 export interface ExpertIssue {
+  session_status?: string | null;
+  session_start_at?: string | null;
+  expected_harvest_date?: string | null;
+  growth_condition?: string | null;
+  growth_updated_at?: string | null;
+  tray_code?: string | null;
+  floor_id?: number | string | null;
+  tray_condition?: string | null;
+  mushroom_condition?: string | null;
+  inspection_notes?: string | null;
+  inspection_at?: string | null;
+  spawn_condition?: string | null;
+  environment_snapshot?: {
+    capturedAt?: string;
+    floorId?: number;
+    sensors?: { sensorAddress: number; temperature: number | null; humidity: number | null; isValid: boolean; receivedAt?: string }[];
+  } | null;
   latest_consultation_id?: number | string | null;
   inspection_id?: number | null;
   spawn_inspection_id?: number | null;
