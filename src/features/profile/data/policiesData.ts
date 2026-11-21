@@ -104,7 +104,7 @@ SmartMush có thể yêu cầu xác minh hoặc hạn chế chức năng khi có
 
 2. Dịch vụ thuê trồng và chăm sóc
 2.1. Đăng ký
-Khách hàng lựa chọn loại nấm, gói, số lượng phôi/khay và dịch vụ đi kèm. Trước khi xác nhận, khách hàng kiểm tra giá, thời gian dự kiến, phạm vi dịch vụ và điều kiện liên quan.
+Khách hàng lựa chọn loại nấm, số lượng phôi/khay và dịch vụ đi kèm. Hệ thống tự chọn gói thuê theo thời gian sinh trưởng dự kiến của loại nấm và hiển thị gói cùng chi phí để khách hàng kiểm tra trước khi xác nhận.
 
 Đơn được ghi nhận sau khi hoàn tất xác nhận và thanh toán theo quy trình. Việc triển khai phụ thuộc tài nguyên, khu vực trồng và khả năng cung cấp tại thời điểm xác nhận.
 
@@ -411,11 +411,11 @@ Chính sách áp dụng cho các khoản thanh toán liên quan đến dịch v�
 
 3. Quy trình thanh toán
 Bước 1: Lựa chọn dịch vụ
-Khách hàng lựa chọn loại nấm, gói thuê, số lượng phôi hoặc khay trồng và các dịch vụ được hệ thống hỗ trợ.
+Khách hàng lựa chọn loại nấm, số lượng phôi hoặc khay trồng và các dịch vụ được hệ thống hỗ trợ. Gói thuê được hệ thống tự chọn theo thời gian sinh trưởng dự kiến và hiển thị trước khi xác nhận.
 
 Bước 2: Kiểm tra đơn hàng
 Hệ thống hiển thị các thông tin cần thiết, gồm:
-- Loại nấm, gói thuê và số lượng.
+- Loại nấm, gói thuê hệ thống tự chọn và số lượng.
 - Thời gian hoặc điều kiện dịch vụ dự kiến.
 - Phí dịch vụ và khoản bổ sung được áp dụng.
 - Tổng số tiền cần thanh toán.
@@ -690,7 +690,7 @@ Chính sách quy định phạm vi dịch vụ, quy trình chăm sóc, quyền l
 
 1. Phạm vi dịch vụ thuê trồng
 Dịch vụ thuê trồng nấm có thể bao gồm:
-- Các gói thuê theo loại nấm và quy mô khách hàng lựa chọn.
+- Gói thuê được hệ thống tự chọn theo thời gian sinh trưởng dự kiến của loại nấm.
 - Bố trí khu vực và khay trồng phù hợp trong phạm vi đơn thuê.
 - Chuẩn bị phôi nấm tương ứng với loại nấm đã xác nhận.
 - Chăm sóc và giám sát quá trình phát triển của nấm.
@@ -705,11 +705,12 @@ Phạm vi cụ thể được xác định theo thông tin gói thuê và đơn 
 Khách hàng lựa chọn:
 - Loại nấm.
 - Số lượng phôi hoặc khay trồng.
-- Thời gian mùa vụ dự kiến.
 - Chi phí và các dịch vụ bổ sung được hiển thị.
 
+Hệ thống tự chọn gói thuê phù hợp theo thời gian sinh trưởng dự kiến của loại nấm. Tên gói, thời hạn và chi phí được hiển thị để khách hàng kiểm tra trước khi xác nhận.
+
 2.2. Xác nhận đơn thuê
-Khách hàng cần kiểm tra loại nấm, số lượng, chi phí và thông tin liên quan trước khi xác nhận. Việc thanh toán thực hiện theo Chính sách thanh toán.
+Khách hàng cần kiểm tra loại nấm, gói thuê được hệ thống tự chọn, số lượng, chi phí và thông tin liên quan trước khi xác nhận. Việc thanh toán thực hiện theo Chính sách thanh toán.
 
 Đơn thuê chỉ được xử lý khi đáp ứng điều kiện đăng ký, thanh toán và khả năng triển khai của trang trại.
 
