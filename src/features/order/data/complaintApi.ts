@@ -7,9 +7,12 @@ export interface OrderComplaint {
   complaint_id: number;
   order_id: number;
   complaint_type: string;
-  description: string;
+  description?: string;
   status: string;
   created_at: string;
+  assigned_to: number | null;
+  resolved_at: string | null;
+  customer_name?: string | null;
 }
 
 export interface ComplaintReply {
@@ -21,6 +24,7 @@ export interface ComplaintReply {
 }
 
 export interface OrderComplaintDetail extends OrderComplaint {
+  description: string;
   image_urls: string[];
   resolution: string | null;
   updated_at: string;
@@ -40,10 +44,14 @@ function isOrderComplaint(value: unknown): value is OrderComplaint {
   return 'complaint_id' in value && typeof value.complaint_id === 'number' &&
     'order_id' in value && typeof value.order_id === 'number' &&
     'complaint_type' in value && typeof value.complaint_type === 'string' &&
-    'description' in value && typeof value.description === 'string' &&
+    (!('description' in value) || typeof value.description === 'string') &&
     'status' in value && typeof value.status === 'string' &&
-    'created_at' in value && typeof value.created_at === 'string';
+    'created_at' in value && typeof value.created_at === 'string' &&
+    'assigned_to' in value && (typeof value.assigned_to === 'number' || value.assigned_to === null) &&
+    'resolved_at' in value && (typeof value.resolved_at === 'string' || value.resolved_at === null);
 }
+
+export type StaffComplaintQueue = 'UNASSIGNED' | 'ASSIGNED' | 'RESPONDED';
 
 interface CreateOrderComplaint {
   orderId: number;
@@ -54,12 +62,33 @@ interface CreateOrderComplaint {
 
 export const complaintApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getStaffComplaints: builder.query<StaffComplaintsPage, { page: number; pageSize: number }>({
-      query: ({ page, pageSize }) => ({
+    getStaffComplaints: builder.query<StaffComplaintsPage, {
+      page: number;
+      pageSize: number;
+      queue: StaffComplaintQueue;
+    }>({
+      query: ({ page, pageSize, queue }) => ({
         url: API_ENDPOINTS.COMPLAINTS.ADMIN,
-        params: { page, pageSize },
+        params: { page, pageSize, queue },
       }),
       providesTags: ['Complaint'],
+    }),
+    getStaffComplaintDetail: builder.query<OrderComplaintDetail, { accountId: string; complaintId: number }>({
+      query: ({ complaintId }) => ({ url: API_ENDPOINTS.COMPLAINTS.DETAIL(complaintId) }),
+      transformResponse: (response: { data: OrderComplaintDetail }) => response.data,
+      providesTags: ['Complaint'],
+    }),
+    resolveStaffComplaint: builder.mutation<
+      OrderComplaint,
+      { complaintId: number; resolution: string }
+    >({
+      query: ({ complaintId, resolution }) => ({
+        url: API_ENDPOINTS.COMPLAINTS.STATUS(complaintId),
+        method: 'PATCH',
+        data: { status: 'RESOLVED', resolution },
+      }),
+      transformResponse: (response: { data: OrderComplaint }) => response.data,
+      invalidatesTags: ['Complaint', 'Notification'],
     }),
     getMyComplaints: builder.query<
       OrderComplaint[],
@@ -153,6 +182,8 @@ export const complaintApi = baseApi.injectEndpoints({
 
 export const {
   useGetStaffComplaintsQuery,
+  useGetStaffComplaintDetailQuery,
+  useResolveStaffComplaintMutation,
   useGetMyComplaintsQuery,
   useGetMyComplaintDetailQuery,
   useCreateOrderComplaintMutation,

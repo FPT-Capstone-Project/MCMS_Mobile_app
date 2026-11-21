@@ -225,7 +225,7 @@ export const AboutUsScreen: React.FC = () => {
               Chính sách & Điều khoản
             </AppText>
             <AppText variant="caption" color={theme.colors.text.muted}>
-              Ngày cập nhật: 13/11/2026
+              Cập nhật lần cuối: 21/11/2026
             </AppText>
           </View>
         </View>
