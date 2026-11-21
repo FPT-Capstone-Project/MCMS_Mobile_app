@@ -189,14 +189,13 @@ export class OrderRepository {
   }
 
   /**
-   * Create an order for a rental package and mushroom type
+   * Create a cultivation order; the backend selects the rental package.
    */
   async createRentalOrder(data: CreateRentalOrderRequest): Promise<CustomerOrder> {
     try {
       const response = await axiosClient.post<{ data: BackendCustomerOrder }>(
         API_ENDPOINTS.ORDERS.CULTIVATION,
         {
-          packageId: data.packageId,
           mushroomTypeId: data.mushroomTypeId,
           quantity: data.quantity,
         }

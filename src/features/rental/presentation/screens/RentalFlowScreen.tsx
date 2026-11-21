@@ -12,6 +12,7 @@ import {
 import { AppError } from '../../../../core/errors/appError';
 import { theme } from '../../../../core/theme';
 import { formatVND } from '../../../../core/utils/currency';
+import { selectAutomaticRentalPackage } from '../../domain/automaticPackage';
 import {
   AppButton,
   AppCard,
@@ -23,7 +24,7 @@ import {
 import { cultivationRepository, MushroomType } from '../../../cultivation';
 import { orderRepository, PaymentQrModal, RentalPackage } from '../../../order';
 
-type RentalStep = 1 | 2 | 3 | 4;
+type RentalStep = 1 | 2 | 3;
 
 const RENTAL_DURATIONS = [15, 20];
 
@@ -53,9 +54,11 @@ export const RentalFlowScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [selectedPackage, setSelectedPackage] = useState<RentalPackage | null>(null);
   const [selectedMushroom, setSelectedMushroom] = useState<MushroomType | null>(null);
   const [trayQuantity, setTrayQuantity] = useState(1);
+  const automaticPackage = selectedMushroom
+    ? selectAutomaticRentalPackage(selectedMushroom.growing_days, packages)
+    : null;
 
   const [submitting, setSubmitting] = useState(false);
   const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
@@ -102,23 +105,12 @@ export const RentalFlowScreen: React.FC = () => {
     else router.replace('/(tabs)');
   };
 
-  const handleSelectMushroom = (mushroom: MushroomType) => {
-    setSelectedMushroom(mushroom);
-    if (
-      selectedPackage &&
-      mushroom.growing_days > selectedPackage.duration_days
-    ) {
-      setSelectedPackage(null);
-    }
-  };
-
   const handleCreateOrder = async () => {
-    if (!selectedPackage || !selectedMushroom) return;
+    if (!automaticPackage || !selectedMushroom) return;
 
     try {
       setSubmitting(true);
       const order = await orderRepository.createRentalOrder({
-        packageId: selectedPackage.package_id,
         mushroomTypeId: selectedMushroom.mushroom_type_id,
         quantity: trayQuantity,
       });
@@ -132,8 +124,8 @@ export const RentalFlowScreen: React.FC = () => {
   };
 
   const totalAmount =
-    selectedPackage && selectedMushroom
-      ? (selectedPackage.price + selectedMushroom.price) * trayQuantity
+    automaticPackage && selectedMushroom
+      ? (automaticPackage.price + selectedMushroom.price) * trayQuantity
       : 0;
 
   if (loading) {
@@ -143,7 +135,7 @@ export const RentalFlowScreen: React.FC = () => {
         <View style={styles.centerState}>
           <ActivityIndicator size="large" color={theme.colors.primary[500]} />
           <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-            Đang tải danh sách nấm và gói dịch vụ...
+            Đang tải loại nấm và thông tin gói thuê...
           </AppText>
         </View>
       </ScreenContainer>
@@ -176,9 +168,8 @@ export const RentalFlowScreen: React.FC = () => {
             <View style={styles.stepsBar}>
               {[
                 { number: 1 as const, label: 'Loại nấm' },
-                { number: 2 as const, label: 'Gói trồng' },
-                { number: 3 as const, label: 'Số khay' },
-                { number: 4 as const, label: 'Xác nhận' },
+                { number: 2 as const, label: 'Số khay' },
+                { number: 3 as const, label: 'Xác nhận' },
               ].map((item, index) => (
                 <React.Fragment key={item.number}>
                   {index > 0 ? <View style={styles.stepConnector} /> : null}
@@ -223,7 +214,7 @@ export const RentalFlowScreen: React.FC = () => {
                 <View style={styles.sectionHeading}>
                   <AppText variant="h3">Chọn loại nấm</AppText>
                   <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-                    Chọn giống nấm bạn muốn trồng. Thời gian sinh trưởng cần phù hợp với gói.
+                    Chọn giống nấm bạn muốn trồng. Hệ thống tự chọn gói thuê phù hợp theo thời gian sinh trưởng dự kiến.
                   </AppText>
                 </View>
                 {mushrooms.length === 0 ? (
@@ -237,7 +228,7 @@ export const RentalFlowScreen: React.FC = () => {
                         key={mushroom.mushroom_type_id}
                         accessibilityRole="radio"
                         accessibilityState={{ selected }}
-                        onPress={() => handleSelectMushroom(mushroom)}
+                        onPress={() => setSelectedMushroom(mushroom)}
                       >
                         <AppCard
                           elevation={selected ? 'md' : 'xs'}
@@ -284,99 +275,45 @@ export const RentalFlowScreen: React.FC = () => {
                     );
                   })
                 )}
+                {selectedMushroom ? (
+                  automaticPackage ? (
+                    <AppCard elevation="xs" style={styles.autoPackageCard}>
+                      <AppText variant="label" color={theme.colors.text.muted}>
+                        GÓI THUÊ DO HỆ THỐNG TỰ CHỌN
+                      </AppText>
+                      <SummaryRow
+                        label="Gói dịch vụ"
+                        value={`${automaticPackage.package_name} (${automaticPackage.duration_days} ngày)`}
+                      />
+                      <SummaryRow
+                        label="Căn cứ lựa chọn"
+                        value={`Sinh trưởng dự kiến ${selectedMushroom.growing_days} ngày`}
+                      />
+                      <SummaryRow label="Phí gói / khay" value={formatVND(automaticPackage.price)} />
+                    </AppCard>
+                  ) : (
+                    <EmptyCatalog message={`Chưa có gói thuê phù hợp với thời gian sinh trưởng ${selectedMushroom.growing_days} ngày của loại nấm này.`} />
+                  )
+                ) : null}
                 <AppButton
-                  title="Tiếp tục chọn gói"
-                  disabled={!selectedMushroom}
-                  onPress={() => selectedMushroom && setStep(2)}
+                  title="Tiếp tục chọn số khay"
+                  disabled={!selectedMushroom || !automaticPackage}
+                  onPress={() => selectedMushroom && automaticPackage && setStep(2)}
                 />
               </View>
             ) : null}
 
-            {step === 2 ? (
-              <View style={styles.section}>
-                <View style={styles.sectionHeading}>
-                  <AppText variant="h3">Chọn gói dịch vụ</AppText>
-                  <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-                    Chọn gói 15 hoặc 20 ngày phù hợp với giống {selectedMushroom?.name}.
-                  </AppText>
-                </View>
-                {packages.length === 0 ? (
-                  <EmptyCatalog message="Hiện chưa có gói dịch vụ 15 hoặc 20 ngày đang hoạt động." />
-                ) : (
-                  packages.map((rentalPackage) => {
-                    const incompatible =
-                      selectedMushroom !== null &&
-                      selectedMushroom.growing_days > rentalPackage.duration_days;
-                    const selected =
-                      selectedPackage?.package_id === rentalPackage.package_id;
-                    return (
-                      <Pressable
-                        key={rentalPackage.package_id}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected, disabled: incompatible }}
-                        disabled={incompatible}
-                        onPress={() => {
-                          setSelectedPackage(rentalPackage);
-                          setStep(3);
-                        }}
-                      >
-                        <AppCard
-                          elevation={selected ? 'md' : 'xs'}
-                          style={[
-                            styles.selectionCard,
-                            selected && styles.cardSelected,
-                            incompatible && styles.cardDisabled,
-                          ]}
-                        >
-                          <View style={styles.packageHeading}>
-                            <View style={styles.iconCircle}>
-                              <Ionicons
-                                name="calendar-outline"
-                                size={22}
-                                color={theme.colors.primary[600]}
-                              />
-                            </View>
-                            <View style={styles.flexContent}>
-                              <AppText variant="title" weight="bold">
-                                {rentalPackage.package_name}
-                              </AppText>
-                              <AppText variant="caption" color={theme.colors.text.secondary}>
-                                {rentalPackage.duration_days} ngày trồng
-                              </AppText>
-                            </View>
-                            <AppText variant="title" weight="bold" color={theme.colors.primary[600]}>
-                              {formatVND(rentalPackage.price)}
-                            </AppText>
-                          </View>
-                          {rentalPackage.description ? (
-                            <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-                              {rentalPackage.description}
-                            </AppText>
-                          ) : null}
-                          {incompatible ? (
-                            <AppText variant="caption" color={theme.colors.error.main}>
-                              Gói này ngắn hơn chu kỳ sinh trưởng của giống nấm đã chọn.
-                            </AppText>
-                          ) : null}
-                        </AppCard>
-                      </Pressable>
-                    );
-                  })
-                )}
-              </View>
-            ) : null}
-
-            {step === 3 && selectedPackage && selectedMushroom ? (
+            {step === 2 && automaticPackage && selectedMushroom ? (
               <View style={styles.section}>
                 <View style={styles.sectionHeading}>
                   <AppText variant="h3">Chọn số lượng khay</AppText>
                   <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-                    Mỗi khay cần 3 đơn vị phôi. Hệ thống sẽ kiểm tra khay và phôi còn đáp ứng trước khi giữ chỗ.
+                    Gói {automaticPackage.package_name} ({automaticPackage.duration_days} ngày) được tự chọn theo giống nấm. Mỗi khay cần 3 đơn vị phôi; hệ thống sẽ kiểm tra khay và phôi trước khi giữ chỗ.
                   </AppText>
                 </View>
                 <AppCard elevation="sm" style={styles.quantityCard}>
                   <AppText variant="label" color={theme.colors.text.muted}>
-                    {selectedMushroom.name} · {selectedPackage.duration_days} ngày
+                    {selectedMushroom.name} · {automaticPackage.duration_days} ngày
                   </AppText>
                   <View style={styles.quantityRow}>
                     <Pressable
@@ -410,7 +347,7 @@ export const RentalFlowScreen: React.FC = () => {
                   <View style={styles.priceRow}>
                     <AppText variant="body">Tạm tính / khay</AppText>
                     <AppText variant="body" weight="bold">
-                      {formatVND(selectedPackage.price + selectedMushroom.price)}
+                      {formatVND(automaticPackage.price + selectedMushroom.price)}
                     </AppText>
                   </View>
                   <View style={styles.priceRow}>
@@ -420,11 +357,11 @@ export const RentalFlowScreen: React.FC = () => {
                     </AppText>
                   </View>
                 </AppCard>
-                <AppButton title="Tiếp tục xác nhận" onPress={() => setStep(4)} />
+                <AppButton title="Tiếp tục xác nhận" onPress={() => setStep(3)} />
               </View>
             ) : null}
 
-            {step === 4 && selectedPackage && selectedMushroom ? (
+            {step === 3 && automaticPackage && selectedMushroom ? (
               <View style={styles.section}>
                 <View style={styles.sectionHeading}>
                   <AppText variant="h3">Xác nhận đơn trồng nấm</AppText>
@@ -438,14 +375,14 @@ export const RentalFlowScreen: React.FC = () => {
                   </AppText>
                   <SummaryRow label="Loại nấm" value={selectedMushroom.name} />
                   <SummaryRow
-                    label="Gói dịch vụ"
-                    value={`${selectedPackage.package_name} (${selectedPackage.duration_days} ngày)`}
+                    label="Gói dịch vụ (tự động)"
+                    value={`${automaticPackage.package_name} (${automaticPackage.duration_days} ngày)`}
                   />
                   <SummaryRow label="Số lượng khay" value={`${trayQuantity} khay`} />
                   <AppDivider spacing="xs" />
                   <SummaryRow
                     label={`Gói trồng (${trayQuantity} khay)`}
-                    value={formatVND(selectedPackage.price * trayQuantity)}
+                    value={formatVND(automaticPackage.price * trayQuantity)}
                   />
                   <SummaryRow
                     label={`Phôi nấm (${trayQuantity} khay)`}
@@ -596,8 +533,11 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.primary[500],
     backgroundColor: theme.colors.primary[50],
   },
-  cardDisabled: {
-    opacity: 0.55,
+  autoPackageCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    gap: theme.spacing.sm,
   },
   mushroomRow: {
     flexDirection: 'row',
@@ -623,11 +563,6 @@ const styles = StyleSheet.create({
   priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
-  packageHeading: {
-    flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.sm,
   },

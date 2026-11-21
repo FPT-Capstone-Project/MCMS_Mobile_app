@@ -13,7 +13,6 @@ export interface RentalPackage {
 }
 
 export interface CreateRentalOrderRequest {
-  packageId: number;
   mushroomTypeId: number;
   quantity: number;
 }

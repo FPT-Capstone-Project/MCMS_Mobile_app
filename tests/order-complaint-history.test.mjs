@@ -30,6 +30,8 @@ const complaint = (id, orderId = id) => ({
   description: 'Damaged',
   status: 'PENDING',
   created_at: '2026-11-20T00:00:00.000Z',
+  assigned_to: null,
+  resolved_at: null,
 });
 
 test('loads all complaint pages, including older orders beyond the first 100', async () => {

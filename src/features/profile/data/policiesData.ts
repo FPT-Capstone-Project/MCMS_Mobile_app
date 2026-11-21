@@ -74,101 +74,139 @@ export const POLICIES_DATA: PolicyItem[] = [
     title: 'Điều khoản sử dụng',
     documentTitle: 'ĐIỀU KHOẢN SỬ DỤNG SMARTMUSH',
     subtitle: 'TERMS OF SERVICE – SMARTMUSH',
-    effectiveDate: '13/11/2026',
+    effectiveDate: '21/11/2026',
     badge: 'Pháp lý & Thỏa thuận',
     icon: 'document-text-outline',
     summary:
-      'Quy chế nền tảng, quyền và nghĩa vụ của người dùng khi tạo tài khoản, thuê phôi nấm và khai thác dịch vụ SmartMush.',
+      'Quy định điều kiện sử dụng tài khoản, dịch vụ thuê trồng, thanh toán, thu hoạch, giao nhận, quyền và nghĩa vụ các bên.',
     content: `# ĐIỀU KHOẢN SỬ DỤNG SMARTMUSH
-Ngày cập nhật: 13/11/2026
+Cập nhật lần cuối: 21/11/2026
+Ngày có hiệu lực: 21/11/2026
 
-Chào mừng bạn đến với SmartMush – hệ thống quản lý và giám sát quá trình trồng nấm thông minh. Bằng việc đăng ký tài khoản, truy cập hoặc sử dụng SmartMush, bạn xác nhận đã đọc, hiểu và đồng ý tuân thủ các điều khoản sử dụng dưới đây.
+SmartMush là hệ thống hỗ trợ đăng ký dịch vụ thuê trồng, chăm sóc nấm, theo dõi mùa vụ, thu hoạch và giao nhận. Điều khoản này quy định quyền, nghĩa vụ và trách nhiệm giữa khách hàng và SmartMush.
 
-1. Giới thiệu về SmartMush
-SmartMush là nền tảng hỗ trợ quản lý hoạt động trồng nấm thông minh, kết nối khách hàng với trang trại thông qua hệ thống quản lý tập trung và công nghệ IoT.
-Hệ thống cung cấp các chức năng chính:
-- Đăng ký và quản lý tài khoản người dùng.
-- Tìm hiểu và đăng ký thuê khu vực trồng nấm hoặc phôi nấm.
-- Theo dõi quá trình sinh trưởng và phát triển của nấm.
-- Giám sát các thông số môi trường như nhiệt độ và độ ẩm thông qua thiết bị IoT.
-- Cập nhật hình ảnh, trạng thái và tiến độ mùa vụ trồng nấm.
-- Đăng ký yêu cầu thu hoạch, nhận nấm tại trang trại hoặc sử dụng dịch vụ giao hàng.
-- Quản lý hoạt động vận hành trang trại và các dịch vụ liên quan.
+Khi đăng ký tài khoản hoặc sử dụng dịch vụ, khách hàng xác nhận đã đọc, hiểu và đồng ý tuân thủ điều khoản này cùng các chính sách có liên quan.
 
-2. Đăng ký và quản lý tài khoản
-- Người dùng cần cung cấp thông tin chính xác, đầy đủ và cập nhật khi đăng ký tài khoản SmartMush.
-- Người dùng có trách nhiệm bảo mật thông tin đăng nhập và không chia sẻ tài khoản cho người khác sử dụng trái phép.
-- Mỗi tài khoản chỉ được sử dụng bởi chủ tài khoản, trừ trường hợp được hệ thống cho phép.
-- Người dùng cần thông báo cho bộ phận quản trị khi phát hiện tài khoản có dấu hiệu bị truy cập hoặc sử dụng trái phép.
-- SmartMush có quyền tạm khóa hoặc hạn chế tài khoản nếu phát hiện hành vi vi phạm điều khoản sử dụng hoặc gây ảnh hưởng đến hoạt động của hệ thống.
+1. Điều kiện đăng ký và tài khoản
+1.1. Đăng ký
+- Khách hàng cung cấp thông tin chính xác, đầy đủ và sử dụng thông tin liên lạc hợp lệ.
+- Người đăng ký cần có năng lực hành vi dân sự theo pháp luật hoặc được người đại diện hợp pháp hỗ trợ khi cần.
+- Khách hàng chịu trách nhiệm về tính chính xác của thông tin đã cung cấp.
 
-3. Quy định về dịch vụ thuê trồng nấm
-- Khách hàng có thể lựa chọn loại nấm, gói thuê và số lượng phôi hoặc khay trồng theo các dịch vụ được cung cấp trên SmartMush.
-- Sau khi xác nhận đăng ký thuê, thông tin đơn thuê sẽ được hệ thống ghi nhận để trang trại tiến hành chuẩn bị khu vực trồng và triển khai mùa vụ.
-- Khách hàng có trách nhiệm kiểm tra thông tin đơn thuê trước khi xác nhận, bao gồm loại nấm, số lượng, thời gian dự kiến và các dịch vụ đi kèm.
-- Mọi thay đổi hoặc yêu cầu liên quan đến đơn thuê cần được thực hiện thông qua các chức năng được hệ thống hỗ trợ hoặc liên hệ với bộ phận quản lý trang trại.
-- Việc hủy đơn, hoàn tiền hoặc thay đổi dịch vụ được thực hiện theo chính sách riêng của SmartMush và thỏa thuận giữa khách hàng với đơn vị vận hành.
+1.2. Bảo mật tài khoản
+- Khách hàng bảo mật thông tin đăng nhập và không chia sẻ cho người không được phép sử dụng.
+- Khách hàng thông báo khi phát hiện dấu hiệu truy cập trái phép.
+- SmartMush không yêu cầu mật khẩu qua kênh liên lạc không chính thức.
+- Hoạt động qua tài khoản được dùng để xác minh trừ khi có căn cứ tài khoản bị truy cập trái phép.
 
-4. Theo dõi quá trình trồng nấm
-- SmartMush cho phép khách hàng theo dõi tiến độ phát triển của nấm thông qua thông tin mùa vụ, hình ảnh cập nhật và trạng thái từng giai đoạn sinh trưởng.
-- Các thông số môi trường như nhiệt độ và độ ẩm được thu thập thông qua hệ thống cảm biến IoT tại khu vực trồng nấm.
-- Dữ liệu hiển thị trên ứng dụng có thể phụ thuộc vào tình trạng kết nối Internet, thiết bị IoT và hệ thống máy chủ.
-- Thông tin về tiến độ sinh trưởng và thời gian thu hoạch chỉ mang tính dự kiến, có thể thay đổi tùy thuộc vào giống nấm, điều kiện môi trường và tình trạng thực tế của phôi nấm.
-- SmartMush không cam kết sản lượng hoặc thời gian thu hoạch tuyệt đối do quá trình sinh trưởng của nấm chịu ảnh hưởng bởi nhiều yếu tố khách quan.
+1.3. Quản lý tài khoản
+SmartMush có thể yêu cầu xác minh hoặc hạn chế chức năng khi có dấu hiệu bất thường, vi phạm điều khoản hoặc nguy cơ an toàn. Mọi hạn chế phải có căn cứ phù hợp.
 
-5. Quy định về thu hoạch và giao nhận
-- Khi nấm đạt điều kiện thu hoạch, khách hàng có thể gửi yêu cầu thu hoạch thông qua ứng dụng SmartMush.
-- Khách hàng có thể lựa chọn nhận nấm trực tiếp tại trang trại hoặc đăng ký dịch vụ giao hàng nếu được hỗ trợ.
-- Farm Operator chịu trách nhiệm kiểm tra tình trạng nấm, thực hiện thu hoạch, phân loại và cập nhật thông tin thu hoạch lên hệ thống.
-- Đối với đơn hàng giao tận nơi, Shipper có trách nhiệm tiếp nhận đơn được phân công, thực hiện giao hàng và cập nhật trạng thái giao nhận.
-- Khách hàng có trách nhiệm cung cấp thông tin nhận hàng chính xác và phối hợp trong quá trình giao nhận.
-- Mọi vấn đề phát sinh liên quan đến chất lượng sản phẩm hoặc quá trình giao nhận cần được thông báo cho bộ phận quản lý để kiểm tra và xử lý.
+2. Dịch vụ thuê trồng và chăm sóc
+2.1. Đăng ký
+Khách hàng lựa chọn loại nấm, số lượng phôi/khay và dịch vụ đi kèm. Hệ thống tự chọn gói thuê theo thời gian sinh trưởng dự kiến của loại nấm và hiển thị gói cùng chi phí để khách hàng kiểm tra trước khi xác nhận.
 
-6. Quyền và trách nhiệm của người dùng
-Người dùng SmartMush có các quyền và trách nhiệm sau:
-- Được sử dụng các chức năng phù hợp với vai trò và quyền hạn của tài khoản.
-- Được xem thông tin đơn thuê, mùa vụ và tiến độ trồng nấm của mình.
-- Được nhận thông báo về tình trạng mùa vụ và các hoạt động liên quan.
-- Cung cấp thông tin chính xác khi sử dụng dịch vụ.
-- Không sử dụng hệ thống vào mục đích trái pháp luật.
-- Không thực hiện hành vi can thiệp, phá hoại hoặc gây ảnh hưởng đến hoạt động của hệ thống.
-- Không truy cập trái phép dữ liệu, tài khoản hoặc chức năng không thuộc quyền hạn của mình.
+Đơn được ghi nhận sau khi hoàn tất xác nhận và thanh toán theo quy trình. Việc triển khai phụ thuộc tài nguyên, khu vực trồng và khả năng cung cấp tại thời điểm xác nhận.
 
-7. Quyền và trách nhiệm của SmartMush
-SmartMush có trách nhiệm:
-- Cung cấp và duy trì các chức năng của hệ thống trong phạm vi khả năng vận hành.
-- Hỗ trợ người dùng theo dõi thông tin mùa vụ và dữ liệu môi trường được hệ thống ghi nhận.
-- Bảo vệ thông tin cá nhân của người dùng theo chính sách bảo mật.
-- Thực hiện bảo trì, nâng cấp và sửa lỗi nhằm cải thiện chất lượng dịch vụ.
-- Gửi thông báo về các hoạt động liên quan đến tài khoản, đơn thuê và mùa vụ.
-- Có quyền điều chỉnh hoặc tạm ngừng một số chức năng để bảo trì, nâng cấp hoặc xử lý sự cố kỹ thuật.
+2.2. Chăm sóc
+- SmartMush tổ chức chăm sóc theo quy trình phù hợp với loại nấm.
+- Farm Operator theo dõi, kiểm tra và cập nhật tình trạng sinh trưởng.
+- Hệ thống IoT hỗ trợ giám sát nhiệt độ, độ ẩm và vận hành theo cấu hình thực tế.
+- Khách hàng theo dõi các dữ liệu được hệ thống ghi nhận.
+- Khách hàng không tự ý can thiệp khu vực trồng, thiết bị hoặc vận hành khi chưa được phép.
 
-8. Quyền riêng tư và bảo vệ dữ liệu
-- SmartMush có thể thu thập các thông tin cần thiết để cung cấp dịch vụ, bao gồm họ tên, email, số điện thoại, địa chỉ giao hàng và thông tin đơn thuê.
-- Dữ liệu về quá trình trồng nấm, hình ảnh mùa vụ và thông số môi trường được sử dụng nhằm hỗ trợ quản lý và theo dõi hoạt động canh tác.
-- SmartMush không sử dụng hoặc chia sẻ thông tin cá nhân của người dùng cho bên thứ ba ngoài các trường hợp cần thiết để cung cấp dịch vụ, được người dùng đồng ý hoặc pháp luật yêu cầu.
-- Người dùng có quyền yêu cầu hỗ trợ cập nhật hoặc xử lý thông tin cá nhân theo quy định của hệ thống và pháp luật hiện hành.
+2.3. Thời gian và sản lượng
+Thời gian và sản lượng chỉ mang tính dự kiến, phụ thuộc điều kiện môi trường, giống nấm và quá trình sinh trưởng. SmartMush chỉ cam kết sản lượng khi được nêu cụ thể trong gói/thỏa thuận. IoT không bảo đảm môi trường luôn ổn định hoặc loại bỏ toàn bộ rủi ro.
 
-9. Giới hạn trách nhiệm
-- SmartMush là nền tảng hỗ trợ quản lý và giám sát hoạt động trồng nấm, không thay thế hoàn toàn việc kiểm tra và đánh giá thực tế tại trang trại.
-- SmartMush không chịu trách nhiệm đối với những gián đoạn dịch vụ do sự cố Internet, mất điện, lỗi thiết bị IoT hoặc các yếu tố bất khả kháng nằm ngoài khả năng kiểm soát hợp lý.
-- Dữ liệu cảm biến có thể có sai số hoặc bị gián đoạn trong quá trình truyền tải. Người vận hành cần kiểm tra thực tế khi phát hiện thông số bất thường.
-- Kết quả sinh trưởng và sản lượng nấm có thể khác với dự kiến do điều kiện sinh học và môi trường.
+3. Thanh toán
+- Khách hàng thanh toán đầy đủ theo đơn và phương thức được hỗ trợ.
+- Giá, phí giao nhận và phụ phí được hiển thị/thông báo trước xác nhận.
+- Giao dịch chỉ thành công khi SmartMush hoặc đơn vị thanh toán xác nhận hợp lệ.
+- Không thanh toán lặp khi giao dịch trước đang xử lý.
+- Vấn đề thanh toán và hoàn tiền xử lý theo Chính sách thanh toán và Chính sách hoàn hàng, hoàn tiền.
 
-10. Thay đổi điều khoản sử dụng
-- SmartMush có quyền cập nhật hoặc điều chỉnh điều khoản sử dụng để phù hợp với hoạt động của hệ thống và quy định pháp luật.
-- Những thay đổi quan trọng sẽ được thông báo đến người dùng thông qua ứng dụng hoặc các kênh liên lạc phù hợp.
-- Việc tiếp tục sử dụng SmartMush sau khi điều khoản được cập nhật sẽ được xử lý theo quy định pháp luật và cơ chế thông báo, chấp thuận áp dụng cho từng thay đổi.
+4. Thu hoạch và giao nhận
+- Farm Operator xác định thời điểm thu hoạch theo tình trạng thực tế.
+- Sản phẩm được kiểm tra, phân loại và ghi nhận sản lượng sau thu hoạch.
+- Khách hàng chọn phương thức nhận trong phạm vi được hỗ trợ.
+- Khách hàng cung cấp thông tin người nhận, địa chỉ và số điện thoại chính xác khi giao hàng.
+- Shipper nhận, vận chuyển và cập nhật trạng thái theo quy trình.
+- Khách hàng kiểm tra sản phẩm khi nhận và phản ánh sai lệch khi phát hiện.
+- Quy trình chi tiết theo Chính sách thu hoạch và giao nhận.
 
-11. Chấm dứt sử dụng dịch vụ
-- Người dùng có thể ngừng sử dụng SmartMush hoặc yêu cầu hỗ trợ đóng tài khoản theo quy trình của hệ thống.
-- SmartMush có quyền tạm ngừng hoặc chấm dứt quyền truy cập của người dùng nếu phát hiện hành vi vi phạm nghiêm trọng điều khoản sử dụng.
-- Việc chấm dứt tài khoản không mặc nhiên làm mất đi các nghĩa vụ hoặc quyền lợi còn tồn tại từ những đơn thuê và dịch vụ đã được xác nhận trước đó.
+5. Quy định sử dụng hệ thống
+Khách hàng không:
+- Cung cấp thông tin sai, giả mạo danh tính.
+- Truy cập tài khoản, dữ liệu hoặc chức năng không thuộc quyền sử dụng.
+- Can thiệp, phá hoại, gây quá tải hoặc gián đoạn hệ thống.
+- Khai thác lỗ hổng hoặc sử dụng công cụ bất hợp pháp.
+- Đăng nội dung vi phạm pháp luật hoặc xâm phạm quyền người khác.
+- Lạm dụng thanh toán, khiếu nại hoặc dịch vụ để gian lận.
 
-12. Điều khoản chung
-- Các điều khoản này được áp dụng đối với tất cả người dùng truy cập và sử dụng nền tảng SmartMush.
-- Những vấn đề chưa được quy định trong điều khoản này sẽ được giải quyết dựa trên thỏa thuận giữa các bên và quy định pháp luật Việt Nam hiện hành.
-- Nếu có bất kỳ thắc mắc hoặc khiếu nại nào liên quan đến việc sử dụng hệ thống, người dùng có thể liên hệ với bộ phận hỗ trợ của SmartMush thông qua các kênh liên lạc được cung cấp trên ứng dụng.`,
+SmartMush có thể xác minh, hạn chế chức năng hoặc tạm khóa tài khoản theo mức độ vi phạm và căn cứ cụ thể.
+
+6. Quyền và nghĩa vụ của SmartMush
+6.1. Quyền
+- Vận hành hệ thống theo phạm vi dịch vụ được công bố.
+- Yêu cầu xác minh thông tin cần thiết để thực hiện giao dịch.
+- Điều chỉnh quy trình nhằm nâng cao chất lượng.
+- Bảo trì, nâng cấp hoặc tạm hạn chế chức năng để xử lý sự cố.
+- Áp dụng biện pháp phù hợp đối với hành vi vi phạm.
+
+6.2. Nghĩa vụ
+- Cung cấp thông tin dịch vụ rõ ràng.
+- Tổ chức trồng, chăm sóc, thu hoạch theo nội dung đã xác nhận.
+- Cập nhật dữ liệu mùa vụ trong phạm vi hệ thống ghi nhận.
+- Bảo vệ thông tin cá nhân theo Chính sách bảo mật.
+- Tiếp nhận hỗ trợ, khiếu nại và thực hiện khắc phục khi có căn cứ trách nhiệm.
+
+7. Quyền và nghĩa vụ của khách hàng
+7.1. Quyền
+- Nhận thông tin gói, giá và điều kiện trước khi xác nhận.
+- Theo dõi tiến độ và dữ liệu được hệ thống hỗ trợ.
+- Nhận thông báo về thay đổi quan trọng.
+- Sử dụng thu hoạch/giao nhận theo phạm vi đã đăng ký.
+- Yêu cầu hỗ trợ, khiếu nại và giải quyết tranh chấp.
+
+7.2. Nghĩa vụ
+- Cung cấp thông tin chính xác, thanh toán đúng hạn.
+- Bảo mật tài khoản và tuân thủ hướng dẫn.
+- Phối hợp xác minh, nhận hàng và xử lý sự cố.
+- Không can thiệp trái phép vào trang trại/thiết bị.
+- Tôn trọng quyền của SmartMush, nhân sự và khách hàng khác.
+
+8. Hủy dịch vụ và hoàn tiền
+Khách hàng có thể yêu cầu hủy hoặc thay đổi theo điều kiện liên quan. Nếu đã bắt đầu chuẩn bị hoặc triển khai, yêu cầu được xem xét theo phần dịch vụ đã thực hiện, chi phí hợp lệ và trách nhiệm các bên. Giao dịch lỗi, trùng hoặc dịch vụ không được cung cấp sẽ được xử lý theo Chính sách thanh toán và Chính sách hoàn hàng, hoàn tiền.
+
+9. Khiếu nại và giải quyết tranh chấp
+Khách hàng có thể khiếu nại về chăm sóc, sản lượng, chất lượng, thanh toán hoặc giao nhận. SmartMush tiếp nhận, xác minh và phản hồi dựa trên dữ liệu và bằng chứng liên quan. Các bên ưu tiên trao đổi; khách hàng vẫn có quyền sử dụng phương thức giải quyết hợp pháp nếu không đạt thỏa thuận.
+
+10. Quyền sở hữu trí tuệ
+Giao diện, thiết kế, biểu tượng và nội dung SmartMush được bảo vệ theo pháp luật. Khách hàng không được sao chép, sửa đổi hoặc khai thác khi chưa được phép, trừ trường hợp pháp luật cho phép. Sử dụng hệ thống không chuyển giao quyền sở hữu trí tuệ.
+
+11. Gián đoạn và sự kiện bất khả kháng
+SmartMush có thể tạm gián đoạn để bảo trì hoặc xử lý sự cố. Mất điện, kết nối, lỗi IoT hoặc sự kiện khách quan có thể ảnh hưởng vận hành. SmartMush áp dụng biện pháp phù hợp trong khả năng và thông báo khi cần. Trách nhiệm được xác định theo thỏa thuận và pháp luật.
+
+12. Thay đổi điều khoản
+SmartMush có thể cập nhật để phù hợp hoạt động và pháp luật. Thay đổi quan trọng được thông báo qua hệ thống hoặc kênh liên hệ. Điều khoản mới có hiệu lực từ thời điểm công bố hoặc thời điểm được thông báo cụ thể và không làm mất quyền hợp pháp đã phát sinh.
+
+13. Tạm ngừng và chấm dứt
+- Khách hàng có thể ngừng sử dụng hoặc yêu cầu kết thúc tài khoản theo quy trình được hỗ trợ.
+- Nghĩa vụ thanh toán, giao nhận và nghĩa vụ đã phát sinh vẫn được xử lý sau khi tài khoản kết thúc.
+- SmartMush có thể tạm/chấm dứt khi có vi phạm nghiêm trọng, yêu cầu hợp pháp hoặc căn cứ phù hợp, đồng thời xem xét quyền lợi còn tồn tại.
+- Xử lý dữ liệu sau chấm dứt tuân theo Chính sách bảo mật và pháp luật.
+
+14. Điều khoản chung
+Điều khoản áp dụng cùng các chính sách SmartMush. Nếu một nội dung không thể thực hiện theo pháp luật, nội dung còn lại vẫn áp dụng trong phạm vi hợp pháp. Vấn đề chưa quy định được xử lý theo thỏa thuận và pháp luật Việt Nam.
+
+15. Thông tin liên hệ
+- Đơn vị vận hành: SmartMush Farm
+- Email hỗ trợ: Smartmush194@gmail.com
+- Số điện thoại: 0379896749
+- Địa chỉ: Cầu Vồng, Long Bình, TP. Thủ Đức, Hồ Chí Minh, Việt Nam
+- Kênh hỗ trợ: Hỗ trợ/Khiếu nại trên ứng dụng
+
+SmartMush – Cung cấp dịch vụ minh bạch, hỗ trợ khách hàng và tôn trọng quyền lợi hợp pháp của các bên.`,
   },
 
   // 2. Chính sách bảo mật
@@ -177,79 +215,158 @@ SmartMush có trách nhiệm:
     title: 'Chính sách bảo mật',
     documentTitle: 'CHÍNH SÁCH BẢO MẬT',
     subtitle: 'SMARTMUSH – SMART MUSHROOM CULTIVATION MANAGEMENT SYSTEM',
-    effectiveDate: '13/11/2026',
+    effectiveDate: '21/11/2026',
     badge: 'An toàn dữ liệu',
     icon: 'shield-checkmark-outline',
     summary:
-      'Cam kết bảo vệ dữ liệu cá nhân, mã hóa mật khẩu, bảo mật nhật ký IoT và các quyền của người dùng đối với dữ liệu.',
+      'Quy định về thu thập, sử dụng, lưu trữ, bảo vệ và chia sẻ dữ liệu cá nhân khi khách hàng sử dụng SmartMush.',
     content: `# CHÍNH SÁCH BẢO MẬT
-SMARTMUSH – SMART MUSHROOM CULTIVATION MANAGEMENT SYSTEM
+Hệ thống SmartMush
 
-Ngày có hiệu lực: 13/11/2026
+Cập nhật lần cuối: 21/11/2026
+Ngày có hiệu lực: 21/11/2026
 
-1. Giới thiệu
-SmartMush cam kết tôn trọng và bảo vệ quyền riêng tư của người dùng trong quá trình sử dụng ứng dụng và các dịch vụ liên quan.
-Chính sách bảo mật này quy định cách SmartMush thu thập, sử dụng, lưu trữ, xử lý và bảo vệ thông tin cá nhân của người dùng khi truy cập và sử dụng hệ thống.
+SmartMush tôn trọng quyền riêng tư của khách hàng và áp dụng các biện pháp phù hợp để bảo vệ thông tin cá nhân trong quá trình cung cấp dịch vụ. Chính sách này giải thích loại thông tin được thu thập, mục đích xử lý, phạm vi chia sẻ, thời gian lưu trữ và các quyền của khách hàng.
 
-2. Phạm vi thu thập thông tin
-2.1. Thông tin tài khoản cá nhân: Họ và tên, email, số điện thoại, tên đăng nhập, mật khẩu (được băm bảo mật, không lưu văn bản thuần), ảnh đại diện.
-2.2. Thông tin đơn thuê và mùa vụ: Loại nấm, số lượng phôi, mã đơn thuê, hình ảnh quá trình sinh trưởng và nhật ký mùa vụ.
-2.3. Thông tin giao hàng: Họ tên người nhận, số điện thoại, địa chỉ nhận hàng, trạng thái giao nhận.
-2.4. Thông tin giao dịch thanh toán: Mã giao dịch, số tiền, thời gian, phương thức. SmartMush không lưu trữ thông tin thẻ ngân hàng đầy đủ hoặc mã CVV.
-2.5. Dữ liệu thiết bị và hoạt động hệ thống: Loại thiết bị, hệ điều hành, địa chỉ IP phiên, thông số nhiệt ẩm từ cảm biến IoT buồng nuôi.
+Khi đăng ký tài khoản hoặc sử dụng SmartMush, khách hàng nên đọc kỹ chính sách này. Việc thu thập và xử lý thông tin được thực hiện trong phạm vi cần thiết để cung cấp dịch vụ, đáp ứng yêu cầu hợp pháp và bảo vệ quyền lợi của khách hàng, SmartMush cũng như các bên liên quan.
+
+1. Phạm vi áp dụng
+- Chính sách áp dụng cho thông tin cá nhân của khách hàng được SmartMush thu thập, xử lý hoặc lưu trữ khi sử dụng ứng dụng và các dịch vụ liên quan.
+- Thông tin môi trường hoặc thông tin vận hành không gắn trực tiếp với một cá nhân cụ thể có thể được sử dụng theo quy định của chính sách này khi trở thành thông tin nhận diện được.
+- Việc xử lý dữ liệu của các đơn vị bên thứ ba được thực hiện theo chính sách riêng của họ và trong phạm vi hợp pháp.
+
+2. Thông tin SmartMush thu thập
+2.1. Thông tin tài khoản
+- Họ và tên, địa chỉ email và số điện thoại.
+- Thông tin đăng nhập cùng dữ liệu xác thực cần thiết để bảo vệ tài khoản.
+- Thông tin hồ sơ khác mà khách hàng chủ động cung cấp hoặc cập nhật.
+
+2.2. Thông tin đơn hàng và dịch vụ
+- Gói thuê, loại nấm, số lượng phôi hoặc khay trồng.
+- Thời gian thuê, thông tin mùa vụ và lịch sử sử dụng dịch vụ.
+- Mã đơn hàng, trạng thái đơn hàng, thông tin thanh toán và giao dịch liên quan.
+- Yêu cầu thu hoạch, nhận hàng trực tiếp hoặc giao hàng.
+
+2.3. Thông tin theo dõi mùa vụ
+- Thông tin phiên trồng, trạng thái phát triển và tiến độ chăm sóc.
+- Hình ảnh, ghi chú hoặc báo cáo được tạo trong quá trình quản lý mùa vụ.
+- Nhiệt độ, độ ẩm và dữ liệu môi trường do hệ thống IoT ghi nhận.
+- Nhật ký cập nhật, cảnh báo và thông báo liên quan đến mùa vụ.
+
+2.4. Thông tin giao nhận và hỗ trợ
+- Tên người nhận, số điện thoại và địa chỉ giao hàng hoặc nhận hàng.
+- Nội dung khiếu nại, phản hồi, yêu cầu hỗ trợ và minh chứng đính kèm.
+- Lịch sử trao đổi giữa khách hàng với bộ phận hỗ trợ, chuyên gia hoặc nhân sự vận hành.
+
+2.5. Dữ liệu kỹ thuật
+- Thông tin phiên đăng nhập và dữ liệu cần thiết để xác thực, cấp quyền truy cập.
+- Nhật ký hoạt động, sự kiện lỗi và thông tin kỹ thuật phục vụ vận hành, bảo mật và xử lý sự cố.
+- Dữ liệu thiết bị hoặc quyền truy cập thiết bị chỉ được thu thập khi cần thiết cho chức năng mà khách hàng sử dụng và khi khách hàng cấp quyền tương ứng.
 
 3. Mục đích sử dụng thông tin
-- Quản lý tài khoản và hỗ trợ xác thực đăng nhập an toàn.
-- Quản lý dịch vụ thuê phôi nấm và cập nhật tiến độ mùa vụ cho khách hàng.
-- Giám sát môi trường nuôi trồng qua hệ thống IoT và gửi cảnh báo khi phát hiện thông số bất thường.
-- Điều phối thu hoạch và giao hàng chính xác đến tay khách hàng.
-- Cải thiện chất lượng hệ thống, nâng cao trải nghiệm ứng dụng.
+SmartMush sử dụng thông tin trong phạm vi cần thiết cho các mục đích sau:
+- Tạo, xác thực và quản lý tài khoản; hỗ trợ đăng nhập và bảo vệ phiên sử dụng.
+- Tiếp nhận, xử lý và quản lý đơn thuê, mùa vụ, thu hoạch, nhận hàng và giao hàng.
+- Hiển thị tiến độ trồng, hình ảnh, dữ liệu môi trường và thông báo liên quan đến dịch vụ.
+- Xác nhận trạng thái thanh toán và đối soát giao dịch qua phương thức được khách hàng lựa chọn.
+- Tiếp nhận, phân tích và xử lý câu hỏi, phản hồi, khiếu nại hoặc yêu cầu hỗ trợ.
+- Duy trì an toàn hệ thống, kiểm soát truy cập, phát hiện hành vi bất thường và xử lý sự cố.
+- Phân tích hoạt động ở mức phù hợp nhằm cải thiện chất lượng dịch vụ và trải nghiệm sử dụng.
+- Thực hiện nghĩa vụ theo hợp đồng, yêu cầu của cơ quan có thẩm quyền hoặc quy định pháp luật.
+
+SmartMush không sử dụng dữ liệu cá nhân cho mục đích khác có thể ảnh hưởng đáng kể đến quyền của khách hàng khi chưa có căn cứ pháp lý hoặc thông báo phù hợp.
 
 4. Phạm vi chia sẻ thông tin
-SmartMush không bao giờ mua bán dữ liệu cá nhân. Dữ liệu chỉ được chia sẻ trong phạm vi cần thiết:
-- Với Farm Operator: Thông tin mùa vụ để chăm sóc và thu hái.
-- Với Shipper: Tên, số điện thoại, địa chỉ để giao hàng thành công.
-- Đơn vị công nghệ bên thứ ba: Lưu trữ đám mây, gửi thông báo OTP, cổng thanh toán có cam kết bảo mật.
-- Cơ quan nhà nước có thẩm quyền khi có yêu cầu hợp pháp.
+SmartMush không mua bán thông tin cá nhân của khách hàng. Thông tin chỉ được cung cấp khi thực sự cần thiết và theo nguyên tắc tối thiểu dữ liệu.
+
+4.1. Nhân sự vận hành SmartMush
+- Quản trị viên có thể truy cập dữ liệu cần thiết để quản lý tài khoản, đơn hàng và hệ thống.
+- Farm Operator có thể tiếp cận thông tin mùa vụ, khay trồng, hình ảnh và dữ liệu vận hành phục vụ chăm sóc, theo dõi và thu hoạch.
+- Nhân viên hỗ trợ hoặc chuyên gia chỉ được tiếp cận thông tin liên quan đến yêu cầu hỗ trợ, tư vấn hoặc khiếu nại được giao xử lý.
+- Quyền truy cập được phân theo vai trò và phạm vi công việc.
+
+4.2. Đơn vị thanh toán
+- Thông tin giao dịch cần thiết có thể được chuyển cho đơn vị thanh toán để tạo, xử lý hoặc xác nhận thanh toán.
+- SmartMush không chủ đích thu thập hoặc lưu trữ đầy đủ thông tin thẻ, mật khẩu tài khoản ngân hàng hoặc mã xác thực giao dịch.
+- Dữ liệu được xử lý theo quy trình của SmartMush và chính sách của đơn vị thanh toán tương ứng.
+
+4.3. Đơn vị vận chuyển hoặc giao nhận
+- Khi khách hàng yêu cầu giao hàng, SmartMush có thể cung cấp tên người nhận, số điện thoại, địa chỉ và thông tin đơn hàng cần thiết cho đơn vị thực hiện giao nhận.
+- Mọi thông tin được chia sẻ chỉ trong phạm vi phục vụ việc giao và hoàn tất đơn hàng.
+
+4.4. Nhà cung cấp dịch vụ công nghệ
+- SmartMush có thể sử dụng nhà cung cấp hạ tầng, lưu trữ, thông báo hoặc dịch vụ hỗ trợ kỹ thuật.
+- Việc chia sẻ phải phục vụ vận hành SmartMush và tuân thủ nghĩa vụ bảo mật áp dụng.
+
+4.5. Cơ quan có thẩm quyền
+- SmartMush có thể cung cấp thông tin khi được yêu cầu hợp pháp, trong phạm vi thẩm quyền và theo quy định pháp luật.
 
 5. Lưu trữ và bảo vệ thông tin
-- Mật khẩu được mã hóa an toàn bằng thuật toán băm tiêu chuẩn.
-- Đường truyền mã hóa HTTPS/TLS.
-- Phân quyền nghiêm ngặt theo vai trò (Customer, Farm Operator, Expert, Admin).
-- Sao lưu dự phòng định kỳ chống mất mát dữ liệu.
+SmartMush áp dụng các biện pháp kỹ thuật và tổ chức phù hợp nhằm hạn chế nguy cơ truy cập, thay đổi, mất, sử dụng hoặc tiết lộ trái phép, bao gồm:
+- Xác thực tài khoản và phân quyền truy cập theo vai trò.
+- Lưu trữ thông tin xác thực ứng dụng và mã phiên trên cơ chế bảo mật phù hợp với nền tảng.
+- Hạn chế truy cập dữ liệu theo nhu cầu công việc và chức năng hệ thống.
+- Theo dõi, kiểm tra hoạt động và xử lý các sự cố kỹ thuật hoặc bảo mật được phát hiện.
+- Chỉ chia sẻ dữ liệu cho bên thứ ba khi cần thiết để thực hiện dịch vụ hoặc theo yêu cầu pháp luật.
+- Yêu cầu khách hàng bảo vệ mật khẩu, mã xác thực, thiết bị và thông tin đăng nhập của mình.
 
-6. Quyền của người dùng đối với thông tin cá nhân
-- Quyền được biết và tra cứu thông tin cá nhân đang được lưu trữ.
-- Quyền chỉnh sửa thông tin hồ sơ (họ tên, số điện thoại, địa chỉ).
-- Quyền yêu cầu xóa thông tin hoặc rút lại sự đồng ý khi ngưng sử dụng dịch vụ.
-- Quyền phản ánh, khiếu nại nếu nghi ngờ thông tin bị rò rỉ.
+Không phương thức truyền tải hoặc lưu trữ điện tử nào có thể bảo đảm an toàn tuyệt đối. SmartMush sẽ không bỏ qua sự cố và sẽ thực hiện bước khắc phục phù hợp khi phát hiện rủi ro.
 
-7. Quyền truy cập các chức năng trên thiết bị di động
-- Camera / Thư viện ảnh: Để cập nhật ảnh đại diện hoặc kỹ thuật viên chụp ảnh nấm.
-- Thông báo (Notifications): Nhận thông báo tiến độ sinh trưởng, báo cáo thu hoạch và mã OTP.
-- Vị trí: Hỗ trợ xác định địa chỉ giao hàng khi cần thiết.
+6. Quyền thiết bị trên ứng dụng
+- SmartMush chỉ yêu cầu quyền truy cập máy ảnh hoặc thư viện ảnh khi khách hàng hoặc nhân sự vận hành cần chụp, chọn và đính kèm hình ảnh.
+- Khách hàng có thể từ chối hoặc thu hồi quyền trên thiết bị. Một số chức năng liên quan đến hình ảnh có thể không hoạt động khi quyền bị tắt.
+- SmartMush không yêu cầu quyền vị trí để hiển thị chính sách này hoặc xác định thông tin chính khách hàng đã khai báo.
+- Khách hàng không bắt buộc cung cấp những dữ liệu tùy chọn nếu dữ liệu đó không cần thiết để hoàn tất chức năng đang sử dụng.
 
-8. Bảng thời gian lưu trữ thông tin
-- Thông tin tài khoản: Trong suốt thời gian tài khoản hoạt động và theo nghĩa vụ pháp lý.
-- Thông tin đơn thuê: Trong thời gian cần thiết để quản lý và giải quyết khiếu nại.
-- Lịch sử mùa vụ: Lưu trữ phục vụ tra cứu nông nghiệp sạch.
-- Dữ liệu kế toán / giao dịch: Lưu trữ theo quy định pháp luật kế toán tài chính.
-- Nhật ký hệ thống: Lưu trữ tối thiểu theo yêu cầu an toàn thông tin mạng.
+7. Thời gian lưu trữ thông tin
+Thông tin cá nhân được lưu trữ trong thời gian cần thiết để:
+- Duy trì tài khoản và cung cấp dịch vụ.
+- Hoàn tất đơn hàng, giao dịch, mùa vụ và các yêu cầu hỗ trợ.
+- Giải quyết tranh chấp, khiếu nại hoặc yêu cầu pháp lý.
+- Thực hiện nghĩa vụ lưu trữ kế toán, thuế, chứng từ và nghĩa vụ khác theo pháp luật.
 
-9. Chuyển dữ liệu xuyên biên giới
-Trường hợp sử dụng hạ tầng đám mây quốc tế, dữ liệu được bảo vệ tuân thủ các quy định hiện hành về bảo vệ dữ liệu cá nhân của Việt Nam.
+Khi thông tin không còn cần thiết, SmartMush sẽ xóa, ẩn danh hoặc áp dụng biện pháp xử lý phù hợp, trừ khi pháp luật hoặc quyền lợi hợp pháp cần thiết cho phép lưu trữ lâu hơn. Một số dữ liệu giao dịch hoặc khiếu nại có thể được giữ lại dù tài khoản đã ngừng sử dụng.
 
-10. Xử lý sự cố và vi phạm bảo mật
-Nếu phát hiện dấu hiệu xâm phạm an ninh mạng, SmartMush kích hoạt quy trình ứng phó khẩn cấp, ngăn chặn rò rỉ và thông báo cho người dùng bị ảnh hưởng.
+8. Quyền và trách nhiệm của khách hàng
+8.1. Quyền của khách hàng
+- Được cung cấp thông tin về loại dữ liệu được thu thập, cách thức sử dụng và phạm vi chia sẻ.
+- Được truy cập, xem hoặc cập nhật thông tin cá nhân trong phạm vi chức năng hệ thống hỗ trợ.
+- Được yêu cầu chỉnh sửa thông tin không chính xác hoặc không đầy đủ.
+- Được yêu cầu truy cập, hạn chế, phản đối hoặc xóa dữ liệu trong phạm vi pháp luật cho phép và không ảnh hưởng đến nghĩa vụ lưu trữ bắt buộc.
+- Được yêu cầu giải thích việc chia sẻ dữ liệu với bên thứ ba.
+- Được phản ánh hoặc khiếu nại khi nghi ngờ thông tin bị sử dụng sai mục đích.
+- Được rút lại sự đồng ý đối với hoạt động xử lý dựa trên sự đồng ý, với điều kiện không ảnh hưởng đến xử lý đã thực hiện hợp pháp trước đó.
 
-11. Thay đổi chính sách bảo mật
-Chính sách có thể được cập nhật định kỳ để phù hợp pháp luật và sẽ thông báo qua ứng dụng.
+Một số yêu cầu có thể cần xác minh danh tính và sẽ được xử lý trong thời gian phù hợp theo nội dung yêu cầu, phạm vi dữ liệu và quy định pháp luật.
 
-12. Thông tin liên hệ
+8.2. Trách nhiệm của khách hàng
+- Cung cấp thông tin chính xác, đầy đủ và thông báo khi có thay đổi.
+- Không cung cấp dữ liệu hoặc sử dụng thông tin của người khác khi chưa được phép.
+- Bảo mật mật khẩu, mã xác thực và thiết bị; không chia sẻ tài khoản cho người khác.
+- Thông báo cho SmartMush khi phát hiện dấu hiệu truy cập trái phép hoặc rủi ro bảo mật.
+- Cập nhật địa chỉ, số điện thoại và thông tin giao nhận trước khi SmartMush thực hiện dịch vụ.
+
+9. Xử lý sự cố bảo mật
+Khi phát hiện hoặc nhận được thông báo về sự cố liên quan đến thông tin cá nhân, SmartMush sẽ:
+- Tiếp nhận và xác minh thông tin về sự cố.
+- Thực hiện các biện pháp cần thiết để hạn chế hoặc ngăn chặn ảnh hưởng.
+- Đánh giá phạm vi dữ liệu, người bị ảnh hưởng và mức độ rủi ro.
+- Phối hợp khắc phục, phục hồi hệ thống và hạn chế nguy cơ tái diễn.
+- Thông báo cho khách hàng hoặc cơ quan có thẩm quyền khi pháp luật yêu cầu hoặc khi việc thông báo là cần thiết để bảo vệ khách hàng.
+
+10. Thay đổi chính sách
+SmartMush có thể cập nhật chính sách để phản ánh thay đổi về chức năng, cách vận hành hoặc yêu cầu pháp lý. Đối với thay đổi quan trọng, SmartMush sẽ thông báo qua ứng dụng hoặc kênh liên hệ phù hợp. Ngày cập nhật tại đầu văn bản thể hiện phiên bản đang có hiệu lực.
+
+11. Thông tin liên hệ và hỗ trợ
+Khách hàng có thể liên hệ để hỏi về quyền riêng tư, cập nhật dữ liệu, phản ánh hoặc gửi yêu cầu liên quan đến thông tin cá nhân:
 - Đơn vị vận hành: SmartMush Farm
-- Email: Smartmush194@gmail.com
-- Hotline: 0379896749
-- Địa chỉ: Cầu Vồng, Long Bình, Hồ Chí Minh, Việt Nam`,
+- Email hỗ trợ: Smartmush194@gmail.com
+- Số điện thoại: 0379896749
+- Địa chỉ: Cầu Vồng, Long Bình, TP. Thủ Đức, Hồ Chí Minh, Việt Nam
+
+SmartMush sẽ xác minh nội dung và phạm vi yêu cầu trước khi cung cấp, sửa đổi hoặc xóa dữ liệu để bảo vệ đúng chủ thể thông tin.
+
+SmartMush – Minh bạch trong vận hành, an toàn trong quản lý và tôn trọng quyền riêng tư của khách hàng.`,
   },
 
   // 3. Chính sách thanh toán
@@ -258,237 +375,296 @@ Chính sách có thể được cập nhật định kỳ để phù hợp pháp
     title: 'Chính sách thanh toán',
     documentTitle: 'CHÍNH SÁCH THANH TOÁN',
     subtitle: 'SMARTMUSH – SMART MUSHROOM CULTIVATION MANAGEMENT SYSTEM',
-    effectiveDate: '13/11/2026',
+    effectiveDate: '21/11/2026',
     badge: 'Giao dịch an toàn',
     icon: 'card-outline',
     summary:
-      'Quy chuẩn thanh toán dịch vụ thuê nấm, hình thức chuyển khoản / quét QR, đối soát minh bạch và xử lý sự cố thanh toán.',
+      'Quy định phương thức PayOS, quy trình xác nhận giao dịch, trách nhiệm của khách hàng và cách xử lý sự cố thanh toán.',
     content: `# CHÍNH SÁCH THANH TOÁN
-SMARTMUSH – SMART MUSHROOM CULTIVATION MANAGEMENT SYSTEM
+Hệ thống SmartMush
 
-Ngày có hiệu lực: 13/11/2026
+Cập nhật lần cuối: 21/11/2026
+Ngày có hiệu lực: 21/11/2026
 
-1. Giới thiệu
-Chính sách thanh toán này quy định các điều kiện, phương thức và quy trình thanh toán khi khách hàng sử dụng dịch vụ trên nền tảng SmartMush.
-SmartMush cung cấp dịch vụ thuê phôi nấm, khay trồng, theo dõi quá trình sinh trưởng và các dịch vụ thu hoạch, giao hàng.
-Chính sách đảm bảo tính minh bạch, an toàn giao dịch và bảo vệ quyền lợi tài chính của khách hàng.
+SmartMush xây dựng chính sách thanh toán nhằm giúp quá trình đăng ký và thanh toán dịch vụ thuê trồng nấm được minh bạch, thuận tiện và an toàn. Chính sách quy định phương thức thanh toán, quy trình xác nhận giao dịch, trách nhiệm của các bên và cách xử lý vấn đề phát sinh.
 
-2. Phạm vi áp dụng
-Áp dụng đối với các giao dịch thanh toán trên ứng dụng SmartMush:
-- Phí thuê phôi nấm và khay nuôi trồng.
-- Phí dịch vụ chăm sóc và giám sát IoT.
-- Phí thu hoạch và các dịch vụ tiện ích bổ sung.
+Khi thực hiện thanh toán trên SmartMush, khách hàng cần kiểm tra đầy đủ thông tin đơn hàng, số tiền và nội dung hiển thị trước khi xác nhận giao dịch.
 
-3. Phương thức thanh toán được hỗ trợ
-3.1. Thanh toán trực tuyến:
-- Chuyển khoản ngân hàng trực tiếp.
-- Quét mã VietQR tiện lợi, chính xác.
-- Ví điện tử hoặc cổng thanh toán trực tuyến liên kết (VNPAY, MoMo, v.v.).
-3.2. Thanh toán trực tiếp tại trang trại (nếu có đăng ký trước).
-3.3. Các phương thức khác được công bố cụ thể trong màn hình thanh toán đơn hàng.
+1. Phạm vi áp dụng
+Chính sách áp dụng cho các khoản thanh toán liên quan đến dịch vụ SmartMush, bao gồm:
+- Phí thuê gói trồng nấm, phôi hoặc khay trồng.
+- Phí dịch vụ bổ sung được hệ thống hỗ trợ.
+- Phí thu hoạch, đóng gói, nhận hàng hoặc giao hàng nếu được áp dụng.
+- Các giao dịch tài chính khác được SmartMush thông báo rõ khi khách hàng xác nhận.
 
-4. Quy trình thanh toán 6 bước
-- Bước 1: Lựa chọn giống nấm, số lượng phôi/khay và dịch vụ chăm sóc.
-- Bước 2: Kiểm tra bảng chi tiết đơn hàng (loại nấm, số lượng, thời gian, tổng tiền).
-- Bước 3: Chọn phương thức thanh toán phù hợp.
-- Bước 4: Thực hiện thanh toán theo hướng dẫn (quét QR hoặc chuyển khoản đúng nội dung).
-- Bước 5: Hệ thống đối soát tự động và cập nhật trạng thái đơn hàng.
-- Bước 6: Trang trại xác nhận đơn thuê và khởi tạo mùa vụ cho khách hàng.
+2. Phương thức thanh toán
+2.1. Thanh toán qua PayOS
+- SmartMush hỗ trợ thanh toán trực tuyến thông qua cổng thanh toán PayOS được tích hợp trong hệ thống.
+- Hệ thống có thể cung cấp mã QR hoặc thông tin giao dịch để khách hàng thực hiện trên ứng dụng/ngân hàng hỗ trợ.
+- SmartMush không yêu cầu khách hàng cung cấp mật khẩu ngân hàng, mã OTP hoặc thông tin xác thực giao dịch cho nhân sự SmartMush.
 
-5. Giá dịch vụ và các khoản phí
-- Giá dịch vụ được niêm yết rõ ràng, công khai trước khi khách hàng bấm xác nhận thanh toán.
-- Đã bao gồm chi phí theo dõi môi trường IoT và nhân công chăm sóc theo gói.
-- Khách hàng không phải chi trả bất kỳ khoản phí ẩn nào ngoài các mục đã hiển thị.
+2.2. Xác nhận thanh toán
+- SmartMush chỉ ghi nhận đơn hàng đã thanh toán khi nhận được kết quả giao dịch hợp lệ từ PayOS hoặc nguồn đối soát được hệ thống chấp nhận.
+- Trạng thái có thể hiển thị là đang xử lý, thành công, thất bại, hết hạn hoặc bị hủy.
+- Việc hiển thị mã QR không đồng nghĩa giao dịch đã thành công.
+- Khách hàng nên kiểm tra trạng thái trong thông tin đơn hàng và tránh chỉ dựa vào màn hình từ thiết bị hoặc ứng dụng thanh toán.
 
-6. Xác nhận và quản lý giao dịch
-- Mỗi đơn thanh toán có mã giao dịch duy nhất để đối chiếu.
-- Lịch sử giao dịch được lưu trữ đầy đủ trong mục "Đơn hàng của tôi".
-- Hệ thống chỉ xác nhận thành công khi tiền đã vào tài khoản trang trại qua hệ thống tự động hoặc xác nhận từ kế toán.
+3. Quy trình thanh toán
+Bước 1: Lựa chọn dịch vụ
+Khách hàng lựa chọn loại nấm, số lượng phôi hoặc khay trồng và các dịch vụ được hệ thống hỗ trợ. Gói thuê được hệ thống tự chọn theo thời gian sinh trưởng dự kiến và hiển thị trước khi xác nhận.
 
-7. Xử lý sự cố giao dịch bất thường
-- Thanh toán thất bại: Tiền chưa trừ, khách hàng có thể chọn thanh toán lại hoặc chọn phương thức khác.
-- Đã trừ tiền nhưng đơn hàng chưa cập nhật: Khách hàng liên hệ Hotline/Email kèm ảnh chụp biên lai giao dịch để kế toán đối soát thủ công và kích hoạt đơn ngay.
-- Chuyển khoản nhầm hoặc trùng lặp: Sau khi xác minh số tiền chuyển thừa, SmartMush hoàn tiền theo Chính sách hoàn tiền.
+Bước 2: Kiểm tra đơn hàng
+Hệ thống hiển thị các thông tin cần thiết, gồm:
+- Loại nấm, gói thuê hệ thống tự chọn và số lượng.
+- Thời gian hoặc điều kiện dịch vụ dự kiến.
+- Phí dịch vụ và khoản bổ sung được áp dụng.
+- Tổng số tiền cần thanh toán.
 
-8. Quy định về thanh toán dịch vụ bổ sung
-Các dịch vụ phát sinh sau (như đăng ký đóng gói đặc biệt, dịch vụ giao hàng đường dài) được tính phí riêng và thông báo trước khi tiến hành.
+Khách hàng chịu trách nhiệm kiểm tra trước khi tiếp tục.
 
-9. Trách nhiệm của khách hàng
-- Nhập đúng số tiền và nội dung chuyển khoản theo hướng dẫn.
-- Bảo mật thông tin tài khoản ngân hàng và mã OTP.
-- Lưu trữ chứng từ giao dịch phục vụ việc đối soát khi cần thiết.
+Bước 3: Thực hiện giao dịch
+Khách hàng sử dụng mã QR hoặc thông tin được PayOS cung cấp, thực hiện đúng số tiền và nội dung do hệ thống hiển thị.
 
-10. Trách nhiệm của SmartMush
-- Hiển thị bảng giá minh bạch, chính xác.
-- Đảm bảo an toàn thông tin giao dịch tài chính.
-- Phối hợp xử lý nhanh các trường hợp lỗi mạng hoặc đối soát chậm từ phía cổng thanh toán.
+Bước 4: Chờ và kiểm tra kết quả
+- Thành công: SmartMush ghi nhận giao dịch và chuyển đơn hàng sang bước xử lý tiếp theo.
+- Thất bại, bị hủy hoặc hết hạn: Đơn hàng chưa được xác nhận thanh toán.
+- Đang xử lý: Khách hàng cần chờ kết quả cuối cùng và không tạo thêm giao dịch lặp lại.
 
-11. Liên kết với chính sách hoàn tiền
-Các trường hợp hủy đơn hoặc yêu cầu trả lại tiền được giải quyết tuân thủ theo Chính sách Hủy đơn và Hoàn tiền của SmartMush.
+Bước 5: Xác nhận dịch vụ
+Sau khi thanh toán được xác nhận, SmartMush xử lý đơn hàng theo quy trình vận hành. Việc thanh toán không mặc nhiên đồng nghĩa mùa vụ hoặc dịch vụ được bắt đầu ngay lập tức.
 
-12. Thay đổi chính sách thanh toán
-SmartMush có thể điều chỉnh chính sách để phù hợp quy định thanh toán của Ngân hàng Nhà nước và sẽ thông báo trước khi áp dụng.
+4. Giá dịch vụ và các khoản phí
+- Giá và tổng số tiền được xác định từ thông tin đơn hàng tại thời điểm khách hàng xác nhận thanh toán.
+- Phí giao hàng, đóng gói, thu hoạch hoặc dịch vụ bổ sung chỉ áp dụng khi được thông báo trước khi khách hàng chấp thuận.
+- SmartMush không chủ đích thu khoản phí ngoài nội dung đã hiển thị hoặc được khách hàng xác nhận.
+- Nếu số tiền hoặc khoản phí chưa rõ, khách hàng nên liên hệ hỗ trợ trước khi thanh toán.
 
-13. Thông tin liên hệ và hỗ trợ thanh toán
+5. Thời điểm thanh toán
+- Khách hàng thực hiện thanh toán theo yêu cầu hiển thị khi đăng ký hoặc xác nhận dịch vụ.
+- Đơn hàng chỉ được xem là đã thanh toán sau khi hệ thống nhận kết quả giao dịch hợp lệ.
+- Việc phân bổ khay trồng, xác nhận mùa vụ, thu hoạch hoặc giao hàng được thực hiện theo quy trình vận hành và tình trạng dịch vụ thực tế.
+- Chi phí bổ sung phát sinh sau đăng ký phải được thông báo để khách hàng xem xét trước khi thanh toán.
+
+6. Xử lý giao dịch chưa thành công
+6.1. Giao dịch thất bại, bị hủy hoặc hết hạn
+Đơn hàng chưa được xác nhận thanh toán. Khách hàng có thể kiểm tra nguyên nhân và tạo giao dịch mới nếu hệ thống cho phép.
+
+6.2. Giao dịch đang xử lý
+Khách hàng nên chờ kết quả cập nhật và tránh thanh toán lại ngay. Việc đồng bộ có thể cần thời gian phụ thuộc vào PayOS hoặc ngân hàng.
+
+6.3. Đã trừ tiền nhưng hệ thống chưa cập nhật
+Khách hàng không nên tạo thêm giao dịch. Cần lưu mã đơn hàng, mã giao dịch, thời gian và bằng chứng thanh toán để SmartMush kiểm tra, đối soát.
+
+6.4. Thanh toán trùng hoặc sai số tiền
+SmartMush sẽ kiểm tra lịch sử đơn hàng và giao dịch liên quan. Việc điều chỉnh hoặc hoàn tiền được xử lý theo kết quả đối soát, Chính sách Hủy đơn và Hoàn tiền và quy định của phương thức thanh toán.
+
+7. Chứng từ và thông tin giao dịch
+- Sau khi giao dịch hoàn tất, SmartMush ghi nhận các thông tin cần thiết để đối chiếu trạng thái đơn hàng.
+- Khách hàng nên lưu mã giao dịch, thời gian, số tiền và thông tin đơn hàng.
+- Khách hàng có thể xem trạng thái thanh toán trong chức năng đơn hàng được hệ thống hỗ trợ.
+- Nếu cần chứng từ hoặc hóa đơn, khách hàng liên hệ SmartMush để được hướng dẫn và cung cấp thông tin cần thiết.
+- Yêu cầu hóa đơn không tự động làm thay đổi giá trị hoặc trạng thái giao dịch đã thực hiện.
+
+8. Trách nhiệm của khách hàng
+- Cung cấp thông tin chính xác và sử dụng đúng tài khoản khi thanh toán.
+- Kiểm tra gói dịch vụ, số lượng, số tiền và thông tin đơn hàng trước khi xác nhận.
+- Bảo mật tài khoản ngân hàng, mật khẩu và mã xác thực; không cung cấp thông tin này cho người khác.
+- Chỉ thực hiện giao dịch trên kênh được SmartMush hoặc PayOS cung cấp.
+- Không thanh toán lặp lại khi giao dịch đang xử lý nếu chưa nhận hướng dẫn kiểm tra.
+- Cung cấp mã đơn hàng, mã giao dịch và bằng chứng phù hợp khi yêu cầu đối soát.
+- Không khai thác lỗi, che giấu hoặc lợi dụng sai lệch giao dịch.
+
+9. Trách nhiệm của SmartMush
+- Hiển thị thông tin phí và tổng số tiền trước bước xác nhận thanh toán.
+- Ghi nhận và cập nhật trạng thái giao dịch dựa trên dữ liệu hợp lệ nhận được từ PayOS hoặc quy trình đối soát.
+- Hỗ trợ khách hàng kiểm tra giao dịch lỗi, chậm cập nhật hoặc thanh toán trùng.
+- Phối hợp với đơn vị thanh toán trong phạm vi cần thiết để xử lý sự cố.
+- Bảo vệ thông tin giao dịch theo Chính sách bảo mật và hạn chế truy cập theo vai trò.
+- Không cam kết thời gian xử lý cố định khi kết quả còn phụ thuộc vào ngân hàng, PayOS hoặc đơn vị thanh toán khác.
+
+10. Hoàn tiền và khiếu nại
+- Yêu cầu hoàn tiền, hủy đơn hoặc điều chỉnh thanh toán được xem xét theo Chính sách Hủy đơn và Hoàn tiền.
+- Khiếu nại thanh toán cần nêu mã đơn hàng, mã giao dịch, thời gian, số tiền và nội dung sự cố.
+- Việc xác nhận giao dịch trùng, sai hoặc không thành công phụ thuộc vào đối chiếu dữ liệu thực tế.
+
+11. Thay đổi chính sách
+SmartMush có thể cập nhật chính sách để phù hợp với thay đổi về phương thức thanh toán, quy trình vận hành hoặc quy định pháp luật. Những thay đổi quan trọng sẽ được thông báo qua ứng dụng hoặc kênh liên hệ phù hợp.
+
+12. Thông tin liên hệ và hỗ trợ
 - Đơn vị vận hành: SmartMush Farm
-- Hotline kế toán / hỗ trợ: 0379896749
-- Email: Smartmush194@gmail.com
-- Địa chỉ: Cầu Vồng, Long Bình, Hồ Chí Minh, Việt Nam`,
+- Email hỗ trợ: Smartmush194@gmail.com
+- Số điện thoại: 0379896749
+- Địa chỉ: Cầu Vồng, Long Bình, TP. Thủ Đức, Hồ Chí Minh, Việt Nam
+
+Khi yêu cầu hỗ trợ, khách hàng nên cung cấp mã đơn hàng, mã giao dịch, thời gian thanh toán và mô tả sự cố để SmartMush có thể kiểm tra.
+
+SmartMush – Minh bạch trong thanh toán, an tâm trong trải nghiệm dịch vụ.`,
   },
 
   // 4. Chính sách hoàn tiền
   {
     id: 'refund-policy',
-    title: 'Chính sách hoàn tiền',
-    documentTitle: 'CHÍNH SÁCH HOÀN TIỀN',
+    title: 'Chính sách hoàn hàng và hoàn tiền',
+    documentTitle: 'CHÍNH SÁCH HOÀN HÀNG VÀ HOÀN TIỀN',
     subtitle: 'SMARTMUSH – SMART MUSHROOM CULTIVATION MANAGEMENT SYSTEM',
-    effectiveDate: '13/11/2026',
-    badge: 'Tài chính & Hoàn phí',
+    effectiveDate: '21/11/2026',
+    badge: 'Hoàn hàng & Hoàn tiền',
     icon: 'cash-outline',
     summary:
-      'Quy định điều kiện, trường hợp, nguyên tắc xác định số tiền hoàn và quy trình giải quyết hoàn tiền minh bạch cho khách hàng.',
-    content: `# CHÍNH SÁCH HOÀN TIỀN
-SMARTMUSH – SMART MUSHROOM CULTIVATION MANAGEMENT SYSTEM
+      'Quy định điều kiện hoàn hàng, các trường hợp được xem xét hoàn tiền và quy trình kiểm tra, đổi hàng hoặc hoàn phí.',
+    content: `# CHÍNH SÁCH HOÀN HÀNG VÀ HOÀN TIỀN
+Hệ thống SmartMush
 
-Ngày có hiệu lực: 13/11/2026
+Cập nhật lần cuối: 21/11/2026
+Ngày có hiệu lực: 21/11/2026
 
-1. Giới thiệu
-Chính sách hoàn tiền này quy định các điều kiện, trường hợp và quy trình xử lý yêu cầu hoàn tiền khi khách hàng sử dụng dịch vụ trên nền tảng SmartMush.
-SmartMush cung cấp dịch vụ hỗ trợ thuê phôi nấm, khay trồng hoặc khu vực trồng nấm, theo dõi quá trình sinh trưởng, quản lý mùa vụ và đăng ký các dịch vụ thu hoạch, giao nhận.
-Chính sách được xây dựng nhằm đảm bảo quyền lợi của khách hàng, đồng thời tạo cơ sở minh bạch để đơn vị vận hành tiếp nhận và xử lý các yêu cầu hoàn tiền phát sinh trong quá trình cung cấp dịch vụ.
-Việc hoàn tiền được xem xét dựa trên trạng thái đơn hàng, tiến độ thực hiện dịch vụ, nguyên nhân phát sinh và các thỏa thuận giữa khách hàng với đơn vị vận hành.
+SmartMush hướng đến việc cung cấp dịch vụ thuê trồng nấm minh bạch và bảo vệ quyền lợi hợp pháp của khách hàng. Chính sách quy định trường hợp được xem xét hoàn hàng, hoàn tiền, điều kiện tiếp nhận, quy trình xác minh và cách thực hiện phương án xử lý.
 
-2. Phạm vi áp dụng
-Chính sách hoàn tiền áp dụng đối với các khoản thanh toán phát sinh trên SmartMush, bao gồm:
-- Phí thuê phôi nấm.
-- Phí thuê khay hoặc khu vực trồng nấm.
-- Phí dịch vụ chăm sóc và quản lý mùa vụ.
-- Phí thu hoạch (nếu có).
-- Các khoản phí dịch vụ bổ sung khác.
-Chính sách áp dụng cho khách hàng đã thực hiện thanh toán và có nhu cầu yêu cầu hoàn lại toàn bộ số tiền đã thanh toán.
+1. Phạm vi áp dụng
+Chính sách áp dụng đối với:
+- Dịch vụ thuê trồng nấm theo gói.
+- Sản phẩm nấm sau thu hoạch.
+- Dịch vụ thu hoạch, đóng gói, nhận hàng hoặc giao hàng nếu được áp dụng.
+- Giao dịch thanh toán liên quan đến dịch vụ trên SmartMush.
+
+2. Nguyên tắc chung
+- Mọi yêu cầu được xem xét dựa trên tình trạng đơn hàng, bằng chứng, phần dịch vụ đã thực hiện, nguyên nhân phát sinh và quy định pháp luật.
+- Việc nhận yêu cầu không đồng nghĩa yêu cầu được chấp nhận hoặc khoản hoàn tiền được thực hiện.
+- Phương án xử lý có thể là đổi hàng, bổ sung sản phẩm, hoàn một phần, hoàn toàn bộ hoặc phương án hỗ trợ khác phù hợp với kết quả xác minh.
+- SmartMush sẽ thông báo kết quả và lý do trong phạm vi thông tin có thể cung cấp.
 
 3. Các trường hợp được xem xét hoàn tiền
-SmartMush tiếp nhận và xem xét yêu cầu hoàn tiền trong các trường hợp sau:
+3.1. Khách hàng hủy dịch vụ
+- Khách hàng có thể yêu cầu hủy trước khi mùa vụ được triển khai.
+- Nếu yêu cầu được chấp thuận và chưa phát sinh chi phí thực tế, SmartMush có thể xem xét hoàn khoản đã thanh toán.
+- Nếu quá trình chuẩn bị hoặc mùa vụ đã bắt đầu, số tiền hoàn được xác định dựa trên phần dịch vụ chưa thực hiện, chi phí hợp lệ đã phát sinh và trách nhiệm của các bên.
 
-3.1. Đơn thuê chưa được xác nhận hoặc chưa triển khai
-Khách hàng có thể được xem xét hoàn tiền khi:
-- Đơn thuê đã thanh toán nhưng chưa được xác nhận bởi đơn vị vận hành.
-- Trang trại không thể tiếp nhận hoặc cung cấp dịch vụ theo đơn thuê.
-- Dịch vụ không thể triển khai do nguyên nhân thuộc trách nhiệm của đơn vị vận hành.
-Việc hoàn tiền được thực hiện sau khi xác minh tình trạng đơn hàng và khoản thanh toán.
+3.2. SmartMush không thể cung cấp dịch vụ
+Khách hàng có thể yêu cầu xem xét hoàn tiền khi SmartMush không thể:
+- Bố trí khu vực hoặc khay trồng như đã xác nhận.
+- Triển khai hoặc tiếp tục mùa vụ theo thỏa thuận.
+- Cung cấp dịch vụ do sự cố vận hành nghiêm trọng thuộc trách nhiệm của SmartMush.
 
-3.2. Đơn thuê bị hủy bởi đơn vị vận hành
-Khách hàng có thể được hoàn tiền nếu SmartMush hoặc trang trại không thể tiếp tục cung cấp dịch vụ vì các lý do thuộc trách nhiệm của đơn vị vận hành.
-Các trường hợp có thể bao gồm:
-- Không đủ phôi hoặc khay trồng để thực hiện đơn thuê.
-- Không thể bố trí khu vực trồng nấm như đã xác nhận.
-- Trang trại không thể tiếp tục cung cấp dịch vụ theo thỏa thuận.
-- Các vấn đề vận hành nghiêm trọng khiến dịch vụ không thể được thực hiện.
-Mức hoàn tiền được xác định dựa trên phần dịch vụ chưa được cung cấp và các chi phí hợp lệ đã phát sinh.
+3.3. Mùa vụ gặp sự cố nghiêm trọng
+SmartMush sẽ kiểm tra dữ liệu mùa vụ, lịch sử chăm sóc, điều kiện thực tế và nguyên nhân sự cố:
+- Nếu lỗi phát sinh thuộc trách nhiệm vận hành của SmartMush, khách hàng có thể được xem xét đổi phương án dịch vụ hoặc hoàn một phần/toàn bộ giá trị chịu ảnh hưởng.
+- Nếu liên quan đến đặc tính sinh học, điều kiện khách quan hoặc yếu tố ngoài khả năng kiểm soát hợp lý, SmartMush xem xét từng trường hợp và đề xuất phương án phù hợp.
+- Chỉ kết quả kiểm tra và thỏa thuận xử lý xác định mức hoàn hoặc phương án thay thế.
 
-3.3. Thanh toán trùng lặp hoặc thanh toán sai
-Khách hàng được xem xét hoàn tiền khi:
-- Thanh toán nhiều lần cho cùng một đơn hàng.
-- Hệ thống ghi nhận khoản thanh toán không tương ứng với đơn hàng.
-- Khách hàng thanh toán vượt quá số tiền phải trả.
-- Giao dịch phát sinh sai lệch được xác minh là lỗi từ hệ thống hoặc quá trình xử lý thanh toán.
-Đối với trường hợp thanh toán trùng lặp hoặc thanh toán thừa, SmartMush sẽ đối chiếu giao dịch và hoàn lại khoản tiền thanh toán dư hợp lệ.
+3.4. Dịch vụ bổ sung chưa được cung cấp
+Khách hàng có thể được xem xét hoàn khoản phí đã xác nhận cho dịch vụ không được thực hiện, như thu hoạch, đóng gói hoặc giao hàng, sau khi kiểm tra trạng thái thực tế.
 
-3.4. Mùa vụ gặp sự cố nghiêm trọng
-Trong quá trình trồng nấm, nếu xảy ra sự cố nghiêm trọng khiến mùa vụ không thể tiếp tục hoặc dịch vụ không đạt được mục đích đã thỏa thuận, khách hàng có quyền gửi yêu cầu để SmartMush xem xét phương án xử lý.
-Các trường hợp có thể bao gồm:
-- Phôi nấm bị hư hỏng nghiêm trọng.
-- Điều kiện môi trường không được duy trì trong thời gian ảnh hưởng đáng kể đến mùa vụ.
-- Thiết bị hoặc hệ thống vận hành gặp sự cố kéo dài làm ảnh hưởng đến quá trình chăm sóc.
-- Trang trại không thể tiếp tục chăm sóc hoặc duy trì mùa vụ.
-Farm Operator và bộ phận quản lý có trách nhiệm kiểm tra tình trạng thực tế, lịch sử chăm sóc và dữ liệu môi trường liên quan để xác định nguyên nhân.
-Tùy theo mức độ ảnh hưởng và trách nhiệm của các bên, SmartMush có thể xem xét:
-- Hoàn tiền toàn bộ đối với phần dịch vụ chưa được thực hiện.
-- Hoàn tiền một phần tương ứng với phần dịch vụ bị ảnh hưởng.
-- Hỗ trợ thay thế phôi hoặc khay trồng.
-- Bố trí mùa vụ mới nếu khách hàng đồng ý.
-Việc lựa chọn phương án xử lý cần được thông báo và thống nhất với khách hàng.
+3.5. Giao dịch thanh toán lỗi hoặc trùng
+Các trường hợp được xem xét gồm:
+- Tài khoản bị trừ tiền nhưng hệ thống chưa ghi nhận thanh toán hợp lệ.
+- Thanh toán nhiều lần cho cùng đơn hàng.
+- Số tiền giao dịch thực tế vượt số tiền cần thanh toán.
 
-3.5. Dịch vụ bổ sung không được cung cấp
-Khách hàng có thể được hoàn tiền đối với các dịch vụ bổ sung đã thanh toán nhưng không được thực hiện theo thỏa thuận.
-Ví dụ:
-- Đã thanh toán phí thu hoạch nhưng dịch vụ thu hoạch không được cung cấp.
-- Đã thanh toán phí giao hàng nhưng đơn vị vận hành không thực hiện giao hàng.
-- Dịch vụ đóng gói đã thanh toán nhưng không được cung cấp.
-Mức hoàn tiền được xác định theo giá trị dịch vụ chưa được thực hiện.
+SmartMush sẽ đối soát trước khi điều chỉnh, hoàn khoản thừa hoặc phối hợp với đơn vị thanh toán.
 
-4. Các trường hợp không được hoàn tiền
-SmartMush có thể từ chối yêu cầu hoàn tiền trong những trường hợp sau, nếu việc từ chối phù hợp với thỏa thuận và quy định pháp luật:
-- Khách hàng thay đổi quyết định sau khi dịch vụ đã được triển khai và các chi phí hợp lệ đã phát sinh.
-- Khách hàng cung cấp thông tin không chính xác dẫn đến việc không thể thực hiện dịch vụ.
-- Khách hàng không phối hợp nhận sản phẩm hoặc không tiếp nhận giao hàng theo thỏa thuận mà không có lý do hợp lệ.
-- Sản lượng hoặc thời gian thu hoạch thực tế khác với dự kiến do đặc tính sinh học tự nhiên của nấm, trong khi trang trại đã thực hiện đúng trách nhiệm chăm sóc và thỏa thuận.
-- Yêu cầu hoàn tiền không có căn cứ xác thực hoặc có dấu hiệu gian lận.
-Lưu ý: Việc một dịch vụ đã bắt đầu hoặc khách hàng thay đổi ý định không mặc nhiên làm mất quyền yêu cầu hoàn tiền trong trường hợp pháp luật có quy định khác hoặc đơn vị vận hành không thực hiện đúng nghĩa vụ.
+4. Chính sách hoàn hàng
+Sản phẩm nấm tươi có thời gian bảo quản hạn chế nên khách hàng nên kiểm tra ngay khi nhận hàng.
 
-5. Nguyên tắc xác định số tiền hoàn
-Số tiền hoàn được xác định dựa trên:
-- Tổng số tiền khách hàng đã thanh toán.
-- Phần dịch vụ đã được thực hiện.
-- Phần dịch vụ chưa được cung cấp.
-- Các chi phí hợp lệ đã phát sinh.
-- Nguyên nhân dẫn đến yêu cầu hoàn tiền.
-- Trách nhiệm của khách hàng và đơn vị vận hành.
-- Các thỏa thuận đã xác nhận giữa các bên.
+4.1. Trường hợp được xem xét
+- Sản phẩm không đúng loại hoặc thông tin đã xác nhận.
+- Số lượng nhận không đúng theo thông tin bàn giao.
+- Sản phẩm giao nhầm hoặc không thuộc đơn hàng của khách hàng.
+- Sản phẩm bị dập nát, hư hỏng trong quá trình đóng gói hoặc vận chuyển.
+- Bao bì hư hỏng nghiêm trọng ảnh hưởng trực tiếp đến chất lượng sản phẩm.
+- Sản phẩm có dấu hiệu hư hỏng bất thường hoặc không đáp ứng tiêu chuẩn đã công bố tại thời điểm nhận.
 
-5.1. Hoàn tiền toàn bộ
-Áp dụng khi giao dịch không thể thực hiện hoặc dịch vụ không được cung cấp do nguyên nhân thuộc trách nhiệm của đơn vị vận hành, không có phần dịch vụ hợp lệ đã được cung cấp cần khấu trừ.
+4.2. Trường hợp có thể không đủ điều kiện
+Sau khi xác minh, SmartMush có thể từ chối hoàn hàng nếu:
+- Sản phẩm đã được sử dụng hoặc bảo quản sai hướng dẫn sau khi bàn giao và nguyên nhân hư hỏng thuộc về điều đó.
+- Hư hỏng phát sinh do tác động hoặc bảo quản từ phía khách hàng.
+- Khiếu nại không liên quan đến số lượng, chất lượng hoặc nội dung đã xác nhận.
+- Yêu cầu không có thông tin hoặc bằng chứng đủ để xác minh trong điều kiện hợp lý.
 
-5.2. Hoàn tiền một phần
-Áp dụng khi một phần dịch vụ đã được cung cấp nhưng phần còn lại không thể thực hiện hoặc không đáp ứng thỏa thuận.
-Số tiền hoàn được xác định tương ứng với giá trị phần dịch vụ chưa được cung cấp hoặc phần thiệt hại thuộc trách nhiệm của đơn vị vận hành.
+Việc từ chối phải dựa trên kết quả xác minh cụ thể và không làm mất quyền hợp pháp của khách hàng theo quy định pháp luật.
 
-5.3. Hoàn tiền do thanh toán thừa
-Đối với giao dịch thanh toán trùng lặp hoặc thanh toán vượt số tiền phải trả, khoản tiền thừa hợp lệ sẽ được hoàn lại sau khi xác minh.
+5. Thời hạn gửi yêu cầu
+- Khách hàng được khuyến nghị kiểm tra sản phẩm ngay khi nhận và gửi khiếu nại trong vòng 24 giờ đối với vấn đề có thể nhận biết khi bàn giao.
+- Với lỗi chất lượng tiềm ẩn không thể phát hiện ngay, khách hàng nên thông báo ngay khi phát hiện.
+- Thời hạn khuyến nghị giúp bảo toàn tình trạng sản phẩm và tăng khả năng xác minh; thời hạn này không tự động loại trừ quyền khiếu nại hoặc quyền khác theo pháp luật.
+- Khi gửi yêu cầu, khách hàng nên cung cấp hình ảnh/video, mã đơn hàng, thời gian nhận và mô tả rõ vấn đề.
 
-6. Quy trình yêu cầu hoàn tiền
-Khách hàng có thể gửi yêu cầu hoàn tiền thông qua chức năng hỗ trợ trên ứng dụng SmartMush hoặc liên hệ trực tiếp với bộ phận quản lý.
-Quy trình xử lý gồm các bước:
-- Bước 1: Gửi yêu cầu hoàn tiền (mã đơn thuê, họ tên, lý do, số tiền đề nghị, chứng từ/hình ảnh nếu có).
-- Bước 2: Tiếp nhận yêu cầu bởi hệ thống và chuyển bộ phận quản lý.
-- Bước 3: Xác minh thông tin (thanh toán, trạng thái mùa vụ, nhật ký IoT, thu hoạch, giao nhận).
-- Bước 4: Đưa ra kết quả xử lý (chấp thuận/từ chối, lý do, số tiền, phương thức, thời gian).
-- Bước 5: Thực hiện hoàn tiền theo phương thức phù hợp.
-- Bước 6: Cập nhật trạng thái trên hệ thống (Pending, Under Review, Approved, Processing, Refunded, Rejected).
+6. Quy trình xử lý
+Bước 1: Gửi yêu cầu
+Khách hàng sử dụng chức năng khiếu nại/hỗ trợ và cung cấp mã đơn, loại yêu cầu, lý do, mô tả và hình ảnh minh chứng nếu có.
 
-7. Thời gian xử lý hoàn tiền
-7.1. SmartMush tiếp nhận và kiểm tra yêu cầu hoàn tiền trong thời gian hợp lý kể từ khi nhận đủ thông tin.
-7.2. Thời gian xác minh phụ thuộc vào mức độ phức tạp của từng trường hợp.
-7.3. Sau khi được duyệt, thời gian hoàn tiền phụ thuộc vào phương thức thanh toán và ngân hàng/cổng thanh toán.
-7.4. Nếu phát sinh chậm trễ, SmartMush sẽ chủ động thông báo cho khách hàng.
+Bước 2: Tiếp nhận
+SmartMush ghi nhận yêu cầu và chuyển đến bộ phận phụ trách. Khách hàng có thể theo dõi trạng thái trong phạm vi chức năng được hỗ trợ.
 
-8. Phương thức hoàn tiền
-Ưu tiên hoàn tiền thông qua phương thức thanh toán ban đầu (tài khoản ngân hàng, ví điện tử).
-Nếu không thể hoàn qua phương thức cũ, SmartMush sẽ liên hệ để thống nhất phương án thay thế.
-Lưu ý: SmartMush không bao giờ yêu cầu khách hàng cung cấp mật khẩu, mã OTP hoặc thông tin xác thực bí mật để hoàn tiền.
+Bước 3: Xác minh
+SmartMush có thể kiểm tra:
+- Lịch sử đơn hàng và thanh toán.
+- Thông tin thu hoạch, đóng gói và bàn giao.
+- Hình ảnh hoặc dữ liệu trạng thái sản phẩm.
+- Thông tin giao nhận.
+- Nhật ký mùa vụ, dữ liệu chăm sóc và môi trường khi cần thiết.
 
-9. Trách nhiệm của khách hàng
-- Cung cấp thông tin chính xác, trung thực.
-- Cung cấp mã đơn và chứng từ thanh toán khi cần.
-- Phối hợp xác minh và cung cấp tài khoản thụ hưởng chính xác.
-- Không gian lận hoặc trục lợi chính sách.
+Nhân sự phụ trách có thể yêu cầu bổ sung thông tin để làm rõ.
 
-10. Trách nhiệm của SmartMush
-- Xử lý minh bạch, bảo vệ quyền lợi hợp pháp của khách hàng.
-- Kiểm tra kỹ lưỡng trước khi ra quyết định và thông báo rõ lý do.
-- Hoàn trả đúng số tiền được duyệt và bảo mật thông tin cá nhân.
+Bước 4: Đề xuất phương án
+Sau khi xác minh, SmartMush có thể đề xuất đổi hàng, giao bổ sung, hoàn toàn bộ, hoàn một phần, thu hồi sản phẩm hoặc phương án hỗ trợ khác.
 
-11. Khiếu nại về kết quả hoàn tiền
-Khách hàng có quyền gửi yêu cầu khiếu nại nếu chưa đồng ý với kết quả xử lý để được xem xét lại.
+Bước 5: Thực hiện và hoàn tất
+Sau khi phương án được xác nhận, SmartMush thực hiện xử lý, cập nhật trạng thái và thông báo kết quả.
 
-12. Thay đổi chính sách hoàn tiền
-SmartMush có quyền cập nhật chính sách và sẽ thông báo qua ứng dụng hoặc các kênh liên lạc chính thức.
+7. Xác định số tiền hoàn
+Số tiền hoàn được xem xét dựa trên:
+- Số tiền khách hàng thực tế đã thanh toán.
+- Phần dịch vụ hoặc sản phẩm đã cung cấp.
+- Phần dịch vụ chưa thực hiện hoặc phần sản phẩm bị ảnh hưởng.
+- Chi phí hợp lệ đã phát sinh.
+- Nguyên nhân, mức độ ảnh hưởng và trách nhiệm của các bên.
+
+Khoản hoàn có thể là toàn bộ hoặc một phần. Với giao dịch trùng hoặc thanh toán thừa, số tiền được xem xét hoàn tương ứng với khoản thừa đã đối soát.
+
+8. Phương thức và thời gian hoàn tiền
+- SmartMush ưu tiên hoàn qua phương thức thanh toán ban đầu nếu cổng thanh toán hỗ trợ.
+- Nếu không thể hoàn qua phương thức ban đầu, SmartMush sẽ liên hệ để thống nhất phương án phù hợp trong khuôn khổ pháp luật.
+- Thời gian tiền ghi có vào tài khoản có thể phụ thuộc ngân hàng, PayOS và đơn vị liên quan.
+- Khách hàng sẽ được thông báo khi yêu cầu được duyệt và khi SmartMush hoàn tất xử lý từ phía hệ thống.
+- SmartMush không yêu cầu mật khẩu, mã OTP hoặc thông tin xác thực bí mật để hoàn tiền.
+
+9. Các trường hợp không áp dụng hoàn tiền tự động
+SmartMush không tự động chấp nhận hoàn tiền khi:
+- Dịch vụ đã được thực hiện đúng thỏa thuận và khách hàng chỉ thay đổi nhu cầu.
+- Thông tin sai từ khách hàng khiến việc thực hiện dịch vụ không thể hoàn tất.
+- Sản phẩm đã bàn giao đúng đơn hàng và không phát hiện lỗi chất lượng qua xác minh.
+- Yêu cầu chưa có đủ thông tin để kiểm tra.
+
+Các trường hợp này vẫn được tiếp nhận xem xét nếu khách hàng có căn cứ hợp lý hoặc thuộc quyền được pháp luật bảo vệ.
+
+10. Trách nhiệm của khách hàng
+- Cung cấp thông tin đơn hàng và yêu cầu chính xác.
+- Mô tả trung thực vấn đề và không sử dụng, điều chỉnh hoặc gây hư hỏng sản phẩm làm sai lệch kết quả xác minh.
+- Cung cấp hình ảnh, video, chứng từ hoặc thông tin thanh toán khi cần.
+- Phối hợp trong quá trình kiểm tra, thu hồi hoặc đổi sản phẩm.
+- Bảo quản sản phẩm phù hợp và theo hướng dẫn trong thời gian chờ xử lý.
+- Cung cấp thông tin nhận tiền hoàn chính xác khi được yêu cầu.
+
+11. Trách nhiệm của SmartMush
+- Tiếp nhận và xử lý yêu cầu có căn cứ minh bạch.
+- Xác minh thông tin và bằng chứng trước khi đưa ra kết quả.
+- Thông báo lý do chấp nhận hoặc từ chối và phương án xử lý dự kiến.
+- Thực hiện khoản hoàn theo phương án đã được xác nhận.
+- Cập nhật trạng thái và bảo vệ thông tin cá nhân, giao dịch của khách hàng.
+
+12. Khiếu nại về kết quả xử lý
+Khách hàng có thể gửi thêm khiếu nại hoặc yêu cầu xem xét lại khi chưa đồng ý với kết quả, kèm thông tin mới hoặc căn cứ liên quan.
 
 13. Thông tin liên hệ
 - Đơn vị vận hành: SmartMush Farm
 - Email hỗ trợ: Smartmush194@gmail.com
 - Số điện thoại: 0379896749
-- Địa chỉ: Cầu Vồng, Long Bình, Hồ Chí Minh, Việt Nam`,
+- Kênh hỗ trợ: Chức năng Khiếu nại/Hỗ trợ trên ứng dụng SmartMush
+- Địa chỉ: Cầu Vồng, Long Bình, TP. Thủ Đức, Hồ Chí Minh, Việt Nam
+
+Khi liên hệ, khách hàng nên cung cấp mã đơn hàng, thời gian nhận hàng hoặc thanh toán, lý do yêu cầu và thông tin liên quan để SmartMush có thể kiểm tra.
+
+SmartMush – Minh bạch trong xử lý, bảo vệ quyền lợi và đồng hành cùng khách hàng.`,
   },
 
   // 5. Chính sách thuê trồng và chăm sóc nấm
@@ -497,80 +673,143 @@ SmartMush có quyền cập nhật chính sách và sẽ thông báo qua ứng d
     title: 'Chính sách thuê trồng và chăm sóc nấm',
     documentTitle: 'CHÍNH SÁCH THUÊ TRỒNG VÀ CHĂM SÓC NẤM',
     subtitle: 'SMARTMUSH – SMART MUSHROOM CULTIVATION MANAGEMENT SYSTEM',
-    effectiveDate: '13/11/2026',
+    effectiveDate: '21/11/2026',
     badge: 'Canh tác & Dịch vụ',
     icon: 'leaf-outline',
     summary:
-      'Quy định chi tiết các giai đoạn nuôi trồng, trách nhiệm của kỹ thuật viên Farm Operator, cơ chế giám sát IoT và quyền lợi của người thuê.',
+      'Quy định phạm vi thuê trồng, quy trình chăm sóc, theo dõi IoT, quyền lợi, trách nhiệm và giới hạn của dịch vụ mùa vụ.',
     content: `# CHÍNH SÁCH THUÊ TRỒNG VÀ CHĂM SÓC NẤM
-SMARTMUSH – SMART MUSHROOM CULTIVATION MANAGEMENT SYSTEM
+Hệ thống SmartMush
 
-Ngày có hiệu lực: 13/11/2026
+Cập nhật lần cuối: 21/11/2026
+Ngày có hiệu lực: 21/11/2026
 
-1. Giới thiệu
-Chính sách thuê trồng và chăm sóc nấm quy định các điều kiện, quyền lợi và trách nhiệm của khách hàng cũng như đơn vị vận hành trong quá trình sử dụng dịch vụ trồng nấm trên nền tảng SmartMush.
-SmartMush cung cấp nền tảng hỗ trợ khách hàng đăng ký thuê phôi nấm, khay trồng hoặc khu vực trồng nấm tại trang trại. Khách hàng có thể theo dõi quá trình sinh trưởng của nấm thông qua thông tin mùa vụ, hình ảnh cập nhật và các thông số môi trường được thu thập từ hệ thống IoT.
-Farm Operator chịu trách nhiệm chuẩn bị khu vực trồng, chăm sóc, giám sát điều kiện môi trường, cập nhật tiến độ sinh trưởng và thực hiện các hoạt động thu hoạch theo quy trình vận hành của trang trại.
+SmartMush cung cấp dịch vụ thuê trồng nấm, cho phép khách hàng tham gia theo dõi quá trình sản xuất mà không cần trực tiếp sở hữu khu vực trồng hoặc thực hiện công việc chăm sóc kỹ thuật hằng ngày.
 
-2. Phạm vi dịch vụ
-SmartMush hỗ trợ:
-- Dịch vụ thuê phôi nấm, khay trồng hoặc khu vực trồng nấm.
-- Chuẩn bị và bố trí phôi tại khu vực trồng đạt chuẩn vệ sinh.
-- Chăm sóc, tưới sương, thông gió và theo dõi sinh trưởng.
-- Giám sát điều kiện môi trường qua cảm biến IoT (nhiệt độ, độ ẩm).
-- Cập nhật hình ảnh thực tế và tiến độ mùa vụ.
-- Thu hoạch và bàn giao sản phẩm nấm thành phẩm.
+Chính sách quy định phạm vi dịch vụ, quy trình chăm sóc, quyền lợi và trách nhiệm của khách hàng, phạm vi công việc của SmartMush trong suốt mùa vụ.
 
-3. Quy định về đăng ký thuê trồng nấm
-3.1. Lựa chọn dịch vụ: Khách hàng chọn loại nấm, số lượng phôi/khay và gói dịch vụ hiển thị trên ứng dụng.
-3.2. Xác nhận đơn thuê: Kiểm tra chi phí, thời gian sinh trưởng dự kiến trước khi xác nhận.
-3.3. Chuẩn bị mùa vụ: Nhân viên kiểm tra phôi, khử khuẩn buồng nuôi, bố trí khay và kết nối cảm biến IoT.
-3.4. Thay đổi thông tin: Gửi yêu cầu qua bộ phận hỗ trợ trước khi mùa vụ bắt đầu triển khai.
+1. Phạm vi dịch vụ thuê trồng
+Dịch vụ thuê trồng nấm có thể bao gồm:
+- Gói thuê được hệ thống tự chọn theo thời gian sinh trưởng dự kiến của loại nấm.
+- Bố trí khu vực và khay trồng phù hợp trong phạm vi đơn thuê.
+- Chuẩn bị phôi nấm tương ứng với loại nấm đã xác nhận.
+- Chăm sóc và giám sát quá trình phát triển của nấm.
+- Theo dõi các điều kiện môi trường qua thiết bị IoT được triển khai.
+- Cập nhật tiến độ và hình ảnh mùa vụ khi hệ thống/nhân sự ghi nhận.
+- Thu hoạch, phân loại và chuẩn bị bàn giao sản phẩm theo dịch vụ đã đăng ký.
 
-4. Quy định về chăm sóc và vận hành mùa vụ
-4.1. Trách nhiệm của Farm Operator: Trực tiếp chăm sóc, kiểm tra tơ nấm, mầm nấm, điều chỉnh nhiệt ẩm, ghi nhật ký và chụp ảnh định kỳ.
-4.2. Giám sát môi trường qua IoT: Cảm biến tự động đo nhiệt độ, độ ẩm buồng trồng. Khi có thông số vượt ngưỡng, hệ thống cảnh báo tức thì cho kỹ thuật viên.
-4.3. Điều chỉnh thiết bị: Vận hành hệ thống phun sương, quạt gió, đèn chiếu sáng phù hợp theo từng loại nấm.
-4.4. Ghi nhận hoạt động: Mọi tác vụ chăm sóc và xử lý sự cố đều được lưu vết trên hệ thống.
+Phạm vi cụ thể được xác định theo thông tin gói thuê và đơn hàng khách hàng đã xác nhận. Không phải mọi gói đều bao gồm toàn bộ dịch vụ bổ sung.
 
-5. Quy định về theo dõi tiến độ mùa vụ
-Khách hàng có thể tra cứu mã mùa vụ, ngày bắt đầu, giai đoạn phát triển, biểu đồ nhiệt ẩm IoT và ảnh chụp nấm theo từng chu kỳ. Dữ liệu mang tính hỗ trợ theo dõi minh bạch.
+2. Đăng ký và xác nhận đơn thuê
+2.1. Lựa chọn dịch vụ
+Khách hàng lựa chọn:
+- Loại nấm.
+- Số lượng phôi hoặc khay trồng.
+- Chi phí và các dịch vụ bổ sung được hiển thị.
 
-6. Quy định về các giai đoạn sinh trưởng
-- Giai đoạn 1: Chuẩn bị phôi (kiểm tra độ ẩm phôi, bố trí vị trí).
-- Giai đoạn 2: Phát triển tơ nấm (nuôi sợi tơ ăn kín giá thể).
-- Giai đoạn 3: Hình thành và phát triển quả thể (ra mầm nấm và phát triển tán nấm).
-- Giai đoạn 4: Thu hoạch (thu hái đúng kích thước tiêu chuẩn, cân đo khối lượng).
+Hệ thống tự chọn gói thuê phù hợp theo thời gian sinh trưởng dự kiến của loại nấm. Tên gói, thời hạn và chi phí được hiển thị để khách hàng kiểm tra trước khi xác nhận.
 
-7. Thời gian sinh trưởng và thu hoạch
-Thời gian sinh trưởng phụ thuộc vào chủng loại nấm và đặc tính sinh học tự nhiên. Thời gian hiển thị trên ứng dụng là thời gian dự kiến tham khảo; thời điểm thu hoạch thực tế do Farm Operator kiểm tra và xác nhận.
+2.2. Xác nhận đơn thuê
+Khách hàng cần kiểm tra loại nấm, gói thuê được hệ thống tự chọn, số lượng, chi phí và thông tin liên quan trước khi xác nhận. Việc thanh toán thực hiện theo Chính sách thanh toán.
 
-8. Quy định về sự cố trong quá trình trồng nấm
-Khi xảy ra sự cố (hư hỏng phôi, lỗi thiết bị, dịch bệnh, mất điện), Farm Operator xử lý ngay và thông báo cho khách hàng phương án xử lý:
-- Chăm sóc khắc phục theo tư vấn chuyên gia.
-- Thay thế phôi hoặc bố trí khay trồng mới.
-- Bố trí mùa vụ mới hoặc xem xét hoàn tiền theo chính sách hoàn tiền.
+Đơn thuê chỉ được xử lý khi đáp ứng điều kiện đăng ký, thanh toán và khả năng triển khai của trang trại.
 
-9. Quyền và trách nhiệm của khách hàng
-- Quyền: Được cập nhật tiến độ, ảnh chụp, thông số IoT, gửi yêu cầu hỗ trợ và đăng ký nhận thành phẩm nấm.
-- Trách nhiệm: Cung cấp thông tin chính xác, thanh toán đầy đủ, không tự ý can thiệp vào trang trại hoặc thiết bị IoT khi chưa được phép.
+2.3. Bố trí khu vực và khay trồng
+Sau khi đơn được xác nhận, SmartMush kiểm tra khu vực, bố trí khay và phôi theo số lượng đã đăng ký, sau đó ghi nhận thông tin mùa vụ trên hệ thống.
 
-10. Trách nhiệm của đơn vị vận hành SmartMush
-- Chuẩn bị đầy đủ phôi và điều kiện canh tác đạt chuẩn.
-- Đảm bảo kỹ thuật viên chăm sóc đều đặn và cập nhật trung thực.
-- Duy trì thiết bị IoT vận hành ổn định.
+3. Quy trình chăm sóc và vận hành
+Farm Operator thực hiện công việc theo loại nấm, tình trạng phôi và quy trình vận hành tại trang trại:
+- Giai đoạn chuẩn bị: Vệ sinh khu vực, kiểm tra phôi, điều kiện môi trường và bố trí vào khay trồng.
+- Giai đoạn phát triển tơ nấm: Theo dõi phôi, tơ nấm và các dấu hiệu bất thường.
+- Giai đoạn hình thành mầm: Theo dõi mật độ, tình trạng mầm và điều kiện môi trường.
+- Giai đoạn phát triển quả thể: Kiểm tra kích thước, mức độ trưởng thành và tình trạng nấm.
+- Giai đoạn thu hoạch: Đánh giá độ sẵn sàng, thu hoạch, phân loại và ghi nhận sản lượng thực tế.
+- Giai đoạn kết thúc: Xử lý khay/khu vực sau mùa vụ, kiểm tra vệ sinh và cập nhật trạng thái hoàn tất.
 
-11. Giới hạn trách nhiệm
-Nấm là sinh vật sống chịu tác động của môi trường và đặc tính sinh học. SmartMush không cam kết tuyệt đối về sản lượng hay ngày thu hoạch chính xác nếu không có thỏa thuận cụ thể, nhưng cam kết thực hiện đầy đủ quy trình kỹ thuật.
+4. Giám sát môi trường và thiết bị IoT
+Hệ thống IoT hỗ trợ:
+- Ghi nhận nhiệt độ, độ ẩm và các thông số khác tùy thiết bị được triển khai.
+- Hiển thị dữ liệu môi trường và lịch sử được hệ thống ghi nhận.
+- Hỗ trợ phát hiện thông số vượt ngưỡng theo cấu hình hiện tại.
+- Hỗ trợ vận hành thiết bị chăm sóc trong phạm vi chức năng được bật.
 
-12. Thay đổi chính sách
-Chính sách có thể được cập nhật và thông báo công khai trên ứng dụng.
+Lưu ý: Dữ liệu IoT chỉ hỗ trợ giám sát và vận hành. Dữ liệu có thể bị trễ, thiếu hoặc sai lệch do kết nối, cảm biến hoặc thiết bị. Việc duy trì điều kiện phù hợp và xác nhận tình trạng thực tế vẫn cần kiểm tra của Farm Operator.
+
+5. Quyền lợi của khách hàng
+Trong phạm vi chức năng và dữ liệu hệ thống có sẵn, khách hàng có thể:
+- Xem thông tin đơn thuê, mùa vụ, khay và trạng thái phát triển.
+- Xem hình ảnh, tiến độ và thông số môi trường được ghi nhận.
+- Xem sản lượng thu hoạch thực tế sau khi được cập nhật.
+- Nhận thông báo về thay đổi hoặc sự cố đáng kể.
+- Gửi câu hỏi, yêu cầu hỗ trợ hoặc khiếu nại về hoạt động mùa vụ.
+
+6. Trách nhiệm của SmartMush
+SmartMush chịu trách nhiệm:
+- Bố trí dịch vụ theo nội dung đơn đã xác nhận.
+- Chuẩn bị phôi, khu vực và khay theo phạm vi gói thuê.
+- Tổ chức nhân sự chăm sóc và kiểm tra mùa vụ.
+- Sử dụng dữ liệu IoT và kiểm tra thực tế để hỗ trợ vận hành.
+- Cập nhật thông tin mùa vụ, thu hoạch và sự cố khi được ghi nhận.
+- Thông báo thay đổi đáng kể hoặc vấn đề có thể ảnh hưởng quyền lợi khách hàng.
+- Thu hoạch và bàn giao sản phẩm theo dịch vụ đã đăng ký.
+- Tiếp nhận và xử lý phản hồi, yêu cầu hỗ trợ hoặc khiếu nại.
+
+7. Trách nhiệm của khách hàng
+Khách hàng cần:
+- Cung cấp thông tin chính xác khi đăng ký và nhận hàng.
+- Kiểm tra loại nấm, số lượng, gói dịch vụ và chi phí trước khi xác nhận.
+- Thanh toán các khoản phí theo đơn đã chấp thuận.
+- Theo dõi thông báo và thông tin mùa vụ trên ứng dụng.
+- Liên hệ SmartMush khi phát hiện dữ liệu hoặc thông tin bất thường.
+- Không tự ý can thiệp vào khu vực trồng, thiết bị hoặc hệ thống khi chưa được phép.
+
+Khách hàng không phải trực tiếp chăm sóc kỹ thuật hằng ngày, trừ khi có thỏa thuận riêng.
+
+8. Tiến độ và thời gian mùa vụ
+- Thời gian trên ứng dụng là thời gian dự kiến theo loại nấm và gói dịch vụ.
+- Thời gian thực tế có thể thay đổi theo điều kiện môi trường, tình trạng phôi và đặc tính sinh học.
+- Thời gian dự kiến không phải cam kết ngày thu hoạch tuyệt đối.
+- Thời điểm thu hoạch được xác định từ tình trạng phát triển thực tế và đánh giá của Farm Operator.
+- Khi mùa vụ thay đổi đáng kể, SmartMush cập nhật thông tin trong phạm vi hệ thống hỗ trợ.
+
+9. Sự cố trong mùa vụ
+Sự cố có thể gồm điều kiện nhiệt ẩm không phù hợp, thiết bị gặp vấn đề, phôi phát triển chậm, nấm có dấu hiệu bất thường, mất điện hoặc yếu tố khách quan.
+
+Khi phát hiện, SmartMush kiểm tra tình trạng thực tế, dữ liệu môi trường và lịch sử vận hành, sau đó áp dụng biện pháp phù hợp và thông báo khi sự cố ảnh hưởng đáng kể. Phương án hỗ trợ, thay thế, bố trí lại mùa vụ hoặc hoàn tiền phải được xem xét theo kết quả xác minh và Chính sách Hoàn hàng và Hoàn tiền.
+
+10. Thu hoạch và bàn giao sản phẩm
+- Nấm được thu hoạch khi đạt điều kiện phù hợp theo đánh giá thực tế.
+- Farm Operator ghi nhận sản lượng, phân loại và chuẩn bị bàn giao.
+- Khách hàng lựa chọn hình thức nhận theo các dịch vụ SmartMush hỗ trợ.
+- Khách hàng nên kiểm tra số lượng và tình trạng sản phẩm khi nhận.
+- Vấn đề về chất lượng hoặc số lượng được xử lý theo Chính sách Hoàn hàng và Hoàn tiền.
+
+Sản lượng thực tế có thể khác dự kiến do đặc tính sinh học và điều kiện canh tác; SmartMush ghi nhận và thông báo sản lượng thực tế được xác nhận.
+
+11. Giới hạn của dịch vụ
+- Nấm là sinh vật sống và phụ thuộc vào nhiều yếu tố sinh học, môi trường.
+- Dữ liệu cảm biến có thể bị gián đoạn hoặc sai lệch.
+- IoT không thay thế việc kiểm tra trực tiếp của nhân sự vận hành.
+- SmartMush không cam kết sản lượng hoặc ngày thu hoạch cố định nếu đơn hàng không quy định cụ thể.
+- Các giới hạn này không miễn trừ trách nhiệm đối với lỗi thuộc phạm vi quản lý và vận hành của SmartMush.
+
+12. Điều chỉnh và chấm dứt dịch vụ
+- Khách hàng có thể yêu cầu thay đổi hoặc hủy theo điều kiện đơn hàng và Chính sách Hoàn hàng và Hoàn tiền.
+- Mọi thay đổi loại nấm, số lượng hoặc thông tin dịch vụ cần được SmartMush xác nhận.
+- SmartMush có thể điều chỉnh hoặc tạm dừng hoạt động khi điều kiện vận hành hoặc an toàn không đảm bảo.
+- Thay đổi đáng kể đối với dịch vụ đã xác nhận sẽ được thông báo để thống nhất phương án phù hợp.
+- Việc chấm dứt dịch vụ thực hiện theo thỏa thuận và các chính sách liên quan.
 
 13. Thông tin liên hệ
 - Đơn vị vận hành: SmartMush Farm
-- Email: Smartmush194@gmail.com
-- Hotline: 0379896749
-- Địa chỉ: Cầu Vồng, Long Bình, Hồ Chí Minh, Việt Nam`,
+- Email hỗ trợ: Smartmush194@gmail.com
+- Số điện thoại: 0379896749
+- Kênh hỗ trợ: Chức năng Hỗ trợ/Khiếu nại trên ứng dụng
+- Địa chỉ: Cầu Vồng, Long Bình, Hồ Chí Minh, Việt Nam
+
+Khi liên hệ, khách hàng nên cung cấp mã đơn hàng hoặc mã mùa vụ để SmartMush kiểm tra chính xác.
+
+SmartMush – Đồng hành cùng khách hàng trong từng giai đoạn phát triển của mùa vụ nấm.`,
   },
 
   // 6. Chính sách thu hoạch và giao nhận
@@ -579,89 +818,137 @@ Chính sách có thể được cập nhật và thông báo công khai trên �
     title: 'Chính sách thu hoạch và giao nhận',
     documentTitle: 'CHÍNH SÁCH THU HOẠCH VÀ GIAO NHẬN',
     subtitle: 'HARVEST & DELIVERY POLICY – SMARTMUSH',
-    effectiveDate: '13/11/2026',
+    effectiveDate: '21/11/2026',
     badge: 'Hậu cần & Vận chuyển',
     icon: 'car-outline',
     summary:
-      'Quy chuẩn thu hái, phân loại chất lượng nấm, các hình thức nhận nấm tại trang trại hoặc giao hàng tận nơi qua đơn vị vận chuyển.',
+      'Quy định thời điểm và quy trình thu hoạch, xác nhận sản lượng, phương thức giao nhận, trách nhiệm và xử lý sự cố.',
     content: `# CHÍNH SÁCH THU HOẠCH VÀ GIAO NHẬN
-HARVEST & DELIVERY POLICY – SMARTMUSH
+Hệ thống SmartMush
 
-Ngày hiệu lực: 13/11/2026
+Cập nhật lần cuối: 21/11/2026
+Ngày có hiệu lực: 21/11/2026
 
-1. Giới thiệu
-Chính sách Thu hoạch và Giao nhận quy định các nguyên tắc, quy trình và trách nhiệm liên quan đến việc thu hoạch, phân loại, đóng gói và bàn giao nấm cho khách hàng sử dụng dịch vụ của SmartMush.
-Khách hàng có thể lựa chọn nhận nấm trực tiếp tại trang trại hoặc sử dụng dịch vụ giao hàng thông qua đối tác vận chuyển thứ ba (Grab hoặc tương đương).
+Chính sách thu hoạch và giao nhận quy định quy trình xác định thời điểm thu hoạch, ghi nhận sản lượng và nhận nấm sau khi hoàn tất chăm sóc. Chính sách áp dụng cho khách hàng sử dụng dịch vụ thuê trồng và chăm sóc nấm của SmartMush.
 
-2. Phạm vi áp dụng
-Áp dụng đối với Customer, Farm Operator, Shipper/đối tác vận chuyển và Administrator phụ trách điều phối.
+1. Phạm vi áp dụng
+Chính sách áp dụng cho hoạt động:
+- Theo dõi, thu hoạch, phân loại và cân đo sản lượng nấm.
+- Nhận sản phẩm tại trang trại.
+- Giao hàng bởi Shipper được SmartMush phân công.
+- Xác nhận bàn giao, xử lý sự cố và phản ánh liên quan.
 
-3. Điều kiện và yêu cầu thu hoạch
-3.1. Nấm được thu hoạch khi đạt kích thước và độ chín sinh học phù hợp.
-3.2. Farm Operator theo dõi, kiểm tra thực tế và cập nhật trạng thái sẵn sàng thu hoạch lên ứng dụng.
-3.3. Khách hàng gửi yêu cầu thu hoạch qua ứng dụng, chọn hình thức nhận hàng (tại nông trại hoặc giao tận nơi), thời gian và địa chỉ.
-3.4. Thời gian thu hoạch có thể điều chỉnh để đảm bảo độ tươi ngon tốt nhất của nấm.
+2. Chính sách thu hoạch
+2.1. Xác định thời điểm thu hoạch
+- Farm Operator theo dõi sự phát triển và tình trạng thực tế của nấm.
+- Thời điểm thu hoạch được xác định theo loại nấm, độ trưởng thành và điều kiện kỹ thuật phù hợp.
+- Khi đạt điều kiện, Farm Operator cập nhật trạng thái thu hoạch trên hệ thống.
+- SmartMush thông báo cho khách hàng trong phạm vi chức năng hiện có.
+- Thời điểm dự kiến có thể thay đổi theo điều kiện môi trường và quá trình sinh trưởng thực tế.
 
-4. Quy trình thu hoạch và phân loại
-4.1. Farm Operator tiếp nhận yêu cầu và kiểm tra buồng nuôi.
-4.2. Tiến hành hái nấm theo đúng kỹ thuật không làm dập nát mũ nấm.
-4.3. Phân loại theo tiêu chuẩn độ tươi, kích thước đồng đều và loại bỏ tạp chất/phôi hỏng.
-4.4. Cân khối lượng thực tế và cập nhật ngay lên ứng dụng cho khách hàng nắm rõ.
+2.2. Quy trình thu hoạch
+- Farm Operator kiểm tra và xác nhận nấm đủ điều kiện.
+- Tiến hành thu hoạch theo quy trình kỹ thuật phù hợp.
+- Kiểm tra, phân loại và cân đo khối lượng thực tế.
+- Ghi nhận thông tin gồm loại nấm, sản lượng, thời gian thu hoạch, hình ảnh/ghi chú nếu có.
+- Thông báo kết quả để khách hàng xác nhận phương thức nhận.
 
-5. Hình thức nhận hàng
-5.1. Nhận trực tiếp tại trang trại:
-- Khách hàng hẹn giờ đến lấy.
-- Kỹ thuật viên đóng gói bảo quản mát sẵn sàng.
-- Khách hàng kiểm tra nấm tại chỗ và ký nhận.
-5.2. Giao hàng qua đơn vị vận chuyển thứ ba:
-- Khách hàng cung cấp địa chỉ nhận và số điện thoại người nhận.
-- Đóng gói cẩn thận chống sốc và dán mã đơn hàng.
-- Bàn giao cho tài xế và cung cấp mã vận đơn để khách hàng theo dõi hành trình.
+2.3. Sản lượng thu hoạch
+- Sản lượng được tính theo khối lượng thực tế sau thu hoạch và cân đo.
+- Sản lượng có thể khác dự kiến do giống nấm, điều kiện môi trường và đặc tính sinh trưởng.
+- SmartMush không cam kết sản lượng cố định trừ khi được quy định cụ thể trong gói dịch vụ hoặc đơn hàng.
+- Thông tin sản lượng thực tế được hệ thống xác nhận sẽ được cập nhật và thông báo cho khách hàng.
 
-6. Quy định về đóng gói và bàn giao
-- Đóng gói bằng bao bì thoáng khí chuyên dụng cho nấm tươi hoặc hộp giữ nhiệt tùy khoảng cách.
-- Dán nhãn thông tin loại nấm, khối lượng tịnh, ngày giờ hái.
-- Bàn giao đúng mã đơn, tránh nhầm lẫn.
+3. Phương thức nhận nấm
+Sau khi thu hoạch, khách hàng có thể lựa chọn phương thức được SmartMush hỗ trợ:
+- Nhận trực tiếp tại trang trại theo thời gian đã thống nhất.
+- Giao hàng đến địa chỉ do khách hàng cung cấp, nếu dịch vụ giao hàng khả dụng.
 
-7. Phí thu hoạch và giao hàng
-- Phí thu hoạch được áp dụng theo gói thuê đã thống nhất.
-- Chi phí vận chuyển tính theo cước phí của bên thứ ba dựa trên khoảng cách và thời điểm đặt chuyến. Khách hàng kiểm tra phí dự kiến trước khi xác nhận đơn giao.
+Phí, phạm vi và điều kiện giao hàng sẽ được thông báo trước khi khách hàng xác nhận khi có áp dụng.
 
-8. Trách nhiệm của các bên
-- Customer: Cung cấp địa chỉ chuẩn xác, nhận hàng đúng giờ và kiểm tra chất lượng nấm khi nhận.
-- Farm Operator: Hái chuẩn kỹ thuật, phân loại chính xác, đóng gói cẩn thận và cập nhật hệ thống.
-- Third-party Delivery: Giao nhanh chóng, bảo quản tránh dập nát, cập nhật trạng thái đơn giao.
-- Administrator: Điều phối và hỗ trợ xử lý khiếu nại phát sinh.
+4. Quy trình giao hàng
+- SmartMush cập nhật thông tin sản lượng và chuẩn bị sản phẩm sau thu hoạch.
+- Khách hàng xác nhận phương thức nhận và kiểm tra thông tin giao hàng.
+- SmartMush tạo yêu cầu giao và phân công Shipper phù hợp.
+- Shipper nhận đúng sản phẩm tại trang trại và cập nhật tiến trình vận chuyển trong hệ thống.
+- Sản phẩm được giao đến địa chỉ đã xác nhận.
+- Khách hàng kiểm tra sản phẩm và xác nhận nhận hàng.
+- Hệ thống cập nhật trạng thái hoàn tất khi bàn giao được ghi nhận.
 
-9. Bảng trạng thái thu hoạch và giao nhận
-- Harvest Requested: Khách hàng đã gửi yêu cầu thu hoạch.
-- Harvest Confirmed: Yêu cầu thu hoạch đã được xác nhận.
-- Harvesting: Farm Operator đang tiến hành thu hoạch.
-- Harvest Completed: Đã hoàn tất thu hoạch và cân đo.
-- Preparing for Delivery: Sản phẩm đang được đóng gói.
-- Waiting for Pickup: Đang chờ tài xế đến nhận hàng.
-- Picked Up: Tài xế đã nhận sản phẩm từ trang trại.
-- Delivering: Đơn hàng đang trên đường vận chuyển.
-- Delivered: Sản phẩm đã giao thành công đến khách hàng.
-- Delivery Failed: Giao hàng không thành công (không liên lạc được người nhận, v.v.).
-- Completed: Hoàn tất quy trình đơn thu hoạch và giao nhận.
-- Cancelled: Yêu cầu đã bị hủy.
+5. Quy trình nhận trực tiếp
+- Khách hàng thống nhất thời gian nhận với SmartMush.
+- Farm Operator chuẩn bị sản phẩm theo sản lượng đã ghi nhận.
+- Khách hàng kiểm tra số lượng và tình trạng sản phẩm.
+- Hai bên xác nhận bàn giao.
+- Hệ thống cập nhật trạng thái nhận hàng khi chức năng được hỗ trợ.
 
-10. Xử lý sự cố giao nhận
-- Nếu không có tài xế nhận chuyến hoặc tài xế trễ: hỗ trợ điều phối lại hoặc đổi khung giờ.
-- Hàng giao bị hư hại do vận chuyển: Khách hàng chụp ảnh lúc nhận và thông báo cho SmartMush trong vòng 2 giờ để phối hợp đơn vị vận chuyển đền bù hoặc gửi đợt nấm mới thay thế.
+6. Trách nhiệm của các bên
+6.1. SmartMush
+- Tổ chức thu hoạch phù hợp thông qua Farm Operator.
+- Kiểm tra, phân loại và ghi nhận sản lượng thực tế.
+- Cung cấp thông tin thu hoạch và chuẩn bị sản phẩm rõ ràng.
+- Phối hợp giao nhận, cập nhật trạng thái và tiếp nhận phản ánh.
 
-11. Chính sách khiếu nại
-Khách hàng có quyền khiếu nại về khối lượng, mẫu mã nấm hoặc thời gian giao nhận để được hỗ trợ kiểm tra và bù hoàn thỏa đáng.
+6.2. Farm Operator
+- Theo dõi và xác định thời điểm đạt điều kiện thu hoạch.
+- Thực hiện thu hoạch, phân loại, cân đo và ghi nhận thông tin.
+- Chuẩn bị bàn giao cho khách hàng hoặc Shipper.
+- Phối hợp xử lý vấn đề phát sinh tại trang trại.
 
-12. Giới hạn trách nhiệm
-SmartMush chịu trách nhiệm chất lượng nấm tại thời điểm hái và bàn giao; đối với khâu vận chuyển của bên thứ ba, SmartMush phối hợp hỗ trợ tối đa nhưng theo chính sách của hãng vận tải.
+6.3. Shipper
+- Kiểm tra đơn giao được phân công.
+- Nhận đúng sản phẩm và số lượng theo bàn giao.
+- Bảo quản phù hợp trong quá trình vận chuyển.
+- Cập nhật trạng thái giao hàng theo tiến trình thực tế.
+- Bàn giao đúng địa chỉ và thông báo sự cố, chậm trễ hoặc không thể hoàn tất.
 
-13. Thông tin liên hệ
-- Đơn vị vận hành: SmartMush Farm
-- Hotline: 0379896749
-- Email: Smartmush194@gmail.com
-- Địa chỉ: Cầu Vồng, Long Bình, Hồ Chí Minh`,
+6.4. Khách hàng
+- Cung cấp địa chỉ, số điện thoại và thông tin người nhận chính xác.
+- Theo dõi thông báo thu hoạch và giao nhận.
+- Có mặt hoặc bố trí người nhận tại thời gian đã thống nhất.
+- Kiểm tra sản phẩm sau khi nhận.
+- Xác nhận nhận hàng khi đã nhận sản phẩm.
+- Thông báo sai lệch, hư hỏng hoặc vấn đề liên quan.
+
+7. Xử lý sự cố giao nhận
+7.1. Không giao thành công
+Nếu khách hàng không có mặt, địa chỉ không chính xác hoặc phát sinh nguyên nhân khách quan:
+- Shipper cập nhật trạng thái và thông báo SmartMush.
+- SmartMush liên hệ để thống nhất phương án tiếp theo.
+- Giao lại, đổi địa chỉ hoặc chi phí phát sinh, nếu có, được xử lý theo thông báo và thỏa thuận cụ thể.
+
+7.2. Sản phẩm bị hư hỏng hoặc sai thông tin
+Khách hàng nên thông báo kèm hình ảnh hoặc thông tin liên quan. SmartMush kiểm tra thu hoạch, bàn giao và vận chuyển rồi xem xét đổi hàng, giao bổ sung, hoàn tiền hoặc phương án khác theo Chính sách Khiếu nại và Hoàn hàng, Hoàn tiền.
+
+7.3. Sản lượng khác dự kiến
+SmartMush đối chiếu sản lượng thực tế với đơn hàng/gói dịch vụ. Farm Operator kiểm tra dữ liệu khi có phản ánh và SmartMush giải thích chênh lệch theo thỏa thuận đã xác nhận.
+
+8. Xác nhận hoàn tất
+Hoạt động được ghi nhận hoàn tất khi:
+- Đã thu hoạch, phân loại và ghi nhận sản lượng.
+- Sản phẩm đã bàn giao cho khách hàng hoặc Shipper theo phương thức đã thống nhất.
+- Kết quả nhận hàng được khách hàng xác nhận hoặc SmartMush ghi nhận xử lý phù hợp khi có sự cố.
+- Hệ thống cập nhật trạng thái và lịch sử tương ứng.
+
+Việc xác nhận nhận hàng không làm mất quyền phản ánh về vấn đề không thể phát hiện hợp lý tại thời điểm bàn giao.
+
+9. Phản ánh và khiếu nại
+Khách hàng có thể gửi phản ánh về:
+- Sản lượng, chất lượng hoặc tình trạng sản phẩm.
+- Sai lệch thông tin bàn giao.
+- Chậm trễ, thất lạc hoặc sự cố giao hàng.
+- Quy trình và thái độ giao nhận.
+
+SmartMush tiếp nhận, kiểm tra dữ liệu hệ thống, bàn giao và bằng chứng trước khi phản hồi theo quy trình khiếu nại.
+
+10. Điều khoản áp dụng
+- Khách hàng nên đọc chính sách trước khi sử dụng dịch vụ.
+- Chi phí ngoài phạm vi gói được thông báo và thống nhất trước khi thực hiện.
+- SmartMush có thể cập nhật chính sách và thông báo thay đổi quan trọng qua hệ thống.
+- Vấn đề chưa quy định sẽ xử lý theo đơn hàng, chính sách liên quan và pháp luật hiện hành.
+- Việc xử lý lỗi sản phẩm không tự động đồng nghĩa bồi thường hoặc hoàn tiền trước khi xác minh.
+
+SmartMush – Minh bạch thông tin thu hoạch, rõ ràng trong bàn giao và hỗ trợ khách hàng trong quá trình nhận sản phẩm.`,
   },
 
   // 7. Chính sách khiếu nại và giải quyết tranh chấp
@@ -670,76 +957,141 @@ SmartMush chịu trách nhiệm chất lượng nấm tại thời điểm hái 
     title: 'Chính sách khiếu nại và giải quyết tranh chấp',
     documentTitle: 'CHÍNH SÁCH KHIẾU NẠI VÀ GIẢI QUYẾT TRANH CHẤP',
     subtitle: 'COMPLAINT & DISPUTE RESOLUTION POLICY – SMARTMUSH',
-    effectiveDate: '13/11/2026',
+    effectiveDate: '21/11/2026',
     badge: 'Khiếu nại & Hỗ trợ',
     icon: 'alert-circle-outline',
     summary:
-      'Quy trình tiếp nhận, thời hạn xác minh và giải quyết tranh chấp công bằng, bảo vệ quyền lợi hợp pháp của người tiêu dùng.',
+      'Quy định phạm vi khiếu nại, quy trình tiếp nhận, xác minh, xem xét lại và giải quyết tranh chấp minh bạch.',
     content: `# CHÍNH SÁCH KHIẾU NẠI VÀ GIẢI QUYẾT TRANH CHẤP
-COMPLAINT & DISPUTE RESOLUTION POLICY – SMARTMUSH
+Hệ thống SmartMush
 
-Ngày hiệu lực: 13/11/2026
+Cập nhật lần cuối: 21/11/2026
+Ngày có hiệu lực: 21/11/2026
 
-1. Giới thiệu
-Chính sách Khiếu nại và Giải quyết Tranh chấp quy định quy trình tiếp nhận, xác minh và xử lý các phản ánh, khiếu nại hoặc tranh chấp phát sinh trong quá trình khách hàng sử dụng dịch vụ của SmartMush.
-Mục tiêu là xử lý minh bạch, khách quan, nhanh chóng và bảo vệ quyền lợi hợp pháp của các bên.
+Chính sách được xây dựng nhằm bảo vệ quyền lợi hợp pháp của khách hàng, thiết lập phương thức tiếp nhận và giải quyết phản ánh liên quan đến dịch vụ thuê trồng, chăm sóc, thu hoạch, giao nhận và thanh toán trên SmartMush.
 
-2. Phạm vi áp dụng
-Áp dụng cho Customer, Farm Operator, Shipper, Quản trị viên Administrator và đơn vị vận hành SmartMush.
+1. Phạm vi áp dụng
+Chính sách áp dụng cho khách hàng sử dụng các dịch vụ của SmartMush và các vấn đề phát sinh trong quá trình quản lý tài khoản, đơn hàng, mùa vụ, thanh toán, thu hoạch hoặc giao nhận.
 
-3. Các trường hợp được tiếp nhận khiếu nại
-- Khiếu nại dịch vụ thuê trồng: Sai số lượng phôi, sai giống nấm, buồng nuôi không đạt cam kết.
-- Khiếu nại quá trình chăm sóc: Sai lệch nhiệt ẩm kéo dài, cảm biến IoT mất kết nối không khắc phục, phôi nhiễm bệnh.
-- Khiếu nại thu hoạch: Khối lượng thực tế chênh lệch bất thường, nấm không đạt chuẩn độ tươi.
-- Khiếu nại thanh toán: Trừ tiền sai, trừ trùng lặp, chậm hoàn tiền.
-- Khiếu nại giao nhận: Nấm dập nát, giao sai địa chỉ, trễ hẹn nghiêm trọng.
+2. Các trường hợp được tiếp nhận
+2.1. Trồng và chăm sóc
+- Quy trình chăm sóc không phù hợp với nội dung gói dịch vụ đã xác nhận.
+- Tiến độ hoặc thông tin mùa vụ sai lệch, thiếu hoặc không được cập nhật phù hợp.
+- Môi trường có dấu hiệu bất thường nhưng không được kiểm tra, xử lý hoặc thông báo trong phạm vi cần thiết.
+- Dịch vụ thực tế khác với đơn hàng hoặc thỏa thuận đã xác nhận.
 
-4. Kênh tiếp nhận khiếu nại
-- Gửi khiếu nại trực tiếp trên ứng dụng SmartMush (mục Hồ sơ > Hỗ trợ/Khiếu nại).
-- Email: Smartmush194@gmail.com
-- Hotline hỗ trợ: 0379896749
-- Trực tiếp tại văn phòng trang trại: Cầu Vồng, Long Bình, TP. Thủ Đức, Hồ Chí Minh.
-Khách hàng vui lòng cung cấp mã mùa vụ/mã đơn hàng, ảnh chụp hoặc biên lai liên quan.
+2.2. Chất lượng và sản lượng
+- Sản phẩm không đúng loại nấm đã đăng ký.
+- Chất lượng không phù hợp với tiêu chuẩn đã công bố hoặc xác nhận.
+- Sản lượng khác với cam kết cụ thể được ghi trong gói dịch vụ/đơn hàng.
+- Sản phẩm hư hỏng hoặc không đảm bảo tình trạng khi bàn giao.
 
-5. Quy trình giải quyết 6 bước
-- Bước 1: Tiếp nhận khiếu nại và tạo mã hồ sơ theo dõi (trạng thái Pending).
-- Bước 2: Kiểm tra và phân loại nhóm vấn đề (kỹ thuật canh tác, IoT, thanh toán, giao vận).
-- Bước 3: Xác minh thông tin (đối soát lịch sử IoT, camera buồng trồng, nhật ký kỹ thuật viên).
-- Bước 4: Đề xuất phương án khắc phục (bù mùa vụ mới, hỗ trợ kỹ thuật, đổi trả, hoàn tiền).
-- Bước 5: Thông báo phương án xử lý và thống nhất với khách hàng.
-- Bước 6: Hoàn tất hồ sơ và lưu trữ nhật ký xử lý (trạng thái Resolved/Closed).
+2.3. Thanh toán
+- Tài khoản bị trừ tiền nhưng hệ thống không ghi nhận thanh toán hợp lệ.
+- Phí không đúng với thông tin đã xác nhận.
+- Thanh toán trùng lặp hoặc vượt số tiền phải trả.
+- Yêu cầu hoàn tiền chưa được xử lý theo phương án đã thống nhất.
 
-6. Thời gian xử lý dự kiến
-- Xác nhận tiếp nhận: Trong vòng 24 giờ làm việc.
-- Kiểm tra & phân loại: 1 - 2 ngày làm việc.
-- Xác minh thông tin chi tiết: 2 - 5 ngày làm việc.
-- Thực hiện phương án: Theo thỏa thuận cụ thể của từng trường hợp.
+2.4. Giao nhận
+- Giao hàng chậm so với lịch đã xác nhận mà không có thông báo phù hợp.
+- Hàng thất lạc, giao sai hoặc bị hư hỏng trong quá trình vận chuyển.
+- Thái độ hoặc quy trình giao nhận không phù hợp.
 
-7. Trách nhiệm của các bên
-- Khách hàng: Cung cấp bằng chứng trung thực, phối hợp trao đổi văn minh.
-- Kỹ thuật viên & Quản trị viên: Cung cấp dữ liệu nhật ký canh tác, giải trình minh bạch và khắc phục kịp thời.
-- Đơn vị vận chuyển: Cung cấp bằng chứng giao nhận và phối hợp bồi thường tổn thất nếu do lỗi vận chuyển.
+2.5. Tài khoản và hỗ trợ
+- Thông tin tài khoản hoặc đơn hàng hiển thị sai.
+- Khách hàng gặp lỗi sử dụng chức năng hệ thống.
+- Yêu cầu hỗ trợ không được phản hồi hoặc xử lý phù hợp.
+- Vấn đề khác ảnh hưởng đến quyền lợi hoặc trải nghiệm sử dụng.
 
-8. Bảng trạng thái khiếu nại trên hệ thống
-- Pending: Khiếu nại mới gửi, chờ tiếp nhận.
-- Under Review: Đang kiểm tra và xác minh dữ liệu.
-- Waiting for Information: Chờ khách hàng hoặc bên liên quan bổ sung tài liệu.
-- In Progress: Đang tiến hành xử lý khắc phục.
-- Awaiting Third Party: Đang chờ phản hồi đối soát từ ngân hàng/đối tác giao vận.
-- Resolved: Đã xử lý xong và thống nhất phương án với khách hàng.
-- Rejected: Khiếu nại không đủ căn cứ và có thông báo lý do rõ ràng.
-- Closed: Hồ sơ giải quyết đã kết thúc.
+3. Quyền và trách nhiệm của khách hàng
+3.1. Quyền của khách hàng
+- Gửi khiếu nại qua chức năng Hỗ trợ/Khiếu nại hoặc kênh liên hệ chính thức.
+- Theo dõi trạng thái và nhận phản hồi trong phạm vi hệ thống hỗ trợ.
+- Bổ sung thông tin, hình ảnh hoặc bằng chứng khi cần.
+- Nhận kết quả xác minh, căn cứ và phương án được đề xuất.
+- Yêu cầu xem xét lại khi có căn cứ hoặc thông tin mới.
+- Được bảo vệ thông tin cá nhân và sử dụng các phương thức giải quyết tranh chấp hợp pháp.
 
-9. Phương thức giải quyết tranh chấp
-Ưu tiên giải quyết thông qua thương lượng thiện chí giữa hai bên. Trường hợp không đạt được thỏa thuận, tranh chấp sẽ được đưa ra cơ quan tài phán có thẩm quyền theo quy định của pháp luật Việt Nam.
+3.2. Trách nhiệm của khách hàng
+- Cung cấp nội dung trung thực, rõ ràng và đầy đủ trong khả năng có thể.
+- Ghi rõ mã đơn hàng/mùa vụ, loại vấn đề và mong muốn giải quyết.
+- Cung cấp hình ảnh, video, hóa đơn hoặc tài liệu liên quan nếu có.
+- Phối hợp trả lời yêu cầu xác minh và bổ sung thông tin.
+- Không sử dụng quy trình khiếu nại nhằm cung cấp thông tin sai hoặc gây ảnh hưởng không chính đáng.
 
-10. Bảo mật thông tin khiếu nại
-Thông tin khiếu nại và chứng từ cá nhân được lưu trữ bảo mật tuyệt đối, chỉ dùng cho mục đích xác minh và giải quyết vụ việc.
+4. Quy trình xử lý khiếu nại
+Bước 1: Gửi khiếu nại
+Khách hàng cung cấp loại khiếu nại, đơn hàng hoặc phiên trồng liên quan, mô tả vấn đề, bằng chứng và yêu cầu xử lý. Sau khi gửi thành công, hệ thống ghi nhận hồ sơ để khách hàng theo dõi nếu chức năng được hỗ trợ.
 
-11. Thông tin liên hệ
+Bước 2: Tiếp nhận và phân loại
+Nhân sự có thẩm quyền kiểm tra nội dung, xác định phạm vi và chuyển cho bộ phận/phụ trách phù hợp.
+
+Bước 3: Xác minh
+Tùy vấn đề, SmartMush có thể kiểm tra:
+- Lịch sử đơn hàng và thanh toán.
+- Nhật ký chăm sóc và dữ liệu phiên trồng.
+- Dữ liệu môi trường IoT.
+- Hình ảnh, thông tin thu hoạch và bàn giao.
+- Lịch sử vận chuyển và nội dung trao đổi liên quan.
+
+SmartMush có thể liên hệ Farm Operator, Shipper hoặc bên liên quan khi cần xác minh. Khách hàng có thể được yêu cầu bổ sung thông tin.
+
+Bước 4: Đề xuất phương án
+Sau khi xác minh, phương án có thể gồm giải thích, điều chỉnh dữ liệu, hỗ trợ kỹ thuật, khắc phục sự cố, giao bổ sung, đổi sản phẩm, hoàn tiền hoặc biện pháp phù hợp khác theo chính sách liên quan.
+
+Bước 5: Phản hồi
+SmartMush thông báo kết quả, căn cứ và phương án được đề xuất. Nếu cần xác nhận hoặc thông tin bổ sung, nhân sự phụ trách sẽ hướng dẫn khách hàng.
+
+Bước 6: Hoàn tất hoặc xem xét lại
+Khi vấn đề được xử lý, hệ thống cập nhật trạng thái. Nếu khách hàng chưa đồng ý, khách hàng có thể yêu cầu xem xét lại và cung cấp căn cứ mới; hồ sơ sẽ được chuyển đến người có thẩm quyền đánh giá lại.
+
+5. Thời gian xử lý
+- Hệ thống ghi nhận khiếu nại khi yêu cầu được gửi thành công.
+- Thời gian xử lý phụ thuộc loại vấn đề, tính đầy đủ của thông tin và mức độ phức tạp.
+- Việc kiểm tra dữ liệu IoT, hoạt động trang trại, thanh toán hoặc vận chuyển bên thứ ba có thể cần thêm thời gian.
+- Nếu việc xử lý kéo dài hơn dự kiến, SmartMush sẽ thông báo tình trạng hiện tại và lý do trong phạm vi có thể.
+- Trường hợp khẩn cấp có nguy cơ đáng kể đến sản phẩm, giao dịch hoặc quyền lợi sẽ được ưu tiên kiểm tra.
+
+SmartMush không cam kết thời hạn cố định nếu chưa xem xét yêu cầu cụ thể; mọi thời hạn quy định trong thỏa thuận hoặc thông báo riêng vẫn được áp dụng.
+
+6. Khiếu nại lặp lại hoặc liên quan
+- SmartMush kiểm tra lịch sử để tránh xử lý trùng một vấn đề.
+- Khiếu nại cùng nguyên nhân có thể được liên kết để xem xét tổng thể.
+- Vấn đề mới hoặc bằng chứng mới vẫn được tiếp nhận xem xét.
+- Khi phát hiện nguyên nhân thuộc quy trình SmartMush, SmartMush xem xét biện pháp khắc phục và hạn chế tái diễn.
+- Hành vi cố ý cung cấp thông tin sai hoặc lạm dụng có thể được xử lý theo điều khoản sử dụng, nhưng không được dùng để loại bỏ khiếu nại chính đáng.
+
+7. Giải quyết tranh chấp
+7.1. Trong hệ thống SmartMush
+Các bên ưu tiên trao đổi và thương lượng; SmartMush tiếp nhận ý kiến, kiểm tra bằng chứng khách quan, đưa ra phương án theo dịch vụ và chính sách đã áp dụng.
+
+7.2. Xem xét lại
+Khách hàng có thể nêu phần chưa đồng ý và căn cứ liên quan. SmartMush chuyển hồ sơ đến người có thẩm quyền để đánh giá lại và thông báo kết quả.
+
+7.3. Phương thức ngoài SmartMush
+Nếu không đạt được thỏa thuận, khách hàng có quyền sử dụng cơ quan có thẩm quyền hoặc phương thức giải quyết tranh chấp khác theo pháp luật Việt Nam.
+
+8. Bảo mật thông tin khiếu nại
+- Thông tin cá nhân và nội dung khiếu nại chỉ dùng cho tiếp nhận, xác minh, giải quyết và cải thiện quy trình.
+- Chỉ nhân sự có thẩm quyền và bên liên quan cần thiết được tiếp cận.
+- Thông tin được bảo vệ theo Chính sách bảo mật và lưu trữ trong thời gian cần thiết để tra cứu, đối chiếu hoặc đáp ứng nghĩa vụ pháp lý.
+- Không phương thức lưu trữ nào được mô tả là bảo mật tuyệt đối ngoài khả năng kỹ thuật và nghĩa vụ thực tế.
+
+9. Điều khoản áp dụng
+- Chính sách có hiệu lực kể từ khi được công bố trên hệ thống.
+- SmartMush có thể cập nhật và thông báo những thay đổi quan trọng.
+- Vấn đề chưa quy định được xử lý theo đơn hàng, các chính sách liên quan và pháp luật Việt Nam.
+- Nếu chính sách khác với quy định pháp luật bắt buộc, quy định pháp luật được ưu tiên.
+
+10. Thông tin liên hệ
 - Đơn vị vận hành: SmartMush Farm
-- Email: Smartmush194@gmail.com
-- Hotline: 0379896749
-- Địa chỉ: Cầu Vồng, Long Bình, Hồ Chí Minh`,
+- Email hỗ trợ: Smartmush194@gmail.com
+- Số điện thoại: 0379896749
+- Địa chỉ: Cầu Vồng, Long Bình, TP. Thủ Đức, Hồ Chí Minh, Việt Nam
+- Kênh hỗ trợ: Chức năng Khiếu nại/Hỗ trợ trên ứng dụng
+
+Khi gửi yêu cầu, khách hàng nên cung cấp mã đơn hàng hoặc mùa vụ, mô tả vấn đề và bằng chứng liên quan.
+
+SmartMush cam kết tiếp nhận và xử lý khiếu nại minh bạch, khách quan, tôn trọng quyền lợi hợp pháp của khách hàng và không né tránh trách nhiệm đối với vấn đề phát sinh từ dịch vụ do SmartMush cung cấp.`,
   },
 ];
