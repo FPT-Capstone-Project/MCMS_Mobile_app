@@ -322,6 +322,23 @@ export interface HarvestItem {
   updated_at?: string;
 }
 
+export interface AdminHarvestRequest {
+  harvest_request_id: number;
+  session_id: number;
+  order_id: number;
+  order_code?: string;
+  customer_id?: number;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  customer_email?: string | null;
+  harvest_method: 'PICKUP' | 'DELIVERY' | null;
+  delivery_address?: string | null;
+  scheduled_at?: string | null;
+  customer_note?: string | null;
+  harvest_request_status: string;
+  session_status?: string;
+}
+
 export interface CreateHarvestRequest {
   sessionId: number;
 }

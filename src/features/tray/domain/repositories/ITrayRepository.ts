@@ -31,10 +31,8 @@ export interface ITrayRepository {
 
   getCustomerDeviceLogs(sessionId: number): Promise<CustomerTrayDetails['device_logs']>;
 
-  /**
-   * Retrieves recent sensor readings for an owned cultivation session.
-   */
-  getCustomerSensorHistory(sessionId: number): Promise<CustomerTrayDetails['sensor_readings']>;
+  /** Retrieves the latest reading from each sensor on an owned session's assigned floors. */
+  getCustomerCurrentSensorReadings(sessionId: number): Promise<CustomerTrayDetails['sensor_readings']>;
 
   /** Retrieves summarized environment history for a customer's cultivation session. */
   getCustomerEnvironmentHistory(

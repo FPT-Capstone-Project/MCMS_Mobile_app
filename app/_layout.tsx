@@ -42,6 +42,8 @@ function NavigationGuard() {
       currentSegment === 'sensors' ||
       currentSegment === 'cultivation' ||
       currentSegment === 'admin-orders' ||
+      currentSegment === 'operator-orders' ||
+      currentSegment === 'operator-complaints' ||
       currentSegment === 'mushrooms';
     const inExpertRoutes = currentSegment === '(expert)';
     const inStaffOnlyRoute =
@@ -49,7 +51,9 @@ function NavigationGuard() {
       currentSegment === 'automatic' ||
       currentSegment === 'sensors' ||
       currentSegment === 'cultivation' ||
-      currentSegment === 'admin-orders';
+      currentSegment === 'admin-orders' ||
+      currentSegment === 'operator-orders' ||
+      currentSegment === 'operator-complaints';
     if (status === 'unauthenticated' && !inAuthGroup) {
       // Route unauthenticated visitors to login screen
       router.replace('/(auth)/login' as Href);
@@ -160,6 +164,18 @@ function NavigationGuard() {
       />
       <Stack.Screen
         name="admin-orders/index"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="operator-orders/index"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="operator-complaints/index"
         options={{
           headerShown: false,
         }}

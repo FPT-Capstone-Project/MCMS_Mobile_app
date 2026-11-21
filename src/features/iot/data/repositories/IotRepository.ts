@@ -6,6 +6,7 @@ import { handleApiError } from '../../../../core/errors/errorHandler';
 import { logApiDebug } from '../../../../core/utils';
 import {
   AdminRental,
+  AdminHarvestRequest,
   AssignTraysToSessionRequest,
   AutoControlConfigResponse,
   AutoControlLogsResponse,
@@ -1346,11 +1347,29 @@ export class IotRepository {
 
   async getSessionReceiving(sessionId: number): Promise<Partial<HarvestItem> | null> {
     try {
-      const response = await axiosClient.get<{ data: (Omit<Partial<HarvestItem>, 'status'> & { status: string })[] }>(`${API_ENDPOINTS.HARVEST_REQUESTS.BASE}/admin`);
-      const request = response.data.data.find((item) => item.session_id === sessionId);
+      const request = (await this.getAdminHarvestRequests()).find((item) => item.session_id === sessionId);
       if (!request) return null;
-      const { status, ...receiving } = request;
-      return { ...receiving, harvest_request_status: status };
+      return {
+        ...request,
+        customer_name: request.customer_name ?? undefined,
+        customer_phone: request.customer_phone ?? undefined,
+        customer_email: request.customer_email ?? undefined,
+      };
+    } catch (error) { throw error instanceof AppError ? error : handleApiError(error); }
+  }
+
+  async getAdminHarvestRequests(): Promise<AdminHarvestRequest[]> {
+    try {
+      const response = await axiosClient.get<{
+        data: (Omit<AdminHarvestRequest, 'harvest_request_status'> & { status: string })[];
+      }>(API_ENDPOINTS.HARVEST_REQUESTS.ADMIN);
+      if (!Array.isArray(response.data?.data)) {
+        throw new AppError('Danh sách yêu cầu nhận nấm từ máy chủ không hợp lệ.', 'API_ERROR', 500);
+      }
+      return response.data.data.map(({ status, ...request }) => ({
+        ...request,
+        harvest_request_status: status,
+      }));
     } catch (error) { throw error instanceof AppError ? error : handleApiError(error); }
   }
 

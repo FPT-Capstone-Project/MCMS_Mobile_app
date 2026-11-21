@@ -186,6 +186,27 @@ const customerActions: QuickActionItem[] = [
   },
 ];
 
+const operatorActions: QuickActionItem[] = [
+  {
+    id: 'operator-orders',
+    title: 'Theo dõi đơn hàng',
+    desc: 'Giao hàng, khách đến hái và đơn hoàn thành',
+    icon: 'car-outline',
+    iconColor: '#0EA5E9',
+    iconBg: 'rgba(14, 165, 233, 0.1)',
+    route: '/operator-orders',
+  },
+  {
+    id: 'operator-complaints',
+    title: 'Khiếu nại đơn hàng',
+    desc: 'Xem danh sách khiếu nại từ khách hàng',
+    icon: 'alert-circle-outline',
+    iconColor: '#E11D48',
+    iconBg: 'rgba(225, 29, 72, 0.1)',
+    route: '/operator-complaints',
+  },
+];
+
 /**
  * Home Tab Screen ("Trang chủ")
  * Comprehensive dashboard connecting real IoT telemetry, Quick Actions, and Active Orders.
@@ -195,7 +216,9 @@ export default function HomeScreen() {
   const { isAdmin, isFarmOperator, isCustomer } = useAuth();
   const isStaff = isAdmin || isFarmOperator;
 
-  const displayedActions = isStaff ? staffActions : customerActions;
+  const displayedActions = isStaff
+    ? isFarmOperator ? [...staffActions, ...operatorActions] : staffActions
+    : customerActions;
   const actionRows: QuickActionItem[][] = [];
   for (let i = 0; i < displayedActions.length; i += 2) {
     actionRows.push(displayedActions.slice(i, i + 2));

@@ -28,6 +28,13 @@ export interface OrderComplaintDetail extends OrderComplaint {
   replies: ComplaintReply[];
 }
 
+export interface StaffComplaintsPage {
+  data: OrderComplaint[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 function isOrderComplaint(value: unknown): value is OrderComplaint {
   if (!value || typeof value !== 'object') return false;
   return 'complaint_id' in value && typeof value.complaint_id === 'number' &&
@@ -47,6 +54,13 @@ interface CreateOrderComplaint {
 
 export const complaintApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
+    getStaffComplaints: builder.query<StaffComplaintsPage, { page: number; pageSize: number }>({
+      query: ({ page, pageSize }) => ({
+        url: API_ENDPOINTS.COMPLAINTS.ADMIN,
+        params: { page, pageSize },
+      }),
+      providesTags: ['Complaint'],
+    }),
     getMyComplaints: builder.query<
       OrderComplaint[],
       { accountId: string }
@@ -138,6 +152,7 @@ export const complaintApi = baseApi.injectEndpoints({
 });
 
 export const {
+  useGetStaffComplaintsQuery,
   useGetMyComplaintsQuery,
   useGetMyComplaintDetailQuery,
   useCreateOrderComplaintMutation,

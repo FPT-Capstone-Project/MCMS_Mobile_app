@@ -6,10 +6,13 @@
 export const API_ENDPOINTS = {
   SHIPMENTS: {
     BASE: '/api/shipments',
+    ADMIN_LIST: '/api/shipments/admin',
     ORDER: (orderId: number) => `/api/shipments/orders/${orderId}`,
+    DETAILS: (shipmentId: number) => `/api/shipments/${shipmentId}/details`,
     STATUS: (shipmentId: number) => `/api/shipments/${shipmentId}/status`,
   },
   COMPLAINTS: {
+    ADMIN: '/api/complaints',
     MY: '/api/complaints/my',
     MY_DETAIL: (complaintId: number) => `/api/complaints/my/${complaintId}`,
     ORDER: (orderId: number) => `/api/orders/${orderId}/complaints`,
@@ -88,6 +91,8 @@ export const API_ENDPOINTS = {
       `/api/customer/sessions/${sessionId}/iot-history`,
     IOT_SENSOR_HISTORY: (sessionId: string | number) =>
       `/api/customer/sessions/${sessionId}/iot-history/sensors`,
+    IOT_CURRENT_SENSOR_READINGS: (sessionId: string | number) =>
+      `/api/customer/sessions/${sessionId}/iot-history/sensors/latest`,
   },
   ENVIRONMENT_HISTORY: {
     SESSION: (sessionId: string | number) => `/api/environment-history/sessions/${sessionId}`,
@@ -195,6 +200,7 @@ export const API_ENDPOINTS = {
   },
   // Harvests Workflow (Admin & Operator)
   HARVEST_REQUESTS: {
+    ADMIN: '/api/harvest-requests/admin',
     COMPLETE: (id: number) => `/api/harvest-requests/${id}/complete`,
     BASE: '/api/harvest-requests',
     DETAIL: (id: number) => `/api/harvest-requests/${id}`,

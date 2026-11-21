@@ -201,7 +201,7 @@ export function CustomerTrayDetail({
     sensorInFlight.current = requestId;
     setSensorLoading(true);
     try {
-      const readings = await trayRepository.getCustomerSensorHistory(sessionId);
+      const readings = await trayRepository.getCustomerCurrentSensorReadings(sessionId);
       if (requestId !== detailRequestId.current) return;
       setDetails((current) =>
         current?.session_id === sessionId
@@ -523,7 +523,6 @@ export function CustomerTrayDetail({
               <DetailEmptyState message="Không thể xác định lịch sử thiết bị theo vị trí cũ vì phiên có khay đã trả." />
             ) : (
               <>
-                {(deviceLoading || sensorLoading) && <ActivityIndicator color={theme.colors.primary[500]} />}
                 <DeviceHistory
                   logs={details?.device_logs ?? []}
                   readings={details?.sensor_readings ?? []}
