@@ -26,7 +26,7 @@ test('a returned shipment cannot complete handover even when its old delivered t
 
 test('delivery handover uses the latest attempt, regardless of response ordering or previous delivery', () => {
   const delivered = { shipment_id: 3, status: 'DELIVERED' };
-  const retry = { shipment_id: 8, status: 'IN_TRANSIT' };
+  const retry = { shipment_id: 8, status: 'SHIPPED' };
   assert.equal(shipmentDomain.deliveryHandoverAllowed([delivered, retry]), false);
   assert.equal(shipmentDomain.deliveryHandoverAllowed([retry, delivered]), false);
   assert.equal(shipmentDomain.deliveryHandoverAllowed([delivered, { ...retry, status: 'DELIVERED' }]), true);
@@ -131,8 +131,7 @@ const { completeDeliveryReceiving } = loadTypeScript('../src/features/order/doma
 
 test('shipment transitions move forward and terminal attempts cannot be reopened', () => {
   assert.deepEqual(shipmentDomain.nextShipmentStatuses('PENDING'), ['SHIPPED', 'CANCELLED']);
-  assert.deepEqual(shipmentDomain.nextShipmentStatuses('SHIPPED'), ['IN_TRANSIT', 'RETURNED']);
-  assert.deepEqual(shipmentDomain.nextShipmentStatuses('IN_TRANSIT'), ['DELIVERED', 'RETURNED']);
+  assert.deepEqual(shipmentDomain.nextShipmentStatuses('SHIPPED'), ['DELIVERED', 'RETURNED']);
   assert.deepEqual(shipmentDomain.nextShipmentStatuses('DELIVERED'), ['RETURNED']);
   for (const status of ['CANCELLED', 'RETURNED', 'UNKNOWN', 'toString']) {
     assert.deepEqual(shipmentDomain.nextShipmentStatuses(status), []);

@@ -1,7 +1,6 @@
 export const SHIPMENT_LABELS = {
   PENDING: 'Chờ giao hàng',
   SHIPPED: 'Đã bàn giao cho đơn vị vận chuyển',
-  IN_TRANSIT: 'Đang vận chuyển',
   DELIVERED: 'Đã giao hàng thành công',
   CANCELLED: 'Đã hủy giao hàng',
   RETURNED: 'Đã hoàn hàng',
@@ -22,8 +21,7 @@ export function canTrackSessionShipment(session: {
 
 const NEXT_SHIPMENT_STATUSES: Record<ShipmentStatus, readonly ShipmentStatus[]> = {
   PENDING: ['SHIPPED', 'CANCELLED'],
-  SHIPPED: ['IN_TRANSIT', 'RETURNED'],
-  IN_TRANSIT: ['DELIVERED', 'RETURNED'],
+  SHIPPED: ['DELIVERED', 'RETURNED'],
   DELIVERED: ['RETURNED'],
   CANCELLED: [],
   RETURNED: [],
@@ -40,6 +38,17 @@ export interface CreateShipment {
   recipientPhone: string;
   shippingFee: number | string;
 }
+
+export interface UpdateShipmentDetails {
+  orderId: number;
+  shipmentId: number;
+  carrier: string | null;
+  trackingCode: string | null;
+  shippingFee: number;
+  shippedAt: string | null;
+  deliveredAt?: string | null;
+}
+
 export interface Shipment {
   shipment_id: number;
   order_id: number;

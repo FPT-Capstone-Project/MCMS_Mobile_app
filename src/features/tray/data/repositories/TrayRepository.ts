@@ -145,11 +145,10 @@ export class TrayRepository implements ITrayRepository {
     return response.data?.data?.deviceEvents || [];
   }
 
-  async getCustomerSensorHistory(sessionId: number): Promise<CustomerSensorReading[]> {
+  async getCustomerCurrentSensorReadings(sessionId: number): Promise<CustomerSensorReading[]> {
     try {
       const response = await axiosClient.get<{ data: CustomerSensorHistory }>(
-        API_ENDPOINTS.CUSTOMER.IOT_SENSOR_HISTORY(sessionId),
-        { params: { page: 1, pageSize: 100 } }
+        API_ENDPOINTS.CUSTOMER.IOT_CURRENT_SENSOR_READINGS(sessionId)
       );
       if (!Array.isArray(response.data?.data?.readings)) {
         throw new AppError('Dữ liệu cảm biến từ máy chủ không hợp lệ.', 'API_ERROR', 500);

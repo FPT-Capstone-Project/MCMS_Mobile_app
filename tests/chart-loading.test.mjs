@@ -11,7 +11,11 @@ function repository(get, getStatus = async () => ({ sessions: [{ session_id: 7, 
   loaded.require = (name) => {
     if (name.endsWith('/axiosClient')) return { axiosClient: { get } };
     if (name.endsWith('/endpoints')) return { API_ENDPOINTS: {
-      CUSTOMER: { CULTIVATION_PROGRESS: id => `progress/${id}`, IOT_HISTORY: id => `devices/${id}` },
+      CUSTOMER: {
+        CULTIVATION_PROGRESS: id => `progress/${id}`,
+        IOT_HISTORY: id => `devices/${id}`,
+        IOT_CURRENT_SENSOR_READINGS: id => `current/${id}`,
+      },
       CULTIVATION_SESSIONS: { ADMIN_PROGRESS: id => `admin/${id}` },
       ENVIRONMENT_HISTORY: { SESSION: id => `history/${id}` },
     } };
@@ -40,6 +44,21 @@ test('growth detail starts status and progress together without waiting for devi
   assert.equal(detail.growth_history.length, 1);
   assert.deepEqual(detail.device_logs, []);
   assert.deepEqual(calls, ['progress/4']);
+});
+
+test('current sensor readings use the latest-per-sensor endpoint without history pagination', async () => {
+  const calls = [];
+  const repo = repository(async (url, options) => {
+    calls.push([url, options]);
+    return { data: { data: { readings: [
+      { id: '2:1', temperature: '25.5', humidity: '82', sensorId: 1 },
+      { id: '2:2', temperature: '26', humidity: '80', sensorId: 2 },
+    ] } } };
+  });
+  const readings = await repo.getCustomerCurrentSensorReadings(7);
+  assert.deepEqual(calls, [['current/7', undefined]]);
+  assert.deepEqual(readings.map(reading => reading.temperature), [25.5, 26]);
+  assert.deepEqual(readings.map(reading => reading.humidity), [82, 80]);
 });
 
 test('growth detail reads the latest progress of the selected session, including numeric strings', async () => {
@@ -136,7 +155,7 @@ function trayDetailHarness(sensorRequest, deviceRequest, detail = {}) {
     getCustomerCultivationDetails: async () => ({
       session_id: 7, growth_history: [], sensor_readings: [], device_logs: [], ...detail,
     }),
-    getCustomerSensorHistory: sensorRequest,
+    getCustomerCurrentSensorReadings: sensorRequest,
     getCustomerDeviceLogs: deviceRequest,
   };
   const source = readFileSync(new URL('../src/features/tray/presentation/components/CustomerTrayDetail.tsx', import.meta.url), 'utf8');
@@ -269,7 +288,11 @@ function renderedText(node) {
 }
 
 test('sensor readings remain visible when device history fails', async () => {
-  const readings = [{ sensorId: 1, temperature: 25.5, humidity: 80, ok: true }];
+  const readings = [
+    { sensorId: 1, temperature: 25, humidity: 80, ok: true },
+    { sensorId: 2, temperature: 26, humidity: 82, ok: true },
+    { sensorId: 3, temperature: 27, humidity: 84, ok: true },
+  ];
   const harness = trayDetailHarness(async () => readings, async () => { throw new Error('device timeout'); });
   try {
     const history = await harness.openDevices();
@@ -278,8 +301,8 @@ test('sensor readings remain visible when device history fails', async () => {
     assert.equal(props.refreshError, null);
     assert.equal(props.deviceRefreshError, 'device timeout');
     const text = renderedText(history.type(props));
-    assert.ok(text.includes('25.5°C'));
-    assert.ok(text.includes('80%'));
+    assert.ok(text.includes('26.0°C'));
+    assert.ok(text.includes('82%'));
   } finally {
     harness.close();
   }
