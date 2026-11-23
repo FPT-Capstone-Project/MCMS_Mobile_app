@@ -91,23 +91,11 @@ test('builds customer and operator conversation updates from complaint endpoints
   });
   assert.equal(reply.data.reply_id, 1);
   assert.deepEqual(
-    endpoints.updateStaffComplaintStatus.query({ complaintId: 7, status: 'NEED_MORE_INFO' }),
+    endpoints.resolveStaffComplaint.query({ complaintId: 7, resolution: 'Đã xử lý' }),
     {
       url: '/api/complaints/7/status',
       method: 'PATCH',
-      data: { status: 'NEED_MORE_INFO' },
-    },
-  );
-  assert.deepEqual(
-    endpoints.updateStaffComplaintStatus.query({
-      complaintId: 7,
-      status: 'RESOLVED',
-      resolution: 'Đã hoàn tiền',
-    }),
-    {
-      url: '/api/complaints/7/status',
-      method: 'PATCH',
-      data: { status: 'RESOLVED', resolution: 'Đã hoàn tiền' },
+      data: { resolution: 'Đã xử lý' },
     },
   );
 });

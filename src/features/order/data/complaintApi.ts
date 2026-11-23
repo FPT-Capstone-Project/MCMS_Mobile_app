@@ -52,11 +52,6 @@ function isOrderComplaint(value: unknown): value is OrderComplaint {
 }
 
 export type StaffComplaintQueue = 'UNASSIGNED' | 'ASSIGNED' | 'RESPONDED';
-export type ActiveComplaintStatus =
-  | 'UNDER_REVIEW'
-  | 'NEED_MORE_INFO'
-  | 'RESOLVING';
-
 interface CreateOrderComplaint {
   orderId: number;
   complaintType: string;
@@ -119,14 +114,14 @@ export const complaintApi = baseApi.injectEndpoints({
       transformResponse: (response: { data: OrderComplaintDetail }) => response.data,
       providesTags: ['Complaint'],
     }),
-    updateStaffComplaintStatus: builder.mutation<
+    resolveStaffComplaint: builder.mutation<
       OrderComplaint,
-      { complaintId: number; status: ActiveComplaintStatus | 'RESOLVED'; resolution?: string }
+      { complaintId: number; resolution: string }
     >({
-      query: ({ complaintId, status, resolution }) => ({
+      query: ({ complaintId, resolution }) => ({
         url: API_ENDPOINTS.COMPLAINTS.STATUS(complaintId),
         method: 'PATCH',
-        data: resolution === undefined ? { status } : { status, resolution },
+        data: { resolution },
       }),
       transformResponse: (response: { data: OrderComplaint }) => response.data,
       invalidatesTags: ['Complaint', 'Notification'],
@@ -239,7 +234,7 @@ export const complaintApi = baseApi.injectEndpoints({
 export const {
   useGetStaffComplaintsQuery,
   useGetStaffComplaintDetailQuery,
-  useUpdateStaffComplaintStatusMutation,
+  useResolveStaffComplaintMutation,
   useGetMyComplaintsQuery,
   useGetMyComplaintDetailQuery,
   useCreateOrderComplaintMutation,
