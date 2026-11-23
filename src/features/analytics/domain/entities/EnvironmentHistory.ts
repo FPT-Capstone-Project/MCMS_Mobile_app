@@ -11,6 +11,7 @@ export interface FloorThresholds {
 }
 
 export interface EnvironmentHistoryPoint {
+  isLive?: boolean;
   timestamp: number; // epoch milliseconds
   temperature: number | null; // °C
   humidity: number | null; // %RH
@@ -34,5 +35,11 @@ export interface EnvironmentHistoryData {
   bucketMs: number;
   refreshAfterMs: number;
   floors: FloorEnvironmentHistory[];
+}
+
+export interface LatestEnvironmentData {
+  fetchedAt: number;
+  floors: FloorEnvironmentHistory[];
+  series?: FloorEnvironmentHistory[];
 }
 

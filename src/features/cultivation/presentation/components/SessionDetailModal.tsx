@@ -399,31 +399,33 @@ const SessionDetailModalContent: React.FC<{
                         {reqTrays} khay • {spawnQuantity} bịch phôi
                       </AppText>
                     </View>
-                    <View style={styles.gridCol}>
-                      <AppText variant="caption" color={theme.colors.text.muted}>
-                        Vị trí tầng nuôi trồng
-                      </AppText>
-                      {(() => {
-                        const assignedFloorName =
-                          current.floor_name ||
-                          current.trays?.[0]?.floor_name ||
-                          (current.floor_id != null ? `Tầng ${current.floor_id}` : null) ||
-                          (current.trays?.[0]?.floor_id != null ? `Tầng ${current.trays[0].floor_id}` : null);
-                        return (
-                          <AppText
-                            variant="bodySmall"
-                            weight="bold"
-                            color={
-                              assignedFloorName
-                                ? theme.colors.text.primary
-                                : theme.colors.warning.dark
-                            }
-                          >
-                            {assignedFloorName || 'Chưa gán tầng'}
-                          </AppText>
-                        );
-                      })()}
-                    </View>
+                    {current.status !== 'COMPLETED' && (
+                      <View style={styles.gridCol}>
+                        <AppText variant="caption" color={theme.colors.text.muted}>
+                          Vị trí tầng nuôi trồng
+                        </AppText>
+                        {(() => {
+                          const assignedFloorName =
+                            current.floor_name ||
+                            current.trays?.[0]?.floor_name ||
+                            (current.floor_id != null ? `Tầng ${current.floor_id}` : null) ||
+                            (current.trays?.[0]?.floor_id != null ? `Tầng ${current.trays[0].floor_id}` : null);
+                          return (
+                            <AppText
+                              variant="bodySmall"
+                              weight="bold"
+                              color={
+                                assignedFloorName
+                                  ? theme.colors.text.primary
+                                  : theme.colors.warning.dark
+                              }
+                            >
+                              {assignedFloorName || 'Chưa gán tầng'}
+                            </AppText>
+                          );
+                        })()}
+                      </View>
+                    )}
                     <View style={styles.gridCol}>
                       <AppText variant="caption" color={theme.colors.text.muted}>
                         Tình trạng quan sát

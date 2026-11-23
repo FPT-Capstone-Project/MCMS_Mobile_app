@@ -18,6 +18,7 @@ export interface FloorEnvironmentChartCardProps {
   from?: number;
   to?: number;
   bucketMs?: number;
+  live?: boolean;
 }
 
 const PLOT_HEIGHT = 220;
@@ -34,48 +35,20 @@ export interface DynamicAxis {
   ticks: number[];
 }
 
-/**
- * Dynamic Y Domain & Ticks algorithm as strictly specified in climateAxis.
- * Operates purely on valid finite values of a series; ignores null/undefined/NaN.
- */
-export function climateAxis(values: number[]): DynamicAxis {
-  const valid = values.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
-  if (valid.length === 0) {
-    return { min: 0, max: 10, ticks: [0, 5, 10] };
-  }
-
-  let dataMin = Math.min(...valid);
-  let dataMax = Math.max(...valid);
-  if (dataMin === dataMax) {
-    dataMin -= 1;
-    dataMax += 1;
-  }
-
-  const span = dataMax - dataMin;
-  const pad = span * 0.08;
-  const targetMin = dataMin - pad;
-  const targetMax = dataMax + pad;
-  const roughStep = (targetMax - targetMin) / 4;
-  const stepPower = Math.pow(10, Math.floor(Math.log10(roughStep)));
-  const stepNorm = roughStep / stepPower;
-
-  let cleanStep: number;
-  if (stepNorm < 1.5) {
-    cleanStep = 1 * stepPower;
-  } else if (stepNorm < 3.5) {
-    cleanStep = 2 * stepPower;
-  } else if (stepNorm < 7.5) {
-    cleanStep = 5 * stepPower;
-  } else {
-    cleanStep = 10 * stepPower;
-  }
-
-  const min = Math.floor(targetMin / cleanStep) * cleanStep;
-  const max = Math.ceil(targetMax / cleanStep) * cleanStep;
+/** Anchor to the first sample and keep a minimum span instead of zooming into noise. */
+export function climateAxis(
+  values: number[],
+  baseline = { minSpan: 4, step: 1 },
+): DynamicAxis {
+  const valid = values.filter(Number.isFinite);
+  const center = Math.round((valid[0] ?? 0) / baseline.step) * baseline.step;
+  const low = Math.min(center - baseline.minSpan / 2, ...valid);
+  const high = Math.max(center + baseline.minSpan / 2, ...valid);
+  const step = Math.max(baseline.step, Math.ceil((high - low) / (5 * baseline.step)) * baseline.step);
+  const min = Math.floor(low / step) * step;
+  const max = Math.ceil(high / step) * step;
   const ticks: number[] = [];
-  for (let t = min; t <= max + cleanStep * 0.001; t += cleanStep) {
-    ticks.push(Number(t.toFixed(4)));
-  }
+  for (let tick = min; tick <= max; tick += step) ticks.push(tick);
   return { min, max, ticks };
 }
 
@@ -91,12 +64,13 @@ function formatTick(val: number, unit: string): string {
 /**
  * Formats epoch ms timestamp to HH:mm string in 24h format (Asia/Ho_Chi_Minh).
  */
-function formatTimeHHmm(timestamp: number): string {
+function formatTimeHHmm(timestamp: number, seconds = false): string {
   try {
     return new Intl.DateTimeFormat('vi-VN', {
       timeZone: 'Asia/Ho_Chi_Minh',
       hour: '2-digit',
       minute: '2-digit',
+      ...(seconds ? { second: '2-digit' as const } : {}),
       hour12: false,
     }).format(new Date(timestamp));
   } catch {
@@ -245,12 +219,14 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
   from,
   to,
   bucketMs,
+  live = false,
 }) => {
   // Sort points ascending by timestamp and normalize non-finite values to null
   const points = useMemo(() => {
     const raw = floor.points || [];
     return [...raw]
       .map((p) => ({
+        isLive: p.isLive,
         timestamp: Number(p.timestamp),
         temperature:
           p.temperature !== null &&
@@ -294,7 +270,8 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
   const lastPointTs = points[points.length - 1]?.timestamp ?? to ?? 0;
 
   const startX = Math.min(from ?? firstPointTs, firstPointTs);
-  const endX = Math.max(to ?? (lastPointTs + effectiveBucketMs), lastPointTs + effectiveBucketMs);
+  const lastPointEnd = lastPointTs + (points[points.length - 1]?.isLive ? 0 : effectiveBucketMs);
+  const endX = Math.max(to ?? lastPointEnd, lastPointEnd);
   const timeSpan = Math.max(effectiveBucketMs, endX - startX);
 
   // Coordinate mapping for X
@@ -306,7 +283,7 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
     [startX, timeSpan, innerWidth]
   );
 
-  // Filter valid numbers independently for dynamic Y domain
+  // Keep fixed reference ranges, expanding only for readings outside the range.
   const validTemps = useMemo(() => {
     return points
       .map((p) => p.temperature)
@@ -378,7 +355,7 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
 
   // Interactive selection: nearest bucket by timestamp on tap/scrub
   const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(
-    points.length > 0 ? points.length - 1 : null
+    null
   );
 
   const handleTouch = (e: GestureResponderEvent) => {
@@ -419,18 +396,18 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
   // X ticks with reference ~45-55px spacing to prevent overlapping
   const xTicks = useMemo(() => {
     if (points.length === 0) return [];
-    const count = Math.max(2, Math.min(6, Math.floor(innerWidth / 50)));
+    const count = Math.max(2, Math.min(6, Math.floor(innerWidth / (live ? 70 : 50))));
     const result: { timestamp: number; x: number; timeStr: string }[] = [];
     for (let i = 0; i < count; i++) {
       const ts = startX + (i / (count - 1)) * timeSpan;
       result.push({
         timestamp: ts,
         x: getX(ts),
-        timeStr: formatTimeHHmm(ts),
+        timeStr: formatTimeHHmm(ts, live),
       });
     }
     return result;
-  }, [startX, timeSpan, innerWidth, getX, points.length]);
+  }, [startX, timeSpan, innerWidth, getX, points.length, live]);
 
   // Threshold evaluations for selected point
   const tempEval = useMemo(() => {
@@ -479,7 +456,8 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
             <View style={styles.tooltipTimeRow}>
               <Ionicons name="time-outline" size={13} color="#5b6b80" />
               <AppText style={styles.tooltipTimeText}>
-                {formatTimeHHmm(selectedPoint.timestamp)}
+                {formatTimeHHmm(selectedPoint.timestamp, live)}
+                {selectedPoint.isLive ? ' · Số đo trực tiếp' : ''}
               </AppText>
             </View>
             <AppText style={styles.tooltipTimeSubtext}>
@@ -566,13 +544,14 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
         </View>
       ) : (
         <View style={styles.chartWrapper} onLayout={handleContainerLayout}>
+          <View style={styles.axisHeadersRow}>
+            <AppText style={[styles.axisHeaderText, { color: '#c2413b' }]}>°C</AppText>
+            <AppText style={[styles.axisHeaderText, { color: '#2563eb' }]}>%RH</AppText>
+          </View>
           {/* Main Chart Canvas: Left Y-Axis | SVG Plot Area | Right Y-Axis */}
           <View style={styles.canvasRow}>
             {/* Left Y-Axis: Temperature (°C) */}
             <View style={styles.leftYAxis}>
-              <AppText style={[styles.axisHeaderText, { color: '#c2413b' }]}>
-                °C
-              </AppText>
               <View style={styles.ticksColumn}>
                 {tempAxis.ticks.map((tick, i) => {
                   const topPos =
@@ -583,7 +562,7 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
                       style={[styles.tickLabelWrapper, { top: topPos, right: 4 }]}
                     >
                       <AppText style={styles.axisTickText}>
-                        {formatTick(tick, '°C')}
+                        {formatTick(tick, '')}
                       </AppText>
                     </View>
                   );
@@ -696,9 +675,6 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
 
             {/* Right Y-Axis: Humidity (%RH) */}
             <View style={styles.rightYAxis}>
-              <AppText style={[styles.axisHeaderText, { color: '#2563eb' }]}>
-                %RH
-              </AppText>
               <View style={styles.ticksColumn}>
                 {humAxis.ticks.map((tick, i) => {
                   const topPos =
@@ -709,7 +685,7 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
                       style={[styles.tickLabelWrapper, { top: topPos, left: 4 }]}
                     >
                       <AppText style={styles.axisTickText}>
-                        {formatTick(tick, '%RH')}
+                        {formatTick(tick, '')}
                       </AppText>
                     </View>
                   );
@@ -726,11 +702,12 @@ export const FloorEnvironmentChartCard: React.FC<FloorEnvironmentChartCardProps>
                 style={[
                   styles.xTickLabelContainer,
                   {
-                    left: Math.max(0, Math.min(svgWidth - 44, tick.x - 22)),
+                    width: live ? 70 : 44,
+                    left: Math.max(0, Math.min(svgWidth - (live ? 70 : 44), tick.x - (live ? 35 : 22))),
                   },
                 ]}
               >
-                <AppText style={styles.xTickText}>{tick.timeStr}</AppText>
+                <AppText numberOfLines={1} adjustsFontSizeToFit style={styles.xTickText}>{tick.timeStr}</AppText>
               </View>
             ))}
           </View>
@@ -898,14 +875,18 @@ const styles = StyleSheet.create({
     height: PLOT_HEIGHT,
     position: 'relative',
   },
+  axisHeadersRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    minHeight: 18,
+  },
   axisHeaderText: {
     fontSize: 11,
     fontWeight: '700',
     textAlign: 'center',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    width: LEFT_AXIS_WIDTH,
+    lineHeight: 18,
   },
   ticksColumn: {
     flex: 1,

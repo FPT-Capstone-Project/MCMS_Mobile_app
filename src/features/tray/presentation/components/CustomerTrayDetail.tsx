@@ -1,3 +1,5 @@
+import { useGetTrayEnvironmentQuery } from '../../../analytics/data/environmentHistoryApi';
+import { useAuth } from '../../../auth';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -147,10 +149,7 @@ export function CustomerTrayDetail({
   const [retryCount, setRetryCount] = useState(0);
   const [sensorRefreshError, setSensorRefreshError] = useState<string | null>(null);
   const [deviceRefreshError, setDeviceRefreshError] = useState<string | null>(null);
-  const [environmentPoints, setEnvironmentPoints] = useState<CustomerEnvironmentHistoryPoint[]>([]);
   const [environmentRange, setEnvironmentRange] = useState<EnvironmentHistoryRange>(1);
-  const [environmentLoading, setEnvironmentLoading] = useState(false);
-  const [environmentError, setEnvironmentError] = useState<string | null>(null);
   const detailRequestId = useRef(0);
 
   useEffect(() => {
@@ -162,9 +161,7 @@ export function CustomerTrayDetail({
       setDetailError(null);
       setSensorRefreshError(null);
       setDeviceRefreshError(null);
-      setEnvironmentPoints([]);
       setEnvironmentRange(1);
-      setEnvironmentError(null);
       setDetailLoadState('loading');
       try {
         if (!tray.sessionId) {
@@ -271,93 +268,21 @@ export function CustomerTrayDetail({
     deviceHistoryUnavailable,
   ]);
 
-  const environmentRequestId = useRef(0);
-  const environmentInFlight = useRef<number | null>(null);
-
-  const refreshEnvironmentHistory = useCallback(
-    async (
-      sessionId: number,
-      floorId: number,
-      rangeHours: EnvironmentHistoryRange,
-      requestId: number,
-      silent: boolean,
-      generation: number
-    ) => {
-      if (environmentInFlight.current === generation) return;
-      environmentInFlight.current = generation;
-      if (!silent) setEnvironmentLoading(true);
-      try {
-        const to = new Date();
-        const from = new Date(to.getTime() - rangeHours * 60 * 60 * 1000);
-        const points = await trayRepository.getCustomerEnvironmentHistory(
-          sessionId,
-          floorId,
-          from.toISOString(),
-          to.toISOString()
-        );
-        if (requestId !== detailRequestId.current || generation !== environmentRequestId.current)
-          return;
-        setEnvironmentPoints(points);
-        setEnvironmentError(null);
-      } catch (error: unknown) {
-        if (requestId !== detailRequestId.current || generation !== environmentRequestId.current)
-          return;
-        setEnvironmentError(getErrorMessage(error, 'Không thể tải lịch sử nhiệt độ và độ ẩm.'));
-      } finally {
-        if (environmentInFlight.current === generation) environmentInFlight.current = null;
-        if (requestId === detailRequestId.current && generation === environmentRequestId.current)
-          setEnvironmentLoading(false);
-      }
-    },
-    []
-  );
-
-  useEffect(() => {
-    const sessionId = selectedTray?.sessionId;
-    const floorId = selectedTray?.floorId;
-    if (
-      deviceHistoryUnavailable ||
-      !sessionId ||
-      !floorId ||
-      detailTab !== 'devices' ||
-      detailLoadState !== 'ready' ||
-      details?.session_id !== sessionId
-    )
-      return;
-
-    const requestId = detailRequestId.current;
-    const generation = ++environmentRequestId.current;
-    void refreshEnvironmentHistory(
-      sessionId,
-      floorId,
-      environmentRange,
-      requestId,
-      false,
-      generation
-    );
-    const intervalId = setInterval(() => {
-      void refreshEnvironmentHistory(
-        sessionId,
-        floorId,
-        environmentRange,
-        requestId,
-        true,
-        generation
-      );
-    }, 60_000);
-    return () => {
-      clearInterval(intervalId);
-      environmentRequestId.current += 1;
-    };
-  }, [
-    selectedTray,
-    detailTab,
-    detailLoadState,
-    details?.session_id,
-    environmentRange,
-    refreshEnvironmentHistory,
-    deviceHistoryUnavailable,
-  ]);
+  // Start alongside session details, so opening the device tab does not start a second wait.
+  const { user } = useAuth();
+  const {
+    currentData: environmentPoints = [], isFetching: environmentLoading,
+    error: environmentQueryError,
+  } = useGetTrayEnvironmentQuery({
+    accountId: user?.id || '', sessionId: selectedTray.sessionId || 0,
+    rangeHours: environmentRange,
+  }, {
+    skip: !user || !selectedTray.sessionId || deviceHistoryUnavailable,
+    refetchOnMountOrArgChange: 60,
+    pollingInterval: detailTab === 'devices' ? 60_000 : 0,
+  });
+  const environmentError = environmentQueryError
+    ? environmentQueryError.message || 'Không thể tải lịch sử môi trường.' : null;
 
   const handleCloseDetails = onClose;
   return (

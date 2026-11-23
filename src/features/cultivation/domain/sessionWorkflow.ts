@@ -64,6 +64,12 @@ export function sessionGroup(session: CultivationSessionAdmin): string {
   if (['SPAWN_RESTING', 'MYCELIAL_DEVELOPMENT'].includes(session.status)) return 'INCUBATING';
   return session.status;
 }
+export const HARVEST_SESSION_GROUPS = ['HARVEST_READY', 'HARVESTING', 'COMPLETED'];
+
+export function isHarvestSession(session: CultivationSessionAdmin): boolean {
+  return HARVEST_SESSION_GROUPS.includes(sessionGroup(session));
+}
+
 export function growthStage(session: CultivationSessionAdmin): string {
   const stage = session.current_stage || session.growth_status;
   return GROWTH_FILTERS.some(x => x.value === stage) ? stage! : 'UNRECORDED';

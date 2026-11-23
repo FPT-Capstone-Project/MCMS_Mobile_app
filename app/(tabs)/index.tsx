@@ -1,10 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
-  AppState,
-  AppStateStatus,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -23,10 +21,7 @@ import {
   IotMaster,
   iotRepository,
 } from '../../src/features/iot';
-import {
-  analyticsRepository,
-  EnvironmentHistoryData,
-} from '../../src/features/analytics';
+import { useLiveEnvironment } from '../../src/features/analytics/presentation/hooks/useLiveEnvironment';
 import {
   AppButton,
   AppCard,
@@ -58,7 +53,7 @@ const staffActions: QuickActionItem[] = [
   {
     id: 'admin-orders',
     title: 'Phiên nuôi trồng',
-    desc: 'Theo dõi phôi, xếp khay & thu hoạch',
+    desc: 'Theo dõi phôi, xếp khay và chăm sóc',
     icon: 'leaf-outline',
     iconColor: '#059669',
     iconBg: 'rgba(5, 150, 105, 0.1)',
@@ -189,8 +184,8 @@ const customerActions: QuickActionItem[] = [
 const operatorActions: QuickActionItem[] = [
   {
     id: 'operator-orders',
-    title: 'Theo dõi đơn hàng',
-    desc: 'Giao hàng, khách đến hái và đơn hoàn thành',
+    title: 'Thu hoạch và giao hàng',
+    desc: 'Sẵn sàng thu hoạch, khách đến hái và giao hàng',
     icon: 'car-outline',
     iconColor: '#0EA5E9',
     iconBg: 'rgba(14, 165, 233, 0.1)',
@@ -213,11 +208,12 @@ const operatorActions: QuickActionItem[] = [
  */
 export default function HomeScreen() {
   const router = useRouter();
-  const { isAdmin, isFarmOperator, isCustomer } = useAuth();
+  const { user, isAdmin, isFarmOperator, isCustomer } = useAuth();
   const isStaff = isAdmin || isFarmOperator;
+  const liveEnvironment = useLiveEnvironment(user?.id || '', isStaff && !!user);
 
   const displayedActions = isStaff
-    ? isFarmOperator ? [...staffActions, ...operatorActions] : staffActions
+    ? isFarmOperator ? [...staffActions, ...operatorActions] : [...staffActions, operatorActions[0]]
     : customerActions;
   const actionRows: QuickActionItem[][] = [];
   for (let i = 0; i < displayedActions.length; i += 2) {
@@ -230,11 +226,8 @@ export default function HomeScreen() {
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
 
-  // Environment History Server State (GET /api/analytics/dashboard/environment-history)
-  const [envHistory, setEnvHistory] = useState<EnvironmentHistoryData | null>(null);
   const [pullRefreshing, setPullRefreshing] = useState(false);
 
-  const appStateRef = useRef<AppStateStatus>((AppState.currentState as AppStateStatus) || 'active');
 
   const loadDashboardData = useCallback(async () => {
     setDashboardError(null);
@@ -255,63 +248,8 @@ export default function HomeScreen() {
     }
   }, [isStaff]);
 
-  const loadEnvironmentHistory = useCallback(async () => {
-    // Strictly restricted to Staff (Admin & Farm Operator); NEVER call for Customer
-    if (!isStaff) return;
-
-    try {
-      const data = await analyticsRepository.getEnvironmentHistory();
-      setEnvHistory(data);
-    } catch {
-      // Retain existing data
-    }
-  }, [isStaff]);
-
-  // Auto-refresh interval from API or fallback 5 minutes (300,000 ms)
-  const refreshIntervalMs = useMemo(() => {
-    if (
-      envHistory?.refreshAfterMs &&
-      typeof envHistory.refreshAfterMs === 'number' &&
-      envHistory.refreshAfterMs > 0
-    ) {
-      return envHistory.refreshAfterMs;
-    }
-    return 300000;
-  }, [envHistory?.refreshAfterMs]);
-
-  // AppState change listener: Pause when backgrounded, refresh when returning to active
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      appStateRef.current = nextState;
-      if (nextState === 'active' && isStaff) {
-        loadEnvironmentHistory();
-      }
-    });
-    return () => {
-      subscription.remove();
-    };
-  }, [isStaff, loadEnvironmentHistory]);
-
-  // Screen Focus Lifecycle: triggers initial load and sets interval while screen is in focus
-  useFocusEffect(
-    useCallback(() => {
-      loadDashboardData();
-
-      if (isStaff) {
-        loadEnvironmentHistory();
-
-        const intervalId = setInterval(() => {
-          if (appStateRef.current === 'active') {
-            loadEnvironmentHistory();
-          }
-        }, refreshIntervalMs);
-
-        return () => {
-          clearInterval(intervalId);
-        };
-      }
-    }, [loadDashboardData, loadEnvironmentHistory, isStaff, refreshIntervalMs])
-  );
+  const refetchLive = liveEnvironment.refetch;
+  useFocusEffect(useCallback(() => { void loadDashboardData(); }, [loadDashboardData]));
 
   useFocusEffect(
     useCallback(() => {
@@ -331,12 +269,12 @@ export default function HomeScreen() {
     try {
       await Promise.all([
         loadDashboardData(),
-        isStaff ? loadEnvironmentHistory() : Promise.resolve(),
+        isStaff ? refetchLive() : Promise.resolve(),
       ]);
     } finally {
       setPullRefreshing(false);
     }
-  }, [loadDashboardData, loadEnvironmentHistory, isStaff]);
+  }, [loadDashboardData, refetchLive, isStaff]);
 
   const firstMaster = masters[0];
   const unpaidOrderCount = orders.filter(
@@ -350,25 +288,13 @@ export default function HomeScreen() {
     latestDashboardTemp: number | null;
     latestDashboardHum: number | null;
   }>(() => {
-    let t: number | null = null;
-    let h: number | null = null;
-    const floorList = envHistory?.floors || [];
-    for (const f of floorList) {
-      const pts = f.points || [];
-      for (let i = pts.length - 1; i >= 0; i--) {
-        const pt = pts[i];
-        if (t === null && pt.temperature !== null) {
-          t = pt.temperature;
-        }
-        if (h === null && pt.humidity !== null) {
-          h = pt.humidity;
-        }
-        if (t !== null && h !== null) break;
-      }
-      if (t !== null && h !== null) break;
-    }
-    return { latestDashboardTemp: t, latestDashboardHum: h };
-  }, [envHistory]);
+    const points = (liveEnvironment.data?.floors || []).flatMap(floor => floor.points);
+    const average = (metric: 'temperature' | 'humidity') => {
+      const values = points.map(point => point[metric]).filter((value): value is number => value != null && Number.isFinite(value));
+      return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+    };
+    return { latestDashboardTemp: average('temperature'), latestDashboardHum: average('humidity') };
+  }, [liveEnvironment.data]);
 
   return (
     <ScreenContainer
@@ -570,13 +496,19 @@ export default function HomeScreen() {
             </View>
 
             <AppText variant="bodySmall" color={theme.colors.text.secondary} style={styles.heroDescription}>
-              Giám sát vi khí hậu buồng trồng và các tầng nuôi. Nhấn nút bên dưới để mở toàn bộ 2 biểu đồ đường 24 giờ.
+              Theo dõi số đo hiện tại của các tầng nuôi. Mở chi tiết để xem biểu đồ trực tiếp.
+            </AppText>
+            <AppText variant="caption" color={theme.colors.text.secondary}>
+              {liveEnvironment.error ? 'Mất kết nối cập nhật cảm biến.'
+                : !liveEnvironment.data ? 'Đang lấy số đo mới nhất…'
+                : latestDashboardTemp == null && latestDashboardHum == null ? 'Chưa có số đo hợp lệ trong 60 giây gần đây.'
+                : 'Số đo hiện tại · Cập nhật mỗi 5 giây'}
             </AppText>
 
             <View style={styles.metricsRow}>
               <View style={styles.metricItem}>
                 <AppText variant="caption" color={theme.colors.text.muted}>
-                  Nhiệt độ gần nhất
+                  Nhiệt độ TB các tầng
                 </AppText>
                 <AppText variant="title" weight="bold" color="#c2413b">
                   {latestDashboardTemp != null ? `${latestDashboardTemp.toFixed(1)} °C` : '—'}
@@ -587,7 +519,7 @@ export default function HomeScreen() {
 
               <View style={styles.metricItem}>
                 <AppText variant="caption" color={theme.colors.text.muted}>
-                  Độ ẩm gần nhất
+                  Độ ẩm TB các tầng
                 </AppText>
                 <AppText variant="title" weight="bold" color="#2563eb">
                   {latestDashboardHum != null ? `${latestDashboardHum.toFixed(1)} %RH` : '—'}
@@ -601,13 +533,13 @@ export default function HomeScreen() {
                   Số tầng giám sát
                 </AppText>
                 <AppText variant="title" weight="bold" color={theme.colors.text.primary}>
-                  {envHistory?.floors ? `${envHistory.floors.length} tầng` : '2 tầng'}
+                  {liveEnvironment.data?.floors ? `${liveEnvironment.data.floors.length} tầng` : '—'}
                 </AppText>
               </View>
             </View>
 
             <AppButton
-              title="Mở 2 biểu đồ vi khí hậu (Tầng 1 & Tầng 2)"
+              title="Mở chi tiết biểu đồ và cảm biến"
               variant="secondary"
               size="md"
               leftIcon={<Ionicons name="stats-chart" size={18} color={theme.colors.primary[700]} />}

@@ -1,7 +1,7 @@
 import { AppAlert as Alert } from '../../../../shared/components/feedback/AppDialog';
 import { ShipmentTrackingButton } from '../components/ShipmentTracking';
 import { canTrackSessionShipment } from '../../domain/shipment';
-import { SESSION_FILTERS, GROWTH_FILTERS, sessionGroup, growthStage, compareSessions, statusLabel } from '../../../cultivation/domain/sessionWorkflow';
+import { SESSION_FILTERS, GROWTH_FILTERS, HARVEST_SESSION_GROUPS, isHarvestSession, sessionGroup, growthStage, compareSessions, statusLabel } from '../../../cultivation/domain/sessionWorkflow';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
@@ -70,10 +70,15 @@ const StatusBadge: React.FC<{
 };
 
 
-const RENTAL_STATUS_FILTERS = SESSION_FILTERS;
-
-export const AdminOrdersScreen: React.FC = () => {
+export const AdminOrdersScreen: React.FC<{
+  workflow?: 'cultivation' | 'harvest';
+  headerAccessory?: React.ReactNode;
+}> = ({ workflow = 'cultivation', headerAccessory }) => {
   const router = useRouter();
+  const isHarvestWorkflow = workflow === 'harvest';
+  const rentalStatusFilters = SESSION_FILTERS.filter((filter) =>
+    filter.value === 'ALL' || HARVEST_SESSION_GROUPS.includes(filter.value) === isHarvestWorkflow,
+  );
 
   // Search Query
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,7 +88,10 @@ export const AdminOrdersScreen: React.FC = () => {
   const [growthFilter, setGrowthFilter] = useState('ALL');
 
   // Data states
-  const [sessions, setSessions] = useState<CultivationSessionAdmin[]>([]);
+  const [allSessions, setSessions] = useState<CultivationSessionAdmin[]>([]);
+  const sessions = useMemo(() => allSessions.filter((session) =>
+    isHarvestSession(session) === isHarvestWorkflow,
+  ), [allSessions, isHarvestWorkflow]);
 
   // UI states
   const [loading, setLoading] = useState(true);
@@ -209,14 +217,14 @@ export const AdminOrdersScreen: React.FC = () => {
 
       return {
         total: sessions.length,
-        highlight1: sessions.filter(s => sessionGroup(s) === 'HARVEST_READY').length,
-        highlight1Label: 'Sẵn sàng thu hoạch',
-        highlight2: cultivatingCount,
-        highlight2Label: 'Đang trồng',
+        highlight1: sessions.filter(s => sessionGroup(s) === (isHarvestWorkflow ? 'HARVEST_READY' : 'READY_FOR_CULTIVATION')).length,
+        highlight1Label: isHarvestWorkflow ? 'Sẵn sàng thu hoạch' : 'Chờ gán khay',
+        highlight2: isHarvestWorkflow ? sessions.filter(s => sessionGroup(s) === 'HARVESTING').length : cultivatingCount,
+        highlight2Label: isHarvestWorkflow ? 'Đang thu hoạch' : 'Đang trồng',
         highlight3: cultivatingCount,
         highlight3Label: 'Đang trồng',
       };
-  }, [sessions]);
+  }, [sessions, isHarvestWorkflow]);
 
   const formatGrowthStatus = statusLabel;
   const formatHarvestStatus = statusLabel;
@@ -251,8 +259,8 @@ export const AdminOrdersScreen: React.FC = () => {
     <ScreenContainer scrollable={false} edges={['top', 'left', 'right']}>
       {/* Header */}
       <AppHeader
-        title="Quản lý phiên nuôi trồng"
-        subtitle="Theo dõi phôi, xếp khay và thu hoạch"
+        title={isHarvestWorkflow ? 'Thu hoạch và giao hàng' : 'Quản lý phiên nuôi trồng'}
+        subtitle={isHarvestWorkflow ? 'Từ sẵn sàng thu hoạch đến hoàn thành' : 'Theo dõi phôi, xếp khay và chăm sóc'}
         showBack
         onBack={() => {
           if (router.canGoBack()) router.back();
@@ -260,6 +268,7 @@ export const AdminOrdersScreen: React.FC = () => {
         }}
       />
 
+      {headerAccessory}
       {/* Top Stats Overview */}
       <View style={styles.statsRow}>
         <View style={styles.statBox}>
@@ -308,7 +317,7 @@ export const AdminOrdersScreen: React.FC = () => {
       {/* Status Filter Chips */}
       <View style={styles.chipsScrollWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContent}>
-          {RENTAL_STATUS_FILTERS.map((filter) => {
+          {rentalStatusFilters.map((filter) => {
             const isSelected = rentalFilter === filter.value;
             return (
               <Pressable
@@ -482,41 +491,43 @@ export const AdminOrdersScreen: React.FC = () => {
                       </AppText>
                     </View>
 
-                    <View style={styles.detailItem}>
-                      <AppText variant="caption" color={theme.colors.text.muted}>
-                        Vị trí tầng
-                      </AppText>
-                      {(() => {
-                        const activeAssignedTrays = (session.trays || []).filter((t) => {
-                          const st = String(t.assignment_status || t.status || '').trim().toUpperCase();
-                          return st === 'ACTIVE';
-                        });
-                        const assignedCount = activeAssignedTrays.length;
-                        const assignedFloorName =
-                          assignedCount > 0
-                            ? session.floor_name ||
-                              activeAssignedTrays[0]?.floor_name ||
-                              (session.floor_id != null ? `Tầng ${session.floor_id}` : null) ||
-                              (activeAssignedTrays[0]?.floor_id != null ? `Tầng ${activeAssignedTrays[0].floor_id}` : null)
-                            : null;
+                    {session.status !== 'COMPLETED' && (
+                      <View style={styles.detailItem}>
+                        <AppText variant="caption" color={theme.colors.text.muted}>
+                          Vị trí tầng
+                        </AppText>
+                        {(() => {
+                          const activeAssignedTrays = (session.trays || []).filter((t) => {
+                            const st = String(t.assignment_status || t.status || '').trim().toUpperCase();
+                            return st === 'ACTIVE';
+                          });
+                          const assignedCount = activeAssignedTrays.length;
+                          const assignedFloorName =
+                            assignedCount > 0
+                              ? session.floor_name ||
+                                activeAssignedTrays[0]?.floor_name ||
+                                (session.floor_id != null ? `Tầng ${session.floor_id}` : null) ||
+                                (activeAssignedTrays[0]?.floor_id != null ? `Tầng ${activeAssignedTrays[0].floor_id}` : null)
+                              : null;
 
-                        return (
-                          <AppText
-                            variant="bodySmall"
-                            weight="medium"
-                            color={
-                              assignedFloorName
-                                ? theme.colors.text.primary
-                                : theme.colors.warning.dark
-                            }
-                          >
-                            {assignedFloorName
-                              ? `${assignedFloorName}${assignedCount > 0 ? ` (${assignedCount} khay)` : ''}`
-                              : 'Chưa gán tầng'}
-                          </AppText>
-                        );
-                      })()}
-                    </View>
+                          return (
+                            <AppText
+                              variant="bodySmall"
+                              weight="medium"
+                              color={
+                                assignedFloorName
+                                  ? theme.colors.text.primary
+                                  : theme.colors.warning.dark
+                              }
+                            >
+                              {assignedFloorName
+                                ? `${assignedFloorName}${assignedCount > 0 ? ` (${assignedCount} khay)` : ''}`
+                                : 'Chưa gán tầng'}
+                            </AppText>
+                          );
+                        })()}
+                      </View>
+                    )}
                   </View>
 
                   {/* Spawn phase badge / notice if relevant */}
@@ -663,7 +674,7 @@ export const AdminOrdersScreen: React.FC = () => {
                     )}
 
                     {/* 4. CULTIVATING: Daily Tray Report, Growth, Harvest Readiness, Harvest Actions */}
-                    {session.status === 'CULTIVATING' && (
+                    {sessionGroup(session) === 'CULTIVATING' && (
                       <View style={styles.actionCol}>
                         {/* Daily Tray Report Buttons */}
                         <View style={styles.spawnActionsSubrow}>
@@ -764,23 +775,11 @@ export const AdminOrdersScreen: React.FC = () => {
                           />
                         </View>
 
-                        {session.harvest_status === 'HARVEST_READY' && (
-                          <AppButton
-                            title="Quản lý thu hoạch"
-                            variant="secondary"
-                            size="sm"
-                            leftIcon={<Ionicons name="leaf" size={16} color={theme.colors.success.dark} />}
-                            onPress={() => {
-                              setHarvestSession(session);
-                              setHarvestModalVisible(true);
-                            }}
-                          />
-                        )}
                       </View>
                     )}
 
                     {/* 5. HARVESTING: Manage harvest yield & completion */}
-                    {session.status === 'HARVESTING' && (
+                    {(sessionGroup(session) === 'HARVEST_READY' || session.status === 'HARVESTING') && (
                       <View style={styles.actionCol}>
                         <AppButton
                           title="Quản lý thu hoạch & Sản lượng"
