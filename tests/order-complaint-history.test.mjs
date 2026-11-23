@@ -73,15 +73,23 @@ test('rejects malformed or incomplete complaint pages', async () => {
   }
 });
 
-test('builds customer and operator conversation updates from complaint endpoints', () => {
-  assert.deepEqual(
-    endpoints.replyToComplaint.query({ complaintId: 7, message: 'Thông tin bổ sung' }),
-    {
-      url: '/api/complaints/7/replies',
-      method: 'POST',
-      data: { message: 'Thông tin bổ sung' },
+test('builds customer and operator conversation updates from complaint endpoints', async () => {
+  const requests = [];
+  const reply = await endpoints.replyToComplaint.queryFn(
+    { complaintId: 7, message: 'Thông tin bổ sung' },
+    {},
+    {},
+    async (request) => {
+      requests.push(request);
+      return { data: { data: { reply_id: 1, message: request.data.message } } };
     },
   );
+  assert.deepEqual(requests[0], {
+    url: '/api/complaints/7/replies',
+    method: 'POST',
+    data: { message: 'Thông tin bổ sung' },
+  });
+  assert.equal(reply.data.reply_id, 1);
   assert.deepEqual(
     endpoints.updateStaffComplaintStatus.query({ complaintId: 7, status: 'NEED_MORE_INFO' }),
     {
