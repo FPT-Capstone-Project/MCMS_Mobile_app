@@ -52,6 +52,10 @@ function isOrderComplaint(value: unknown): value is OrderComplaint {
 }
 
 export type StaffComplaintQueue = 'UNASSIGNED' | 'ASSIGNED' | 'RESPONDED';
+export type ActiveComplaintStatus =
+  | 'UNDER_REVIEW'
+  | 'NEED_MORE_INFO'
+  | 'RESOLVING';
 
 interface CreateOrderComplaint {
   orderId: number;
@@ -78,16 +82,28 @@ export const complaintApi = baseApi.injectEndpoints({
       transformResponse: (response: { data: OrderComplaintDetail }) => response.data,
       providesTags: ['Complaint'],
     }),
-    resolveStaffComplaint: builder.mutation<
+    updateStaffComplaintStatus: builder.mutation<
       OrderComplaint,
-      { complaintId: number; resolution: string }
+      { complaintId: number; status: ActiveComplaintStatus | 'RESOLVED'; resolution?: string }
     >({
-      query: ({ complaintId, resolution }) => ({
+      query: ({ complaintId, status, resolution }) => ({
         url: API_ENDPOINTS.COMPLAINTS.STATUS(complaintId),
         method: 'PATCH',
-        data: { status: 'RESOLVED', resolution },
+        data: resolution === undefined ? { status } : { status, resolution },
       }),
       transformResponse: (response: { data: OrderComplaint }) => response.data,
+      invalidatesTags: ['Complaint', 'Notification'],
+    }),
+    replyToComplaint: builder.mutation<
+      ComplaintReply,
+      { complaintId: number; message: string }
+    >({
+      query: ({ complaintId, message }) => ({
+        url: API_ENDPOINTS.COMPLAINTS.REPLIES(complaintId),
+        method: 'POST',
+        data: { message },
+      }),
+      transformResponse: (response: { data: ComplaintReply }) => response.data,
       invalidatesTags: ['Complaint', 'Notification'],
     }),
     getMyComplaints: builder.query<
@@ -183,8 +199,9 @@ export const complaintApi = baseApi.injectEndpoints({
 export const {
   useGetStaffComplaintsQuery,
   useGetStaffComplaintDetailQuery,
-  useResolveStaffComplaintMutation,
+  useUpdateStaffComplaintStatusMutation,
   useGetMyComplaintsQuery,
   useGetMyComplaintDetailQuery,
   useCreateOrderComplaintMutation,
+  useReplyToComplaintMutation,
 } = complaintApi;

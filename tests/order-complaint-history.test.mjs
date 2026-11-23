@@ -16,7 +16,11 @@ loaded.require = (name) => {
     } } };
   }
   if (name.endsWith('/endpoints')) {
-    return { API_ENDPOINTS: { COMPLAINTS: { MY: '/api/complaints/my' } } };
+    return { API_ENDPOINTS: { COMPLAINTS: {
+      MY: '/api/complaints/my',
+      REPLIES: (id) => `/api/complaints/${id}/replies`,
+      STATUS: (id) => `/api/complaints/${id}/status`,
+    } } };
   }
   if (name === 'react-native') return { Platform: { OS: 'android' } };
   throw new Error(`Unexpected dependency: ${name}`);
@@ -67,4 +71,35 @@ test('rejects malformed or incomplete complaint pages', async () => {
     assert.equal(result.error.code, 'INVALID_RESPONSE');
     assert.equal(result.data, undefined);
   }
+});
+
+test('builds customer and operator conversation updates from complaint endpoints', () => {
+  assert.deepEqual(
+    endpoints.replyToComplaint.query({ complaintId: 7, message: 'Thông tin bổ sung' }),
+    {
+      url: '/api/complaints/7/replies',
+      method: 'POST',
+      data: { message: 'Thông tin bổ sung' },
+    },
+  );
+  assert.deepEqual(
+    endpoints.updateStaffComplaintStatus.query({ complaintId: 7, status: 'NEED_MORE_INFO' }),
+    {
+      url: '/api/complaints/7/status',
+      method: 'PATCH',
+      data: { status: 'NEED_MORE_INFO' },
+    },
+  );
+  assert.deepEqual(
+    endpoints.updateStaffComplaintStatus.query({
+      complaintId: 7,
+      status: 'RESOLVED',
+      resolution: 'Đã hoàn tiền',
+    }),
+    {
+      url: '/api/complaints/7/status',
+      method: 'PATCH',
+      data: { status: 'RESOLVED', resolution: 'Đã hoàn tiền' },
+    },
+  );
 });
