@@ -1,0 +1,1 @@
+export { CustomerComplaintsScreen as default } from '../../src/features/order/presentation/screens/CustomerComplaintsScreen';

@@ -91,7 +91,7 @@ export function OrderComplaintHistory({
                 {complaints.length > 1 ? (
                   <AppButton title="Danh sách khiếu nại" variant="ghost" size="sm" onPress={() => setSelectedId(null)} />
                 ) : null}
-                <ComplaintDetail accountId={accountId} complaintId={selectedId} />
+                <CustomerComplaintDetail accountId={accountId} complaintId={selectedId} />
               </>
             )}
           </ScrollView>
@@ -101,7 +101,13 @@ export function OrderComplaintHistory({
   );
 }
 
-function ComplaintDetail({ accountId, complaintId }: { accountId: string; complaintId: number }) {
+export function CustomerComplaintDetail({
+  accountId,
+  complaintId,
+}: {
+  accountId: string;
+  complaintId: number;
+}) {
   const [active, setActive] = useState(AppState.currentState === 'active');
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => setActive(state === 'active'));

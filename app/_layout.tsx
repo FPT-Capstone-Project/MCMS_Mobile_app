@@ -36,6 +36,7 @@ function NavigationGuard() {
       currentSegment === '(tabs)' ||
       currentSegment === 'rental' ||
       currentSegment === 'customer-sessions' ||
+      currentSegment === 'customer-complaints' ||
       currentSegment === 'camera' ||
       currentSegment === 'control' ||
       currentSegment === 'automatic' ||
@@ -122,6 +123,12 @@ function NavigationGuard() {
       />
       <Stack.Screen
         name="customer-sessions/index"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="customer-complaints/index"
         options={{
           headerShown: false,
         }}
