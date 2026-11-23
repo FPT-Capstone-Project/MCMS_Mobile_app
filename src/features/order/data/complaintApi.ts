@@ -64,6 +64,43 @@ interface CreateOrderComplaint {
   images: ImagePickerAsset[];
 }
 
+interface ReplyToComplaint {
+  complaintId: number;
+  message: string;
+  images?: ImagePickerAsset[];
+}
+
+async function createImageFormData(
+  images: ImagePickerAsset[],
+  appendText: (form: FormData) => void,
+): Promise<FormData> {
+  const form = new FormData();
+  appendText(form);
+  for (const [index, image] of images.entries()) {
+    const name = image.fileName || `complaint-${index + 1}.jpg`;
+    if (Platform.OS === 'web') {
+      let file = image.file;
+      if (!file) {
+        const response = await fetch(image.uri);
+        if (!response.ok) throw new Error('Không thể đọc ảnh đã chọn.');
+        const blob = await response.blob();
+        file = new File([blob], name, { type: blob.type || image.mimeType || 'image/jpeg' });
+      }
+      form.append('images', file, name);
+    } else {
+      const nativeForm = form as FormData & {
+        append(key: string, value: { uri: string; name: string; type: string }): void;
+      };
+      nativeForm.append('images', {
+        uri: image.uri,
+        name,
+        type: image.mimeType || 'image/jpeg',
+      });
+    }
+  }
+  return form;
+}
+
 export const complaintApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getStaffComplaints: builder.query<StaffComplaintsPage, {
@@ -96,14 +133,40 @@ export const complaintApi = baseApi.injectEndpoints({
     }),
     replyToComplaint: builder.mutation<
       ComplaintReply,
-      { complaintId: number; message: string }
+      ReplyToComplaint
     >({
-      query: ({ complaintId, message }) => ({
-        url: API_ENDPOINTS.COMPLAINTS.REPLIES(complaintId),
-        method: 'POST',
-        data: { message },
-      }),
-      transformResponse: (response: { data: ComplaintReply }) => response.data,
+      async queryFn({ complaintId, message, images = [] }, _api, _extraOptions, baseQuery) {
+        let data: FormData | { message: string } = { message };
+        if (images.length > 0) {
+          try {
+            data = await createImageFormData(images, (form) => form.append('message', message));
+          } catch {
+            return {
+              error: {
+                status: 400,
+                code: 'IMAGE_READ_ERROR',
+                message: 'Không thể đọc ảnh đã chọn. Vui lòng chọn lại ảnh.',
+              },
+            };
+          }
+        }
+        const result = await baseQuery({
+          url: API_ENDPOINTS.COMPLAINTS.REPLIES(complaintId),
+          method: 'POST',
+          data,
+        });
+        if (result.error) return { error: result.error };
+        if (!result.data || typeof result.data !== 'object' || !('data' in result.data)) {
+          return {
+            error: {
+              status: 500,
+              code: 'INVALID_RESPONSE',
+              message: 'Phản hồi khiếu nại từ máy chủ không hợp lệ.',
+            },
+          };
+        }
+        return { data: result.data.data as ComplaintReply };
+      },
       invalidatesTags: ['Complaint', 'Notification'],
     }),
     getMyComplaints: builder.query<
@@ -148,37 +211,14 @@ export const complaintApi = baseApi.injectEndpoints({
       async queryFn({ orderId, complaintType, description, images }, _api, _extraOptions, baseQuery) {
         let data: FormData | { complaintType: string; description: string } = { complaintType, description };
         if (images.length > 0) {
-          const form = new FormData();
-          form.append('complaintType', complaintType);
-          form.append('description', description);
           try {
-            for (const [index, image] of images.entries()) {
-              const name = image.fileName || `complaint-${index + 1}.jpg`;
-              if (Platform.OS === 'web') {
-                let file = image.file;
-                if (!file) {
-                  const response = await fetch(image.uri);
-                  if (!response.ok) throw new Error('Không thể đọc ảnh đã chọn.');
-                  const blob = await response.blob();
-                  file = new File([blob], name, { type: blob.type || image.mimeType || 'image/jpeg' });
-                }
-                form.append('images', file, name);
-              } else {
-                // React Native accepts URI-backed parts, unlike the DOM FormData type.
-                const nativeForm = form as FormData & {
-                  append(key: string, value: { uri: string; name: string; type: string }): void;
-                };
-                nativeForm.append('images', {
-                  uri: image.uri,
-                  name,
-                  type: image.mimeType || 'image/jpeg',
-                });
-              }
-            }
+            data = await createImageFormData(images, (form) => {
+              form.append('complaintType', complaintType);
+              form.append('description', description);
+            });
           } catch {
             return { error: { status: 400, code: 'IMAGE_READ_ERROR', message: 'Không thể đọc ảnh đã chọn. Vui lòng chọn lại ảnh.' } };
           }
-          data = form;
         }
         const result = await baseQuery({
           url: API_ENDPOINTS.COMPLAINTS.ORDER(orderId),
