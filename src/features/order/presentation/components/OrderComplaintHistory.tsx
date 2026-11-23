@@ -1,11 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import React, { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, ScrollView, StyleSheet, View } from 'react-native';
 import { theme } from '../../../../core/theme';
 import { formatVietnamDateTime } from '../../../../core/utils';
-import { AppBottomSheet, AppButton, AppText } from '../../../../shared/components';
-import { useGetMyComplaintDetailQuery, type OrderComplaint } from '../../data/complaintApi';
+import { AppBottomSheet, AppButton, AppInput, AppText } from '../../../../shared/components';
+import { AppAlert } from '../../../../shared/components/feedback/AppDialog';
+import {
+  useGetMyComplaintDetailQuery,
+  useReplyToComplaintMutation,
+  type OrderComplaint,
+} from '../../data/complaintApi';
 
 const typeLabels: Record<string, string> = {
   DAMAGED: 'Hàng bị hư hỏng',
@@ -93,10 +98,18 @@ export function OrderComplaintHistory({
 }
 
 function ComplaintDetail({ accountId, complaintId }: { accountId: string; complaintId: number }) {
+  const [active, setActive] = useState(AppState.currentState === 'active');
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => setActive(state === 'active'));
+    return () => subscription.remove();
+  }, []);
   const { currentData: complaint, isFetching, isError, refetch } = useGetMyComplaintDetailQuery(
     { accountId, complaintId },
-    { refetchOnMountOrArgChange: true },
+    { pollingInterval: active ? 5000 : 0, refetchOnMountOrArgChange: true },
   );
+  const [reply, setReply] = useState('');
+  const [sendReply, { isLoading: isReplying }] = useReplyToComplaintMutation();
+  const submitLock = useRef(false);
 
   if (isFetching && !complaint) return <ActivityIndicator color={theme.colors.primary[600]} />;
   if (isError || !complaint) {
@@ -107,6 +120,27 @@ function ComplaintDetail({ accountId, complaintId }: { accountId: string; compla
       </View>
     );
   }
+
+  const closed = ['RESOLVED', 'REJECTED', 'CLOSED'].includes(complaint.status);
+  const needsInformation = complaint.status === 'NEED_MORE_INFO';
+
+  const submitReply = async () => {
+    const message = reply.trim();
+    if (submitLock.current || !message || closed) return;
+    submitLock.current = true;
+    try {
+      await sendReply({ complaintId, message }).unwrap();
+      setReply('');
+      AppAlert.alert('Đã gửi phản hồi', 'Thông tin bổ sung đã được gửi cho nhân viên xử lý.');
+    } catch {
+      AppAlert.alert(
+        'Chưa gửi được phản hồi',
+        'Không xác nhận được việc gửi. Vui lòng tải lại khiếu nại để kiểm tra trước khi gửi lại.',
+      );
+    } finally {
+      submitLock.current = false;
+    }
+  };
 
   return (
     <>
@@ -146,6 +180,39 @@ function ComplaintDetail({ accountId, complaintId }: { accountId: string; compla
           </View>
         )) : <AppText color={theme.colors.text.secondary}>Chưa có phản hồi.</AppText>}
       </View>
+      {closed ? (
+        <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+          Khiếu nại đã hoàn tất. Lịch sử trao đổi được giữ lại để bạn theo dõi.
+        </AppText>
+      ) : (
+        <View style={styles.replyForm}>
+          {needsInformation ? (
+            <AppText variant="bodySmall" color={theme.colors.warning.dark}>
+              Nhân viên đang cần thêm thông tin. Hãy bổ sung nội dung cụ thể để tiếp tục xử lý.
+            </AppText>
+          ) : (
+            <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+              Gửi thêm thông tin hoặc trao đổi với nhân viên. Việc gửi phản hồi sẽ không đóng khiếu nại.
+            </AppText>
+          )}
+          <AppInput
+            label={needsInformation ? 'Thông tin bổ sung' : 'Nội dung phản hồi'}
+            placeholder="Nhập phản hồi cho nhân viên..."
+            multiline
+            maxLength={10000}
+            value={reply}
+            onChangeText={setReply}
+            disabled={isReplying}
+            inputStyle={styles.replyInput}
+          />
+          <AppButton
+            title="Gửi phản hồi"
+            loading={isReplying}
+            disabled={isReplying || !reply.trim()}
+            onPress={() => void submitReply()}
+          />
+        </View>
+      )}
     </>
   );
 }
@@ -177,4 +244,6 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
     backgroundColor: theme.colors.neutral[100],
   },
+  replyForm: { gap: theme.spacing.sm },
+  replyInput: { minHeight: 96, textAlignVertical: 'top' },
 });

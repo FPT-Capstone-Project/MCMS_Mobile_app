@@ -1,14 +1,16 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, FlatList, StyleSheet, View } from 'react-native';
 import { theme } from '../../../../core/theme';
 import { useAuth } from '../../../auth';
 import {
   useGetStaffComplaintsQuery,
   useGetStaffComplaintDetailQuery,
-  useResolveStaffComplaintMutation,
+  useReplyToComplaintMutation,
+  useUpdateStaffComplaintStatusMutation,
   type OrderComplaint,
+  type ActiveComplaintStatus,
   type StaffComplaintQueue,
 } from '../../data/complaintApi';
 import {
@@ -71,19 +73,8 @@ export function OperatorComplaintsScreen() {
     { page, pageSize: PAGE_SIZE, queue },
     { skip: !user, refetchOnMountOrArgChange: true },
   );
-  const [resolveComplaint, resolveState] = useResolveStaffComplaintMutation();
   const complaints = currentData?.data ?? [];
   const totalPages = Math.ceil((currentData?.total ?? 0) / PAGE_SIZE);
-
-  const handleResolve = async (complaintId: number, resolution: string) => {
-    try {
-      await resolveComplaint({ complaintId, resolution }).unwrap();
-      setExpandedComplaintId(null);
-      AppAlert.alert('Đã gửi phản hồi', 'Khiếu nại đã được đánh dấu là đã giải quyết.');
-    } catch (error) {
-      AppAlert.alert('Chưa gửi được phản hồi', complaintErrorMessage(error));
-    }
-  };
 
   const selectQueue = (nextQueue: StaffComplaintQueue) => {
     setQueue(nextQueue);
@@ -114,10 +105,8 @@ export function OperatorComplaintsScreen() {
               accountId={String(user?.id ?? '')}
               operatorId={Number(user?.id)}
               expanded={expandedComplaintId === item.complaint_id}
-              isResolving={resolveState.isLoading}
               onToggle={() => setExpandedComplaintId((current) =>
                 current === item.complaint_id ? null : item.complaint_id)}
-              onResolve={(resolution) => void handleResolve(item.complaint_id, resolution)}
             />
           )}
           ListHeaderComponent={
@@ -196,18 +185,14 @@ function ComplaintCard({
   accountId,
   operatorId,
   expanded,
-  isResolving,
   onToggle,
-  onResolve,
 }: {
   complaint: OrderComplaint;
   queue: StaffComplaintQueue;
   accountId: string;
   operatorId: number;
   expanded: boolean;
-  isResolving: boolean;
   onToggle: () => void;
-  onResolve: (resolution: string) => void;
 }) {
   const canRespond = queue === 'ASSIGNED' &&
     complaint.assigned_to === operatorId &&
@@ -246,8 +231,6 @@ function ComplaintCard({
           accountId={accountId}
           complaintId={complaint.complaint_id}
           canRespond={canRespond}
-          isResolving={isResolving}
-          onResolve={onResolve}
         />
       ) : null}
     </AppCard>
@@ -258,20 +241,25 @@ function StaffComplaintDetail({
   accountId,
   complaintId,
   canRespond,
-  isResolving,
-  onResolve,
 }: {
   accountId: string;
   complaintId: number;
   canRespond: boolean;
-  isResolving: boolean;
-  onResolve: (resolution: string) => void;
 }) {
+  const [active, setActive] = useState(AppState.currentState === 'active');
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => setActive(state === 'active'));
+    return () => subscription.remove();
+  }, []);
   const { currentData: complaint, isFetching, isError, refetch } = useGetStaffComplaintDetailQuery(
     { accountId, complaintId },
-    { refetchOnMountOrArgChange: true },
+    { pollingInterval: active ? 5000 : 0, refetchOnMountOrArgChange: true },
   );
   const [resolutionDraft, setResolutionDraft] = useState<string | null>(null);
+  const [replyDraft, setReplyDraft] = useState('');
+  const [updateStatus, statusState] = useUpdateStaffComplaintStatusMutation();
+  const [sendReply, replyState] = useReplyToComplaintMutation();
+  const submitLock = useRef(false);
 
   if (isFetching && !complaint) return <ActivityIndicator color={theme.colors.primary[600]} />;
   if (isError || !complaint) {
@@ -284,6 +272,68 @@ function StaffComplaintDetail({
   }
 
   const resolution = resolutionDraft ?? complaint.resolution ?? '';
+  const isBusy = statusState.isLoading || replyState.isLoading;
+  const currentStatus = complaint.status;
+
+  const submitReply = async () => {
+    const message = replyDraft.trim();
+    if (submitLock.current || !message) return;
+    submitLock.current = true;
+    try {
+      await sendReply({ complaintId, message }).unwrap();
+      setReplyDraft('');
+      AppAlert.alert('Đã gửi phản hồi', 'Khách hàng đã nhận được phản hồi trao đổi.');
+    } catch (error) {
+      AppAlert.alert('Chưa gửi được phản hồi', complaintErrorMessage(error));
+    } finally {
+      submitLock.current = false;
+    }
+  };
+
+  const changeStatus = async (status: ActiveComplaintStatus) => {
+    if (submitLock.current) return;
+    if (status === 'NEED_MORE_INFO' && !replyDraft.trim()) {
+      AppAlert.alert(
+        'Cần nội dung yêu cầu',
+        'Hãy nhập thông tin khách hàng cần bổ sung trước khi chuyển trạng thái.',
+      );
+      return;
+    }
+    submitLock.current = true;
+    try {
+      if (status === 'NEED_MORE_INFO') {
+        await sendReply({ complaintId, message: replyDraft.trim() }).unwrap();
+        setReplyDraft('');
+      }
+      await updateStatus({ complaintId, status }).unwrap();
+      AppAlert.alert('Đã cập nhật', `Khiếu nại đã chuyển sang trạng thái: ${complaintStatusLabel(status)}.`);
+    } catch (error) {
+      AppAlert.alert(
+        status === 'NEED_MORE_INFO' ? 'Chưa hoàn tất yêu cầu bổ sung' : 'Chưa cập nhật được trạng thái',
+        complaintErrorMessage(error),
+      );
+    } finally {
+      submitLock.current = false;
+    }
+  };
+
+  const resolveComplaint = async () => {
+    const normalizedResolution = resolution.trim();
+    if (submitLock.current || !normalizedResolution) return;
+    submitLock.current = true;
+    try {
+      await updateStatus({
+        complaintId,
+        status: 'RESOLVED',
+        resolution: normalizedResolution,
+      }).unwrap();
+      AppAlert.alert('Đã gửi phản hồi', 'Khiếu nại đã được đánh dấu là đã giải quyết.');
+    } catch (error) {
+      AppAlert.alert('Chưa gửi được phản hồi', complaintErrorMessage(error));
+    } finally {
+      submitLock.current = false;
+    }
+  };
 
   return (
     <View style={styles.details}>
@@ -307,9 +357,60 @@ function StaffComplaintDetail({
         )) : <AppText variant="bodySmall">Không có ảnh đính kèm.</AppText>}
       </View>
       <View style={styles.detailSection}>
+        <AppText variant="caption" color={theme.colors.text.secondary}>Trao đổi với khách hàng</AppText>
+        {canRespond ? (
+          <>
+            <AppInput
+              label="Nội dung phản hồi"
+              placeholder="Trao đổi với khách hàng hoặc yêu cầu thông tin bổ sung"
+              multiline
+              maxLength={10000}
+              value={replyDraft}
+              onChangeText={setReplyDraft}
+              disabled={isBusy}
+              inputStyle={styles.replyInput}
+            />
+            <View style={styles.actionRow}>
+              <AppButton
+                title="Gửi trao đổi"
+                variant="outline"
+                size="sm"
+                disabled={isBusy || !replyDraft.trim()}
+                onPress={() => void submitReply()}
+              />
+              <AppButton
+                title="Yêu cầu bổ sung"
+                variant="outline"
+                size="sm"
+                disabled={isBusy || !replyDraft.trim() || currentStatus === 'NEED_MORE_INFO'}
+                onPress={() => void changeStatus('NEED_MORE_INFO')}
+              />
+            </View>
+            <AppText variant="caption" color={theme.colors.text.secondary}>
+              Gửi trao đổi để tiếp tục hội thoại. Chọn “Yêu cầu bổ sung” để chuyển trạng thái chờ khách trả lời.
+            </AppText>
+          </>
+        ) : null}
+      </View>
+      <View style={styles.detailSection}>
         <AppText variant="caption" color={theme.colors.text.secondary}>Giải pháp khắc phục</AppText>
         {canRespond ? (
           <>
+            <View style={styles.actionRow}>
+              {([
+                ['UNDER_REVIEW', 'Đang xem xét'],
+                ['RESOLVING', 'Đang xử lý'],
+              ] as const).map(([status, label]) => (
+                <AppButton
+                  key={status}
+                  title={label}
+                  variant={currentStatus === status ? 'primary' : 'outline'}
+                  size="sm"
+                  disabled={isBusy || currentStatus === status}
+                  onPress={() => void changeStatus(status)}
+                />
+              ))}
+            </View>
             <AppInput
               label="Nội dung phản hồi"
               placeholder="Ghi rõ giải pháp khắc phục cho khách hàng"
@@ -317,14 +418,14 @@ function StaffComplaintDetail({
               maxLength={10000}
               value={resolution}
               onChangeText={setResolutionDraft}
-              editable={!isResolving}
+              disabled={isBusy}
               inputStyle={styles.resolutionInput}
             />
             <AppButton
               title="Gửi phản hồi"
-              disabled={isResolving || !resolution.trim()}
-              loading={isResolving}
-              onPress={() => onResolve(resolution.trim())}
+              disabled={isBusy || !resolution.trim()}
+              loading={statusState.isLoading}
+              onPress={() => void resolveComplaint()}
             />
           </>
         ) : (
@@ -387,6 +488,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.neutral[100],
   },
   resolutionInput: { minHeight: 120, textAlignVertical: 'top' },
+  replyInput: { minHeight: 96, textAlignVertical: 'top' },
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
   reply: {
     gap: theme.spacing.xs,
     padding: theme.spacing.sm,

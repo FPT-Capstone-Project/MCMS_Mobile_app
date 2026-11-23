@@ -14,6 +14,7 @@ export const API_ENDPOINTS = {
   COMPLAINTS: {
     ADMIN: '/api/complaints',
     DETAIL: (complaintId: number) => `/api/complaints/${complaintId}`,
+    REPLIES: (complaintId: number) => `/api/complaints/${complaintId}/replies`,
     STATUS: (complaintId: number) => `/api/complaints/${complaintId}/status`,
     MY: '/api/complaints/my',
     MY_DETAIL: (complaintId: number) => `/api/complaints/my/${complaintId}`,
