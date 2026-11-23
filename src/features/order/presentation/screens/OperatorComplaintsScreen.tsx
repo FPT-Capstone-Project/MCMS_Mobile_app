@@ -8,9 +8,8 @@ import {
   useGetStaffComplaintsQuery,
   useGetStaffComplaintDetailQuery,
   useReplyToComplaintMutation,
-  useUpdateStaffComplaintStatusMutation,
+  useResolveStaffComplaintMutation,
   type OrderComplaint,
-  type ActiveComplaintStatus,
   type StaffComplaintQueue,
 } from '../../data/complaintApi';
 import {
@@ -257,7 +256,7 @@ function StaffComplaintDetail({
   );
   const [resolutionDraft, setResolutionDraft] = useState<string | null>(null);
   const [replyDraft, setReplyDraft] = useState('');
-  const [updateStatus, statusState] = useUpdateStaffComplaintStatusMutation();
+  const [resolveComplaintMutation, resolutionState] = useResolveStaffComplaintMutation();
   const [sendReply, replyState] = useReplyToComplaintMutation();
   const submitLock = useRef(false);
 
@@ -272,8 +271,7 @@ function StaffComplaintDetail({
   }
 
   const resolution = resolutionDraft ?? complaint.resolution ?? '';
-  const isBusy = statusState.isLoading || replyState.isLoading;
-  const currentStatus = complaint.status;
+  const isBusy = resolutionState.isLoading || replyState.isLoading;
 
   const submitReply = async () => {
     const message = replyDraft.trim();
@@ -282,36 +280,12 @@ function StaffComplaintDetail({
     try {
       await sendReply({ complaintId, message }).unwrap();
       setReplyDraft('');
-      AppAlert.alert('Đã gửi phản hồi', 'Khách hàng đã nhận được phản hồi trao đổi.');
+      AppAlert.alert(
+        'Đã gửi yêu cầu phản hồi',
+        'Khiếu nại tự động chuyển sang chờ khách hàng bổ sung thông tin.',
+      );
     } catch (error) {
       AppAlert.alert('Chưa gửi được phản hồi', complaintErrorMessage(error));
-    } finally {
-      submitLock.current = false;
-    }
-  };
-
-  const changeStatus = async (status: ActiveComplaintStatus) => {
-    if (submitLock.current) return;
-    if (status === 'NEED_MORE_INFO' && !replyDraft.trim()) {
-      AppAlert.alert(
-        'Cần nội dung yêu cầu',
-        'Hãy nhập thông tin khách hàng cần bổ sung trước khi chuyển trạng thái.',
-      );
-      return;
-    }
-    submitLock.current = true;
-    try {
-      if (status === 'NEED_MORE_INFO') {
-        await sendReply({ complaintId, message: replyDraft.trim() }).unwrap();
-        setReplyDraft('');
-      }
-      await updateStatus({ complaintId, status }).unwrap();
-      AppAlert.alert('Đã cập nhật', `Khiếu nại đã chuyển sang trạng thái: ${complaintStatusLabel(status)}.`);
-    } catch (error) {
-      AppAlert.alert(
-        status === 'NEED_MORE_INFO' ? 'Chưa hoàn tất yêu cầu bổ sung' : 'Chưa cập nhật được trạng thái',
-        complaintErrorMessage(error),
-      );
     } finally {
       submitLock.current = false;
     }
@@ -322,9 +296,8 @@ function StaffComplaintDetail({
     if (submitLock.current || !normalizedResolution) return;
     submitLock.current = true;
     try {
-      await updateStatus({
+      await resolveComplaintMutation({
         complaintId,
-        status: 'RESOLVED',
         resolution: normalizedResolution,
       }).unwrap();
       AppAlert.alert('Đã gửi phản hồi', 'Khiếu nại đã được đánh dấu là đã giải quyết.');
@@ -372,22 +345,14 @@ function StaffComplaintDetail({
             />
             <View style={styles.actionRow}>
               <AppButton
-                title="Gửi trao đổi"
-                variant="outline"
+                title="Gửi phản hồi cho khách hàng"
                 size="sm"
                 disabled={isBusy || !replyDraft.trim()}
                 onPress={() => void submitReply()}
               />
-              <AppButton
-                title="Yêu cầu bổ sung"
-                variant="outline"
-                size="sm"
-                disabled={isBusy || !replyDraft.trim() || currentStatus === 'NEED_MORE_INFO'}
-                onPress={() => void changeStatus('NEED_MORE_INFO')}
-              />
             </View>
             <AppText variant="caption" color={theme.colors.text.secondary}>
-              Gửi trao đổi để tiếp tục hội thoại. Chọn “Yêu cầu bổ sung” để chuyển trạng thái chờ khách trả lời.
+              Sau khi gửi, hệ thống tự chuyển khiếu nại sang chờ khách hàng phản hồi.
             </AppText>
           </>
         ) : null}
@@ -396,21 +361,6 @@ function StaffComplaintDetail({
         <AppText variant="caption" color={theme.colors.text.secondary}>Giải pháp khắc phục</AppText>
         {canRespond ? (
           <>
-            <View style={styles.actionRow}>
-              {([
-                ['UNDER_REVIEW', 'Đang xem xét'],
-                ['RESOLVING', 'Đang xử lý'],
-              ] as const).map(([status, label]) => (
-                <AppButton
-                  key={status}
-                  title={label}
-                  variant={currentStatus === status ? 'primary' : 'outline'}
-                  size="sm"
-                  disabled={isBusy || currentStatus === status}
-                  onPress={() => void changeStatus(status)}
-                />
-              ))}
-            </View>
             <AppInput
               label="Nội dung phản hồi"
               placeholder="Ghi rõ giải pháp khắc phục cho khách hàng"
@@ -424,7 +374,7 @@ function StaffComplaintDetail({
             <AppButton
               title="Gửi phản hồi"
               disabled={isBusy || !resolution.trim()}
-              loading={statusState.isLoading}
+              loading={resolutionState.isLoading}
               onPress={() => void resolveComplaint()}
             />
           </>
