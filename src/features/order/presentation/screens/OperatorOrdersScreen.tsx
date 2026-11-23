@@ -8,6 +8,7 @@ import { iotRepository } from '../../../iot/data/repositories/IotRepository';
 import { AppButton, AppCard, AppEmptyState, AppHeader, AppText, ScreenContainer } from '../../../../shared/components';
 import { ShipmentTrackingButton } from '../components/ShipmentTracking';
 import { useGetAdminShipmentsQuery } from '../../data/shipmentApi';
+import { AdminOrdersScreen } from './AdminOrdersScreen';
 
 type OrderFilter = 'ALL' | 'DELIVERY_IN_PROGRESS' | 'PICKUP' | 'WAITING_DELIVERY' | 'COMPLETED';
 type TrackedOrder = { orderId: number; customerName: string; requests: AdminHarvestRequest[] };
@@ -32,6 +33,28 @@ function formatDate(value: string | null | undefined): string | null {
 }
 
 export function OperatorOrdersScreen() {
+  const [section, setSection] = useState<'harvest' | 'delivery'>('harvest');
+  const tabs = (
+    <View style={styles.sectionTabs}>
+      {(['harvest', 'delivery'] as const).map((value) => (
+        <AppButton
+          key={value}
+          title={value === 'harvest' ? 'Thu hoạch' : 'Giao hàng / đến hái'}
+          variant={section === value ? 'primary' : 'outline'}
+          size="sm"
+          accessibilityState={{ selected: section === value }}
+          onPress={() => setSection(value)}
+        />
+      ))}
+    </View>
+  );
+
+  return section === 'harvest'
+    ? <AdminOrdersScreen workflow="harvest" headerAccessory={tabs} />
+    : <DeliveryOrdersScreen headerAccessory={tabs} />;
+}
+
+function DeliveryOrdersScreen({ headerAccessory }: { headerAccessory: React.ReactNode }) {
   const router = useRouter();
   const [requests, setRequests] = useState<AdminHarvestRequest[]>([]);
   const [filter, setFilter] = useState<OrderFilter>('ALL');
@@ -111,11 +134,12 @@ export function OperatorOrdersScreen() {
   return (
     <View style={styles.screen}>
       <AppHeader
-        title="Theo dõi đơn hàng"
+        title="Thu hoạch và giao hàng"
         subtitle="Giao hàng và khách đến hái"
         showBack
         onBack={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
       />
+      {headerAccessory}
       <ScreenContainer edges={['left', 'right', 'bottom']} keyboardAvoiding={false}>
         <FlatList
           data={orders}
@@ -203,6 +227,7 @@ export function OperatorOrdersScreen() {
 }
 
 const styles = StyleSheet.create({
+  sectionTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm, padding: theme.spacing.md },
   screen: { flex: 1, backgroundColor: theme.colors.background.default },
   list: { padding: theme.spacing.md, gap: theme.spacing.md, paddingBottom: theme.spacing.xl },
   header: { gap: theme.spacing.sm },

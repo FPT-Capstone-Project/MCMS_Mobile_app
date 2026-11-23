@@ -1,11 +1,11 @@
+import { useLiveEnvironment } from '../../../analytics/presentation/hooks/useLiveEnvironment';
+import { useAuth } from '../../../auth';
 import { AppAlert as Alert } from '../../../../shared/components/feedback/AppDialog';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  AppState,
-  AppStateStatus,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -29,8 +29,6 @@ import {
 import { iotRepository } from '../../data/repositories/IotRepository';
 import { formatMistingBoolean, formatMistingCode } from '../../utils/mistingI18n';
 import {
-  analyticsRepository,
-  EnvironmentHistoryData,
   FloorEnvironmentChartCard,
 } from '../../../analytics';
 
@@ -45,28 +43,22 @@ export const SensorDetailScreen: React.FC = () => {
   const [floors, setFloors] = useState<FloorMapping[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 24h Aggregated Environment History State
-  const [envHistory, setEnvHistory] = useState<EnvironmentHistoryData | null>(null);
-  const [envLoading, setEnvLoading] = useState(false);
-  const [envRefreshing, setEnvRefreshing] = useState(false);
-  const [envError, setEnvError] = useState<string | null>(null);
+  // Shared rolling live series; no full-history request on this screen.
+  const { user } = useAuth();
+  const liveEnvironment = useLiveEnvironment(user?.id || '', !!user);
+  const chartHistory = liveEnvironment.chart;
+  const envLoading = liveEnvironment.isFetching;
+  const envRefreshing = envLoading && !!chartHistory;
+  const envError = liveEnvironment.error?.message;
   const [pullRefreshing, setPullRefreshing] = useState(false);
 
-  const appStateRef = useRef<AppStateStatus>((AppState.currentState as AppStateStatus) || 'active');
 
   // Filter out floors with empty points from the card list
   const validFloors = useMemo(() => {
-    return (envHistory?.floors || []).filter(
+    return (chartHistory?.floors || []).filter(
       (f) => f.points && f.points.length > 0
     );
-  }, [envHistory]);
-
-  const refreshIntervalMs =
-    envHistory?.refreshAfterMs &&
-    typeof envHistory.refreshAfterMs === 'number' &&
-    envHistory.refreshAfterMs > 0
-      ? envHistory.refreshAfterMs
-      : 300000;
+  }, [chartHistory]);
 
   // Map Node address to floor information:
   // Node 1 -> Tầng 1, Node 2 -> Tầng 2, omit Tầng 3
@@ -96,32 +88,7 @@ export const SensorDetailScreen: React.FC = () => {
     [floors]
   );
 
-  const environmentInFlight = useRef(false);
-
-  // Load 24h environment history from backend analytics endpoint
-  const loadEnvironmentHistory = useCallback(async (isSilent = false) => {
-    if (environmentInFlight.current) return;
-    environmentInFlight.current = true;
-    if (!isSilent) {
-      setEnvLoading(true);
-    } else {
-      setEnvRefreshing(true);
-    }
-    setEnvError(null);
-
-    try {
-      const data = await analyticsRepository.getEnvironmentHistory();
-      setEnvHistory(data);
-    } catch (err: unknown) {
-      setEnvError(
-        err instanceof Error ? err.message : 'Không thể tải lịch sử vi khí hậu.'
-      );
-    } finally {
-      environmentInFlight.current = false;
-      setEnvLoading(false);
-      setEnvRefreshing(false);
-    }
-  }, []);
+  const refetchLive = liveEnvironment.refetch;
 
   // Load masters, floors & hardware sensors
   const loadMasters = useCallback(async () => {
@@ -162,41 +129,7 @@ export const SensorDetailScreen: React.FC = () => {
     }
   }, []);
 
-  // AppState change listener: Pause when backgrounded, refresh when active
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      appStateRef.current = nextState;
-      if (nextState === 'active') {
-        loadEnvironmentHistory(true);
-      }
-    });
-    return () => {
-      subscription.remove();
-    };
-  }, [loadEnvironmentHistory]);
-
-  // Focus effect: trigger initial load & setup 5-minute auto-refresh interval
-  useFocusEffect(
-    useCallback(() => {
-      loadMasters();
-      loadEnvironmentHistory(false);
-
-    }, [loadMasters, loadEnvironmentHistory])
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      const intervalId = setInterval(() => {
-        if (appStateRef.current === 'active') {
-          loadEnvironmentHistory(true);
-        }
-      }, refreshIntervalMs);
-
-      return () => {
-        clearInterval(intervalId);
-      };
-    }, [loadEnvironmentHistory, refreshIntervalMs])
-  );
+  useFocusEffect(useCallback(() => { void loadMasters(); }, [loadMasters]));
 
   // Manual pull-to-refresh
   const handlePullRefresh = useCallback(async () => {
@@ -204,12 +137,12 @@ export const SensorDetailScreen: React.FC = () => {
     try {
       await Promise.all([
         loadMasters(),
-        loadEnvironmentHistory(true),
+        refetchLive(),
       ]);
     } finally {
       setPullRefreshing(false);
     }
-  }, [loadMasters, loadEnvironmentHistory]);
+  }, [loadMasters, refetchLive]);
 
   // When master selection changes
   const handleSelectMaster = async (masterId: string) => {
@@ -249,7 +182,7 @@ export const SensorDetailScreen: React.FC = () => {
     >
       <AppHeader
         title="Cảm biến & Biểu đồ"
-        subtitle="Giám sát vi khí hậu & Lịch sử 24h theo tầng"
+        subtitle="Biểu đồ trực tiếp · 15 phút gần nhất"
         showBack
         onBack={() => {
           if (router.canGoBack()) router.back();
@@ -258,13 +191,13 @@ export const SensorDetailScreen: React.FC = () => {
       />
 
       <View style={styles.content}>
-        {/* ================= 1. HAI BIỂU ĐỒ ĐƯỜNG VI KHÍ HẬU 24 GIỜ (HAI TRỤC Y ĐỘC LẬP) ================= */}
+        {/* Live climate curves with independent temperature and humidity axes. */}
         <View style={styles.chartSection}>
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="stats-chart" size={18} color={theme.colors.primary[600]} />
               <AppText variant="label" weight="bold">
-                BIỂU ĐỒ VI KHÍ HẬU 24 GIỜ (HAI TRỤC Y ĐỘC LẬP)
+                BIỂU ĐỒ VI KHÍ HẬU TRỰC TIẾP
               </AppText>
             </View>
             {envRefreshing && (
@@ -277,14 +210,18 @@ export const SensorDetailScreen: React.FC = () => {
             )}
           </View>
 
-          {envLoading && !envHistory ? (
+          <AppText variant="caption" color={theme.colors.text.secondary}>
+            {liveEnvironment.error ? 'Mất kết nối cập nhật cảm biến; đang hiển thị lịch sử.'
+              : 'Đường vẽ nối thêm số đo mới mỗi 5 giây · Hiển thị 15 phút gần nhất từ khi mở màn hình.'}
+          </AppText>
+          {envLoading && !chartHistory ? (
             <AppCard elevation="xs" style={styles.loadingCard}>
               <ActivityIndicator size="small" color={theme.colors.primary[500]} />
               <AppText variant="bodySmall" color={theme.colors.text.secondary}>
                 Đang nạp dữ liệu biểu đồ từ máy chủ...
               </AppText>
             </AppCard>
-          ) : envError && !envHistory ? (
+          ) : envError && !chartHistory ? (
             <AppCard elevation="xs" style={styles.errorCard}>
               <View style={styles.errorHeader}>
                 <Ionicons name="alert-circle" size={20} color={theme.colors.error.main} />
@@ -299,7 +236,7 @@ export const SensorDetailScreen: React.FC = () => {
                 title="Thử lại"
                 variant="outline"
                 size="sm"
-                onPress={() => loadEnvironmentHistory(false)}
+                onPress={() => refetchLive()}
                 style={styles.retryButton}
               />
             </AppCard>
@@ -309,9 +246,10 @@ export const SensorDetailScreen: React.FC = () => {
                 <FloorEnvironmentChartCard
                   key={floor.floorId}
                   floor={floor}
-                  from={envHistory?.from}
-                  to={envHistory?.to}
-                  bucketMs={envHistory?.bucketMs}
+                  from={chartHistory?.from}
+                  to={chartHistory?.to}
+                  bucketMs={chartHistory?.bucketMs}
+                  live
                 />
               ))}
             </View>
