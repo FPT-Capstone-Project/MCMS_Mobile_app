@@ -329,6 +329,7 @@ function HandoverDetails({ orderId, session, method }: {
     <>
       <ReportRow label="Phương thức" value={method === 'PICKUP' ? 'Khách nhận tại trại' : method === 'DELIVERY' ? 'Giao hàng tận nơi' : 'Chưa ghi nhận'} />
       <ReportRow label="Trạng thái" value={session.harvest_request_status === 'COMPLETED' ? 'Đã xác nhận hoàn tất' : 'Chưa có xác nhận bàn giao'} />
+      <ReportRow label="Hoàn tất bàn giao" value={formatTimestamp(session.handover_completed_at)} />
       {method === 'PICKUP' ? (
         <ReportRow label="Lịch hẹn nhận" value={formatTimestamp(session.scheduled_at)} />
       ) : method === 'DELIVERY' ? (
@@ -353,6 +354,7 @@ function HandoverDetails({ orderId, session, method }: {
             <AppText variant="caption" color={theme.colors.text.secondary}>Chưa có vận đơn cho đơn hàng.</AppText>
           ) : (
             <>
+              <ReportRow label="Mã vận đơn nội bộ" value={`#${shipment.shipment_id}`} />
               <ReportRow label="Trạng thái giao" value={shipmentLabel(shipment.status)} />
               <ReportRow label="Người nhận" value={shipment.recipient_name || 'Chưa ghi nhận'} />
               <ReportRow label="Số điện thoại" value={shipment.recipient_phone || 'Chưa ghi nhận'} />

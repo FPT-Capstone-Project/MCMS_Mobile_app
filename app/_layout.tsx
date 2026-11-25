@@ -37,6 +37,7 @@ function NavigationGuard() {
       currentSegment === '(tabs)' ||
       currentSegment === 'rental' ||
       currentSegment === 'customer-sessions' ||
+      currentSegment === 'customer-orders' ||
       currentSegment === 'customer-complaints' ||
       currentSegment === 'camera' ||
       currentSegment === 'control' ||

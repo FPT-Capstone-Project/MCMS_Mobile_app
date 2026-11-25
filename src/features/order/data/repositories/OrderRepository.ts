@@ -1,5 +1,6 @@
 import { axiosClient } from '../../../../core/api/axiosClient';
 import { API_ENDPOINTS } from '../../../../core/api/endpoints';
+import { findMushroomImage, getMushroomImages } from '../../../../core/api/mushroomImages';
 import { AppError } from '../../../../core/errors/appError';
 import { handleApiError } from '../../../../core/errors/errorHandler';
 import {
@@ -214,14 +215,41 @@ export class OrderRepository {
    */
   async getCustomerOrders(status?: string): Promise<CustomerOrder[]> {
     try {
-      const response = await axiosClient.get<{ data: BackendCustomerOrder[] }>(
-        API_ENDPOINTS.ORDERS.BASE,
-        { params: status ? { status } : undefined }
-      );
+      const [response, mushroomImages] = await Promise.all([
+        axiosClient.get<{ data: BackendCustomerOrder[] }>(
+          API_ENDPOINTS.ORDERS.BASE,
+          { params: status ? { status } : undefined }
+        ),
+        getMushroomImages(),
+      ]);
       if (!Array.isArray(response.data?.data)) {
         throw new AppError('Danh sách đơn hàng từ máy chủ không hợp lệ.', 'API_ERROR', 500);
       }
-      return response.data.data.map(mapBackendOrder);
+      return response.data.data.map((backendOrder) => {
+        const order = mapBackendOrder(backendOrder);
+        const items = order.items ?? [];
+        const primaryMushroom = items.find((item) =>
+          item.item_type?.toUpperCase() === 'MUSHROOM' || Boolean(item.mushroom_name)
+        );
+        const databaseImage = findMushroomImage(
+          mushroomImages,
+          primaryMushroom?.mushroom_type_id,
+          order.mushroom_name ?? primaryMushroom?.mushroom_name,
+        );
+        return {
+          ...order,
+          image_url: databaseImage ?? order.image_url,
+          mushroom_image_url: databaseImage ?? order.mushroom_image_url,
+          items: items.map((item) => ({
+            ...item,
+            image_url: findMushroomImage(
+              mushroomImages,
+              item.mushroom_type_id,
+              item.mushroom_name,
+            ) ?? item.image_url,
+          })),
+        };
+      });
     } catch (error) {
       throw error instanceof AppError ? error : handleApiError(error);
     }
@@ -249,13 +277,26 @@ export class OrderRepository {
    */
   async getCustomerCultivationStatus(orderId: number): Promise<CustomerCultivationStatus> {
     try {
-      const response = await axiosClient.get<{ data: CustomerCultivationStatus }>(
-        API_ENDPOINTS.CUSTOMER.CULTIVATION_STATUS(orderId)
-      );
+      const [response, mushroomImages] = await Promise.all([
+        axiosClient.get<{ data: CustomerCultivationStatus }>(
+          API_ENDPOINTS.CUSTOMER.CULTIVATION_STATUS(orderId)
+        ),
+        getMushroomImages(),
+      ]);
       if (!response.data?.data || !Array.isArray(response.data.data.sessions)) {
         throw new AppError('Dữ liệu phiên nuôi trồng từ máy chủ không hợp lệ.', 'API_ERROR', 500);
       }
-      return response.data.data;
+      return {
+        ...response.data.data,
+        sessions: response.data.data.sessions.map((session) => ({
+          ...session,
+          mushroom_image_url: findMushroomImage(
+            mushroomImages,
+            session.mushroom_type_id,
+            session.mushroom_name,
+          ) ?? session.mushroom_image_url,
+        })),
+      };
     } catch (error) {
       throw error instanceof AppError ? error : handleApiError(error);
     }

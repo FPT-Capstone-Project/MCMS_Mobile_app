@@ -3,10 +3,10 @@ import { useAuth } from '../../../auth';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { GROWTH_STAGE_LABELS } from '../../../../core/constants/growthStages';
 import { AppError } from '../../../../core/errors/appError';
 import { theme } from '../../../../core/theme';
-import { AppButton, AppText } from '../../../../shared/components';
+import { statusLabel } from '../../../cultivation/domain/sessionWorkflow';
+import { AppButton, AppCard, AppText } from '../../../../shared/components';
 import type {
   CustomerDeviceLogItem,
   CustomerEnvironmentHistoryPoint,
@@ -35,49 +35,27 @@ function formatDateTime(value: string): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('vi-VN');
 }
 
-function getGrowthStageLabel(stage: string): string {
-  const normalizedStage = stage.trim().toUpperCase();
-  const labels: Record<string, string> = {
-    UNKNOWN: 'Chưa cập nhật',
-    SPAWN_PENDING: 'Đang chuẩn bị phôi',
-    SPAWN_RESTING: 'Đang ủ phôi',
-    MYCELIAL_DEVELOPMENT: 'Đang phát triển tơ nấm',
-    READY_FOR_CULTIVATION: 'Sẵn sàng nuôi trồng',
-    FRUITING_INITIATION: GROWTH_STAGE_LABELS.FRUITING_INITIATION,
-    PINNING: GROWTH_STAGE_LABELS.PINNING,
-    YOUNG_FRUITING: GROWTH_STAGE_LABELS.YOUNG_FRUITING,
-    MATURATION: GROWTH_STAGE_LABELS.MATURATION,
-    HARVEST_READY: 'Sẵn sàng thu hoạch',
-  };
-  return labels[normalizedStage] ?? 'Giai đoạn đang được cập nhật';
-}
-
-function getCultivationStatusLabel(status?: string): string | null {
-  if (!status) return null;
-  const normalizedStatus = status.trim().toUpperCase();
-  const labels: Record<string, string> = {
-    PENDING: 'Đang chuẩn bị phôi',
-    SPAWN_RESTING: 'Đang ủ phôi',
-    MYCELIAL_DEVELOPMENT: 'Đang phát triển tơ nấm',
-    READY_FOR_CULTIVATION: 'Sẵn sàng nuôi trồng',
-    CULTIVATING: 'Đang nuôi trồng',
-    HARVEST_READY: 'Sẵn sàng thu hoạch',
-    HARVESTING: 'Đang thu hoạch',
-    COMPLETED: 'Đã hoàn tất',
-    CANCELLED: 'Đã hủy',
-  };
-  return labels[normalizedStatus] ?? 'Đang được cập nhật';
+function formatDate(value: string): string {
+  if (!value) return 'Chưa ghi nhận';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? 'Chưa ghi nhận'
+    : date.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 }
 
 function getHarvestStatusLabel(cultivationStatus?: string, harvestStatus?: string | null): string {
-  if (cultivationStatus === 'COMPLETED') return 'Đã hoàn tất';
-  if (cultivationStatus === 'CANCELLED') return 'Không áp dụng';
-  if (cultivationStatus === 'HARVESTING') return 'Đang thu hoạch';
-  if (harvestStatus === 'HARVEST_READY' || cultivationStatus === 'HARVEST_READY') {
-    return 'Sẵn sàng thu hoạch';
-  }
-  if (harvestStatus === 'COMPLETED') return 'Đã hoàn tất';
-  return 'Chưa sẵn sàng';
+  const resolvedStatus = cultivationStatus?.toUpperCase() === 'COMPLETED'
+    ? 'COMPLETED'
+    : harvestStatus || 'NOT_READY';
+  const labels: Record<string, string> = {
+    NOT_READY: 'Chưa sẵn sàng',
+    HARVEST_READY: 'Sẵn sàng thu hoạch',
+    READY: 'Sẵn sàng',
+    HARVESTED: 'Đã thu hoạch',
+    IN_PROGRESS: 'Đang thu hoạch',
+    COMPLETED: 'Đã hoàn thành',
+  };
+  return labels[resolvedStatus.toUpperCase()] ?? statusLabel(resolvedStatus);
 }
 
 function formatGrowthConditionText(condition?: string | null): string {
@@ -401,8 +379,20 @@ export function CustomerTrayDetail({
                   history={details?.growth_history ?? []}
                   cultivationStatus={details?.cultivation_status}
                   harvestStatus={details?.harvest_status}
+                  expectedHarvestDate={details?.expected_harvest_date}
+                  condition={details?.condition}
                   currentStage={details?.current_stage}
                   progressPercent={details?.progress_percent}
+                  mushroomName={details?.mushroom_name || selectedTray.mushroomName}
+                  requiredTrays={details?.required_trays ?? details?.tray_quantity}
+                  spawnQuantity={details?.spawn_quantity}
+                  spawnStatus={details?.spawn_status}
+                  spawnIssued={details?.spawn_issued}
+                  floorName={details?.floor_name || selectedTray.floorName}
+                  floorNumber={selectedTray.floorNumber}
+                  rowNumber={selectedTray.rowNumber}
+                  columnNumber={selectedTray.columnNumber}
+                  trayCode={selectedTray.code}
                 />
                 {selectedTray?.sessionId ? (
                   <CustomerDailyReport
@@ -501,126 +491,228 @@ const GrowthHistory: React.FC<{
   history: CustomerGrowthHistoryItem[];
   cultivationStatus?: string;
   harvestStatus?: string | null;
+  expectedHarvestDate?: string | null;
+  condition?: string | null;
   currentStage?: string | null;
   progressPercent?: number | null;
-}> = ({ history, cultivationStatus, harvestStatus, currentStage, progressPercent }) => {
-  const stages = [
-    'FRUITING_INITIATION',
-    'PINNING',
-    'YOUNG_FRUITING',
-    'MATURATION',
-    'HARVEST_READY',
-  ];
-  const harvestReady =
-    harvestStatus === 'HARVEST_READY' ||
-    cultivationStatus === 'HARVEST_READY' ||
-    cultivationStatus === 'HARVESTING' ||
-    cultivationStatus === 'COMPLETED';
-  const activeStage = harvestReady
-    ? 'HARVEST_READY'
-    : currentStage || history[history.length - 1]?.current_stage || 'FRUITING_INITIATION';
-  const normalizedStage = activeStage.trim().toUpperCase();
-  const activeStageIndex =
-    cultivationStatus === 'COMPLETED'
-      ? stages.length - 1
-      : Math.max(0, stages.indexOf(normalizedStage));
+  mushroomName?: string;
+  requiredTrays?: number | null;
+  spawnQuantity?: number | null;
+  spawnStatus?: string | null;
+  spawnIssued?: boolean;
+  floorName?: string;
+  floorNumber?: number;
+  rowNumber?: number;
+  columnNumber?: number;
+  trayCode: string;
+}> = ({
+  history,
+  cultivationStatus,
+  harvestStatus,
+  expectedHarvestDate,
+  condition,
+  currentStage,
+  progressPercent,
+  mushroomName,
+  requiredTrays,
+  spawnQuantity,
+  spawnStatus,
+  spawnIssued,
+  floorName,
+  floorNumber,
+  rowNumber,
+  columnNumber,
+  trayCode,
+}) => {
   const latestUpdate = history[history.length - 1];
+  const growthStage = currentStage || latestUpdate?.current_stage || '';
+  const displayedProgress = progressPercent ?? 0;
+  const normalizedProgress = Math.min(100, Math.max(0, displayedProgress));
+  const resolvedHarvestStatus = cultivationStatus?.toUpperCase() === 'COMPLETED'
+    ? 'COMPLETED'
+    : harvestStatus || 'NOT_READY';
+  const harvestReady = resolvedHarvestStatus.toUpperCase() === 'HARVEST_READY';
+  const trayCount = requiredTrays && requiredTrays > 0 ? requiredTrays : 1;
+  const displayedSpawnQuantity = spawnQuantity && spawnQuantity > 0 ? spawnQuantity : trayCount * 2;
+  const hasSpawnBeenIssued = spawnIssued ??
+    ['ISSUED', 'SPAWN_ISSUED'].includes(spawnStatus?.toUpperCase() ?? '');
+  const displayedSpawnStatus = spawnStatus || (spawnIssued ? 'ISSUED' : 'NOT_ISSUED');
+  const displayedCondition = condition || latestUpdate?.condition;
+  const location = [
+    floorName || (floorNumber != null ? `Tầng ${floorNumber}` : null),
+    rowNumber != null && columnNumber != null
+      ? `Hàng ${rowNumber}, cột ${columnNumber}`
+      : null,
+  ].filter(Boolean).join(' · ');
 
   return (
     <View style={styles.historyList}>
-      <View style={styles.historyCard}>
-        <AppText variant="bodyMedium" weight="bold">
-          Tiến độ vụ trồng
-        </AppText>
-        {cultivationStatus ? (
-          <AppText variant="caption" color={theme.colors.text.secondary}>
-            Trạng thái phiên: {getCultivationStatusLabel(cultivationStatus)}
-          </AppText>
-        ) : null}
-        <AppText variant="caption" color={theme.colors.text.secondary}>
-          Trạng thái thu hoạch: {getHarvestStatusLabel(cultivationStatus, harvestStatus)}
-        </AppText>
-        {currentStage ? (
-          <AppText variant="caption" color={theme.colors.text.secondary}>
-            Giai đoạn nấm: {getGrowthStageLabel(currentStage)}
-          </AppText>
-        ) : null}
-      </View>
-      <View style={styles.historyCard}>
-        <View style={styles.historyHeading}>
-          <AppText variant="bodyMedium" weight="bold" style={styles.historyTitle}>
-            {getGrowthStageLabel(activeStage)}
-          </AppText>
-          <AppText variant="captionMedium" weight="bold" color={theme.colors.primary[700]}>
-            {progressPercent == null ? 'Chưa cập nhật' : `${progressPercent}%`}
-          </AppText>
-        </View>
-        <View
-          accessibilityRole="progressbar"
-          accessibilityValue={progressPercent == null
-            ? { text: 'Chưa cập nhật tiến độ' }
-            : { min: 0, max: 100, now: progressPercent }}
-          style={styles.progressTrack}
-        >
-          <View style={styles.progressRail} />
-          {progressPercent != null ? (
-            <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
-          ) : null}
-          {stages.map((stage, index) => (
-            <View
-              key={stage}
-              accessibilityLabel={getGrowthStageLabel(stage)}
-              style={[
-                styles.progressDot,
-                index <= activeStageIndex ? styles.progressDotReached : styles.progressDotUpcoming,
-                index === activeStageIndex && styles.progressDotCurrent,
-                { left: `${(index / (stages.length - 1)) * 100}%` },
-              ]}
-            />
-          ))}
-        </View>
-        <View style={styles.progressLabels}></View>
-        {latestUpdate?.description ? (
-          <AppText variant="caption" color={theme.colors.text.secondary}>
-            {latestUpdate.description}
-          </AppText>
-        ) : null}
-        {latestUpdate ? (
+      <View style={styles.metricsRow}>
+        <View style={styles.metricCard}>
           <AppText variant="caption" color={theme.colors.text.muted}>
-            Cập nhật: {formatDateTime(latestUpdate.updated_at)}
+            Giai đoạn sinh trưởng
           </AppText>
-        ) : null}
-      </View>
-      {history.length === 0 ? (
-        <DetailEmptyState message="Chưa có nhật ký cập nhật giai đoạn nấm." />
-      ) : null}
-      {history.map((item) => (
-        <View key={item.progress_id} style={styles.growthHistoryEntry}>
-          <View style={styles.historyHeading}>
-            <AppText variant="bodyMedium" weight="bold" style={styles.historyTitle}>
-              {getGrowthStageLabel(item.current_stage)}
-            </AppText>
-            {typeof item.progress_percent === 'number' ? (
-              <AppText variant="captionMedium" weight="bold" color={theme.colors.primary[700]}>
-                {item.progress_percent}%
-              </AppText>
-            ) : null}
-          </View>
-          {item.condition ? (
+          <AppText variant="bodySmall" weight="bold" color={theme.colors.primary[700]}>
+            {statusLabel(growthStage)}
+          </AppText>
+          {growthStage ? (
+            <View style={styles.progressBarBackground}>
+              <View style={[styles.progressBarFill, { width: `${normalizedProgress}%` }]} />
+            </View>
+          ) : null}
+          <AppText variant="caption" color={theme.colors.text.secondary}>
+            Tiến độ: {displayedProgress}%
+          </AppText>
+          {cultivationStatus ? (
             <AppText variant="caption" color={theme.colors.text.secondary}>
-              Tình trạng: {formatGrowthConditionText(item.condition)}
+              Trạng thái phiên: {statusLabel(cultivationStatus)}
             </AppText>
           ) : null}
-          {item.description ? (
-            <AppText variant="bodySmall" color={theme.colors.text.primary}>
-              {item.description}
-            </AppText>
-          ) : null}
+        </View>
+        <View style={styles.metricCard}>
           <AppText variant="caption" color={theme.colors.text.muted}>
-            {formatDateTime(item.updated_at)}
+            Trạng thái thu hoạch
+          </AppText>
+          <View style={styles.harvestStatus}>
+            <Ionicons
+              name={harvestReady ? 'checkmark-circle' : 'hourglass-outline'}
+              size={16}
+              color={harvestReady ? theme.colors.success.dark : theme.colors.warning.dark}
+            />
+            <AppText
+              variant="caption"
+              weight="bold"
+              color={harvestReady ? theme.colors.success.dark : theme.colors.warning.dark}
+            >
+              {getHarvestStatusLabel(cultivationStatus, harvestStatus)}
+            </AppText>
+          </View>
+          {expectedHarvestDate ? (
+            <AppText variant="caption" color={theme.colors.text.secondary}>
+              Dự kiến: {formatDate(expectedHarvestDate)}
+            </AppText>
+          ) : null}
+        </View>
+      </View>
+
+      <AppCard elevation="none" style={styles.sectionCard}>
+        <View style={styles.sectionTitleRow}>
+          <Ionicons name="leaf-outline" size={18} color={theme.colors.primary[600]} />
+          <AppText variant="label" weight="bold">THÔNG TIN GIỐNG NẤM & QUY MÔ</AppText>
+        </View>
+        <View style={styles.infoGrid}>
+          <View style={styles.gridColumn}>
+            <AppText variant="caption" color={theme.colors.text.muted}>Giống nấm</AppText>
+            <AppText variant="bodySmall" weight="bold">{mushroomName || 'Nấm giống'}</AppText>
+          </View>
+          <View style={styles.gridColumn}>
+            <AppText variant="caption" color={theme.colors.text.muted}>Quy mô nuôi trồng</AppText>
+            <AppText variant="bodySmall" weight="bold">
+              {trayCount} khay · {displayedSpawnQuantity} bịch phôi
+            </AppText>
+          </View>
+          <View style={styles.gridColumn}>
+            <AppText variant="caption" color={theme.colors.text.muted}>Khay đang xem</AppText>
+            <AppText variant="bodySmall" weight="bold">{trayCode}</AppText>
+          </View>
+          <View style={styles.gridColumn}>
+            <AppText variant="caption" color={theme.colors.text.muted}>Vị trí tầng nuôi trồng</AppText>
+            <AppText
+              variant="bodySmall"
+              weight="bold"
+              color={location ? theme.colors.text.primary : theme.colors.warning.dark}
+            >
+              {location || 'Chưa gán tầng'}
+            </AppText>
+          </View>
+          <View style={styles.gridColumn}>
+            <AppText variant="caption" color={theme.colors.text.muted}>Tình trạng quan sát</AppText>
+            <AppText variant="bodySmall" weight="bold">
+              {formatGrowthConditionText(displayedCondition)}
+            </AppText>
+          </View>
+        </View>
+      </AppCard>
+
+      <AppCard elevation="none" style={styles.sectionCard}>
+        <View style={styles.sectionTitleRow}>
+          <Ionicons name="flask-outline" size={18} color="#0284C7" />
+          <AppText variant="label" weight="bold" color="#0369A1">
+            KIỂM TRA PHÔI THEO PHIÊN
           </AppText>
         </View>
-      ))}
+        <AppText variant="caption" color={theme.colors.text.muted}>
+          Thông tin phôi được áp dụng chung cho cả phiên nuôi trồng.
+        </AppText>
+        <View style={styles.spawnSummary}>
+          <View style={styles.spawnSummaryRow}>
+            <AppText variant="caption" color={theme.colors.text.secondary}>Tiêu chuẩn phôi phiên:</AppText>
+            <AppText variant="caption" weight="bold">
+              {displayedSpawnQuantity} bịch ({trayCount} khay × {Math.round(displayedSpawnQuantity / trayCount)} bịch/khay)
+            </AppText>
+          </View>
+          <View style={styles.spawnSummaryRow}>
+            <AppText variant="caption" color={theme.colors.text.secondary}>Trạng thái phôi:</AppText>
+            <AppText
+              variant="caption"
+              weight="bold"
+              color={hasSpawnBeenIssued ? theme.colors.success.dark : theme.colors.warning.dark}
+            >
+              {statusLabel(displayedSpawnStatus)}
+            </AppText>
+          </View>
+        </View>
+      </AppCard>
+
+      <AppCard elevation="none" style={styles.sectionCard}>
+        <View style={styles.sectionTitleRow}>
+          <Ionicons name="time-outline" size={18} color={theme.colors.primary[600]} />
+          <AppText variant="label" weight="bold">LỊCH SỬ TIẾN ĐỘ SINH TRƯỞNG</AppText>
+        </View>
+        {history.length > 0 ? (
+          <View style={styles.timelineContainer}>
+            {history.map((item, index) => {
+              const isLatest = index === history.length - 1;
+              return (
+                <View key={`${item.progress_id}-${index}`} style={styles.timelineItem}>
+                  <View style={styles.timelineDotLine}>
+                    <View style={[styles.timelineDot, isLatest && styles.timelineDotLatest]} />
+                    {index < history.length - 1 ? <View style={styles.timelineLine} /> : null}
+                  </View>
+                  <View style={styles.timelineContent}>
+                    <View style={styles.timelineHeader}>
+                      <AppText
+                        variant="bodySmall"
+                        weight="bold"
+                        color={isLatest ? theme.colors.primary[700] : theme.colors.text.primary}
+                      >
+                        {statusLabel(item.current_stage)} ({item.progress_percent ?? 0}%)
+                      </AppText>
+                      <AppText variant="caption" color={theme.colors.text.muted}>
+                        {formatDate(item.updated_at)}
+                      </AppText>
+                    </View>
+                    <AppText variant="caption" color={theme.colors.text.secondary}>
+                      Tình trạng: <AppText variant="caption" weight="medium">
+                        {formatGrowthConditionText(item.condition)}
+                      </AppText>
+                    </AppText>
+                    {item.description ? (
+                      <AppText variant="caption" color={theme.colors.text.muted}>
+                        {item.description}
+                      </AppText>
+                    ) : null}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : (
+          <AppText variant="caption" color={theme.colors.text.muted}>
+            Chưa có lịch sử cập nhật sinh trưởng nào được ghi nhận.
+          </AppText>
+        )}
+      </AppCard>
     </View>
   );
 };
@@ -804,6 +896,111 @@ const styles = StyleSheet.create({
   historyList: {
     gap: theme.spacing.sm,
   },
+  metricsRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  metricCard: {
+    flex: 1,
+    minWidth: 0,
+    backgroundColor: '#FFFFFF',
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+    gap: theme.spacing.xs,
+  },
+  progressBarBackground: {
+    height: 6,
+    backgroundColor: theme.colors.neutral[200],
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginVertical: theme.spacing.xs,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: theme.colors.primary[600],
+  },
+  harvestStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  sectionCard: {
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+    gap: theme.spacing.sm,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing.xs,
+  },
+  infoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+  },
+  gridColumn: {
+    flex: 1,
+    minWidth: '45%',
+    gap: theme.spacing.xxs,
+  },
+  spawnSummary: {
+    backgroundColor: theme.colors.neutral[50],
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    gap: theme.spacing.xs,
+  },
+  spawnSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  timelineContainer: {
+    gap: theme.spacing.md,
+    marginTop: theme.spacing.xs,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  timelineDotLine: {
+    alignItems: 'center',
+    width: 14,
+  },
+  timelineDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.colors.neutral[300],
+    marginTop: 4,
+  },
+  timelineDotLatest: {
+    backgroundColor: theme.colors.primary[600],
+  },
+  timelineLine: {
+    flex: 1,
+    width: 2,
+    backgroundColor: theme.colors.neutral[200],
+    marginTop: 4,
+  },
+  timelineContent: {
+    flex: 1,
+    backgroundColor: theme.colors.neutral[50],
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    gap: theme.spacing.xxs,
+  },
+  timelineHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: theme.spacing.xs,
+  },
   historyCard: {
     gap: theme.spacing.xs,
     padding: theme.spacing.md,
@@ -811,12 +1008,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.neutral[50],
     borderWidth: 1,
     borderColor: theme.colors.border.light,
-  },
-  historyHeading: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
   },
   sensorSection: {
     gap: theme.spacing.sm,
@@ -841,62 +1032,6 @@ const styles = StyleSheet.create({
     width: StyleSheet.hairlineWidth,
     height: 48,
     backgroundColor: '#E5ECEA',
-  },
-  historyTitle: {
-    flex: 1,
-  },
-  growthHistoryEntry: {
-    display: 'none',
-  },
-  progressTrack: {
-    height: 18,
-    width: '100%',
-    justifyContent: 'center',
-    overflow: 'visible',
-  },
-  progressRail: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 6,
-    borderRadius: 8,
-    backgroundColor: theme.colors.neutral[200],
-  },
-  progressFill: {
-    position: 'absolute',
-    left: 0,
-    height: 6,
-    borderRadius: 8,
-    backgroundColor: theme.colors.primary[600],
-  },
-  progressDot: {
-    position: 'absolute',
-    top: 2,
-    width: 14,
-    height: 14,
-    marginLeft: -7,
-    borderRadius: 7,
-    borderWidth: 2,
-  },
-  progressDotReached: {
-    borderColor: theme.colors.primary[600],
-    backgroundColor: theme.colors.primary[600],
-  },
-  progressDotUpcoming: {
-    borderColor: theme.colors.neutral[400],
-    backgroundColor: '#FFFFFF',
-  },
-  progressDotCurrent: {
-    width: 18,
-    height: 18,
-    top: 0,
-    marginLeft: -9,
-    borderRadius: 9,
-    borderColor: theme.colors.primary[700],
-  },
-  progressLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
   },
   deviceAction: {
     flexDirection: 'row',

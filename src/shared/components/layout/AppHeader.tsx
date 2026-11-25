@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Href, usePathname, useRouter, useSegments } from 'expo-router';
 import React, { ReactNode } from 'react';
 import { StyleSheet, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { AppText } from '../primitives/AppText';
 export interface AppHeaderProps {
   title?: string;
   subtitle?: string;
+  showHome?: boolean;
   showBack?: boolean;
   onBack?: () => void;
   leftAction?: ReactNode;
@@ -23,6 +24,7 @@ export interface AppHeaderProps {
 export const AppHeader: React.FC<AppHeaderProps> = ({
   title,
   subtitle,
+  showHome = true,
   showBack = false,
   onBack,
   leftAction,
@@ -32,8 +34,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   style,
 }) => {
   const router = useRouter();
+  const pathname = usePathname();
+  const segments = useSegments();
   const insets = useSafeAreaInsets();
-  const hasLeadingAction = showBack || Boolean(leftAction);
+  const isAuthRoute = segments[0] === '(auth)';
+  const isHomeRoute = pathname === '/';
+  const shouldShowHome = showHome && !isAuthRoute && !isHomeRoute;
+  const hasLeadingAction = shouldShowHome || showBack || Boolean(leftAction);
 
   const handleBack = () => {
     if (onBack) {
@@ -59,7 +66,21 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             !hasLeadingAction && styles.leftContainerEmpty,
           ]}
         >
-          {showBack ? (
+          {shouldShowHome ? (
+            <AppIconButton
+              icon={
+                <Ionicons
+                  name="home-outline"
+                  size={21}
+                  color={theme.colors.text.primary}
+                />
+              }
+              onPress={() => router.replace('/' as Href)}
+              accessibilityLabel="Về trang chủ"
+              size="sm"
+            />
+          ) : null}
+          {showBack && !shouldShowHome ? (
             <AppIconButton
               icon={
                 <Ionicons
@@ -72,9 +93,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               accessibilityLabel="Quay lại"
               size="sm"
             />
-          ) : (
-            leftAction
-          )}
+          ) : null}
+          {!showBack ? leftAction : null}
         </View>
 
         <View
@@ -135,7 +155,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.screenHorizontal,
   },
   leftContainer: {
+    flexDirection: 'row',
     minWidth: 40,
+    gap: theme.spacing.xs,
     alignItems: 'flex-start',
     justifyContent: 'center',
   },

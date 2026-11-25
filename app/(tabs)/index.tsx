@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { Href, useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   Pressable,
@@ -146,11 +146,11 @@ const customerActions: QuickActionItem[] = [
   {
     id: 'my-sessions',
     title: 'Phiên của tôi',
-    desc: 'Xem phiên và vị trí khay',
+    desc: 'Theo dõi đơn đã thanh toán đến khi hoàn tất',
     icon: 'layers-outline',
     iconColor: theme.colors.primary[700],
     iconBg: 'rgba(34, 197, 94, 0.1)',
-    route: '/customer-sessions',
+    route: '/(tabs)/orders',
   },
   {
     id: 'orders',
@@ -159,7 +159,7 @@ const customerActions: QuickActionItem[] = [
     icon: 'receipt-outline',
     iconColor: '#14B8A6',
     iconBg: 'rgba(20, 184, 166, 0.1)',
-    route: '/(tabs)/orders',
+    route: '/customer-orders',
   },
   {
     id: 'mushrooms',
@@ -323,7 +323,7 @@ export default function HomeScreen() {
                   ? 'Mở đơn hàng, đang tải số đơn chưa thanh toán'
                   : `Mở đơn hàng, ${unpaidOrderCount} đơn chưa thanh toán`
               }
-              onPress={() => router.push('/(tabs)/orders' as any)}
+              onPress={() => router.push('/customer-orders' as Href)}
               style={styles.orderHeaderAction}
             >
               <Ionicons name="receipt-outline" size={22} color={theme.colors.primary[600]} />

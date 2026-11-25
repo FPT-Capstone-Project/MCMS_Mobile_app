@@ -1,11 +1,12 @@
 import { AppAlert as Alert } from '../../../../shared/components/feedback/AppDialog';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Href, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
@@ -143,7 +144,7 @@ export const RentalFlowScreen: React.FC = () => {
   }
 
   return (
-    <ScreenContainer scrollable edges={['left', 'right']}>
+    <ScreenContainer edges={['left', 'right', 'bottom']}>
       <AppHeader
         title="Thuê khay nuôi trồng"
         subtitle="Dịch vụ trồng nấm tại SmartMush Farm"
@@ -151,278 +152,317 @@ export const RentalFlowScreen: React.FC = () => {
         onBack={navigateBack}
       />
 
-      <View style={styles.content}>
-        {loadError ? (
-          <AppCard elevation="sm" style={styles.stateCard}>
-            <Ionicons name="cloud-offline-outline" size={40} color={theme.colors.error.main} />
-            <AppText variant="title" weight="bold">
-              Không tải được danh mục
-            </AppText>
-            <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-              {loadError}
-            </AppText>
-            <AppButton title="Thử tải lại" onPress={handleRetryCatalog} />
-          </AppCard>
-        ) : (
-          <>
-            <View style={styles.stepsBar}>
-              {[
-                { number: 1 as const, label: 'Loại nấm' },
-                { number: 2 as const, label: 'Số khay' },
-                { number: 3 as const, label: 'Xác nhận' },
-              ].map((item, index) => (
-                <React.Fragment key={item.number}>
-                  {index > 0 ? <View style={styles.stepConnector} /> : null}
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: step === item.number }}
-                    disabled={item.number > step}
-                    onPress={() => setStep(item.number)}
-                    style={styles.stepItem}
-                  >
-                    <View
-                      style={[
-                        styles.stepCircle,
-                        step >= item.number && styles.stepCircleActive,
-                      ]}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
+      >
+        <View
+          style={[styles.content, step === 1 && selectedMushroom && styles.contentWithStickyAction]}
+        >
+          {loadError ? (
+            <AppCard elevation="sm" style={styles.stateCard}>
+              <Ionicons name="cloud-offline-outline" size={40} color={theme.colors.error.main} />
+              <AppText variant="title" weight="bold">
+                Không tải được danh mục
+              </AppText>
+              <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+                {loadError}
+              </AppText>
+              <AppButton title="Thử tải lại" onPress={handleRetryCatalog} />
+            </AppCard>
+          ) : (
+            <>
+              <View style={styles.stepsBar}>
+                {[
+                  { number: 1 as const, label: 'Loại nấm' },
+                  { number: 2 as const, label: 'Số khay' },
+                  { number: 3 as const, label: 'Xác nhận' },
+                ].map((item, index) => (
+                  <React.Fragment key={item.number}>
+                    {index > 0 ? <View style={styles.stepConnector} /> : null}
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: step === item.number }}
+                      disabled={item.number > step}
+                      onPress={() => setStep(item.number)}
+                      style={styles.stepItem}
                     >
+                      <View
+                        style={[styles.stepCircle, step >= item.number && styles.stepCircleActive]}
+                      >
+                        <AppText
+                          variant="caption"
+                          color={step >= item.number ? '#FFFFFF' : theme.colors.text.muted}
+                        >
+                          {item.number}
+                        </AppText>
+                      </View>
                       <AppText
                         variant="caption"
-                        color={step >= item.number ? '#FFFFFF' : theme.colors.text.muted}
+                        weight={step === item.number ? 'bold' : 'normal'}
+                        color={
+                          step === item.number
+                            ? theme.colors.primary[600]
+                            : theme.colors.text.secondary
+                        }
                       >
-                        {item.number}
+                        {item.label}
                       </AppText>
-                    </View>
-                    <AppText
-                      variant="caption"
-                      weight={step === item.number ? 'bold' : 'normal'}
-                      color={
-                        step === item.number
-                          ? theme.colors.primary[600]
-                          : theme.colors.text.secondary
-                      }
-                    >
-                      {item.label}
-                    </AppText>
-                  </Pressable>
-                </React.Fragment>
-              ))}
-            </View>
+                    </Pressable>
+                  </React.Fragment>
+                ))}
+              </View>
 
-            {step === 1 ? (
-              <View style={styles.section}>
-                <View style={styles.sectionHeading}>
-                  <AppText variant="h3">Chọn loại nấm</AppText>
-                  <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-                    Chọn giống nấm bạn muốn trồng. Hệ thống tự chọn gói thuê phù hợp theo thời gian sinh trưởng dự kiến.
-                  </AppText>
-                </View>
-                {mushrooms.length === 0 ? (
-                  <EmptyCatalog message="Hiện chưa có loại nấm nào đang mở dịch vụ." />
-                ) : (
-                  mushrooms.map((mushroom) => {
-                    const selected =
-                      selectedMushroom?.mushroom_type_id === mushroom.mushroom_type_id;
-                    return (
-                      <Pressable
-                        key={mushroom.mushroom_type_id}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected }}
-                        onPress={() => setSelectedMushroom(mushroom)}
-                      >
-                        <AppCard
-                          elevation={selected ? 'md' : 'xs'}
-                          style={[styles.selectionCard, selected && styles.cardSelected]}
+              {step === 1 ? (
+                <View style={styles.section}>
+                  <View style={styles.sectionHeading}>
+                    <AppText variant="h3">Chọn loại nấm</AppText>
+                    <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+                      Chọn giống nấm bạn muốn trồng. Hệ thống tự chọn gói thuê phù hợp theo thời
+                      gian sinh trưởng dự kiến.
+                    </AppText>
+                  </View>
+                  {mushrooms.length === 0 ? (
+                    <EmptyCatalog message="Hiện chưa có loại nấm nào đang mở dịch vụ." />
+                  ) : (
+                    mushrooms.map((mushroom) => {
+                      const selected =
+                        selectedMushroom?.mushroom_type_id === mushroom.mushroom_type_id;
+                      return (
+                        <Pressable
+                          key={mushroom.mushroom_type_id}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected }}
+                          onPress={() => setSelectedMushroom(mushroom)}
                         >
-                          <View style={styles.mushroomRow}>
-                            {mushroom.image_url ? (
-                              <Image source={{ uri: mushroom.image_url }} style={styles.mushroomImage} />
-                            ) : (
-                              <View style={styles.iconCircle}>
-                                <Ionicons name="leaf-outline" size={22} color={theme.colors.primary[600]} />
+                          <AppCard
+                            elevation={selected ? 'md' : 'xs'}
+                            style={[styles.selectionCard, selected && styles.cardSelected]}
+                          >
+                            <View style={styles.mushroomRow}>
+                              {mushroom.image_url ? (
+                                <Image
+                                  source={{ uri: mushroom.image_url }}
+                                  style={styles.mushroomImage}
+                                />
+                              ) : (
+                                <View style={styles.iconCircle}>
+                                  <Ionicons
+                                    name="leaf-outline"
+                                    size={22}
+                                    color={theme.colors.primary[600]}
+                                  />
+                                </View>
+                              )}
+                              <View style={styles.flexContent}>
+                                <AppText variant="title" weight="bold">
+                                  {mushroom.name}
+                                </AppText>
+                                <AppText variant="caption" color={theme.colors.text.secondary}>
+                                  Sinh trưởng khoảng {mushroom.growing_days} ngày
+                                </AppText>
                               </View>
-                            )}
-                            <View style={styles.flexContent}>
-                              <AppText variant="title" weight="bold">
-                                {mushroom.name}
+                              <Ionicons
+                                name={selected ? 'checkmark-circle' : 'ellipse-outline'}
+                                size={24}
+                                color={
+                                  selected ? theme.colors.primary[600] : theme.colors.neutral[400]
+                                }
+                              />
+                            </View>
+                            {mushroom.description ? (
+                              <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+                                {mushroom.description}
                               </AppText>
-                              <AppText variant="caption" color={theme.colors.text.secondary}>
-                                Sinh trưởng khoảng {mushroom.growing_days} ngày
+                            ) : null}
+                            <AppDivider spacing="xs" />
+                            <View style={styles.priceRow}>
+                              <AppText variant="caption" color={theme.colors.text.muted}>
+                                Phôi nấm / khay
+                              </AppText>
+                              <AppText
+                                variant="title"
+                                weight="bold"
+                                color={theme.colors.primary[600]}
+                              >
+                                {formatVND(mushroom.price)}
                               </AppText>
                             </View>
-                            <Ionicons
-                              name={selected ? 'checkmark-circle' : 'ellipse-outline'}
-                              size={24}
-                              color={selected ? theme.colors.primary[600] : theme.colors.neutral[400]}
-                            />
-                          </View>
-                          {mushroom.description ? (
-                            <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-                              {mushroom.description}
-                            </AppText>
-                          ) : null}
-                          <AppDivider spacing="xs" />
-                          <View style={styles.priceRow}>
-                            <AppText variant="caption" color={theme.colors.text.muted}>
-                              Phôi nấm / khay
-                            </AppText>
-                            <AppText variant="title" weight="bold" color={theme.colors.primary[600]}>
-                              {formatVND(mushroom.price)}
-                            </AppText>
-                          </View>
-                        </AppCard>
-                      </Pressable>
-                    );
-                  })
-                )}
-                {selectedMushroom ? (
-                  automaticPackage ? (
-                    <AppCard elevation="xs" style={styles.autoPackageCard}>
-                      <AppText variant="label" color={theme.colors.text.muted}>
-                        GÓI THUÊ DO HỆ THỐNG TỰ CHỌN
-                      </AppText>
-                      <SummaryRow
-                        label="Gói dịch vụ"
-                        value={`${automaticPackage.package_name} (${automaticPackage.duration_days} ngày)`}
+                          </AppCard>
+                        </Pressable>
+                      );
+                    })
+                  )}
+                  {selectedMushroom ? (
+                    automaticPackage ? (
+                      <AppCard elevation="xs" style={styles.autoPackageCard}>
+                        <AppText variant="label" color={theme.colors.text.muted}>
+                          GÓI THUÊ DO HỆ THỐNG TỰ CHỌN
+                        </AppText>
+                        <SummaryRow
+                          label="Gói dịch vụ"
+                          value={`${automaticPackage.package_name} (${automaticPackage.duration_days} ngày)`}
+                        />
+                        <SummaryRow
+                          label="Căn cứ lựa chọn"
+                          value={`Sinh trưởng dự kiến ${selectedMushroom.growing_days} ngày`}
+                        />
+                        <SummaryRow
+                          label="Phí gói / khay"
+                          value={formatVND(automaticPackage.price)}
+                        />
+                      </AppCard>
+                    ) : (
+                      <EmptyCatalog
+                        message={`Chưa có gói thuê phù hợp với thời gian sinh trưởng ${selectedMushroom.growing_days} ngày của loại nấm này.`}
                       />
-                      <SummaryRow
-                        label="Căn cứ lựa chọn"
-                        value={`Sinh trưởng dự kiến ${selectedMushroom.growing_days} ngày`}
-                      />
-                      <SummaryRow label="Phí gói / khay" value={formatVND(automaticPackage.price)} />
-                    </AppCard>
-                  ) : (
-                    <EmptyCatalog message={`Chưa có gói thuê phù hợp với thời gian sinh trưởng ${selectedMushroom.growing_days} ngày của loại nấm này.`} />
-                  )
-                ) : null}
-                <AppButton
-                  title="Tiếp tục chọn số khay"
-                  disabled={!selectedMushroom || !automaticPackage}
-                  onPress={() => selectedMushroom && automaticPackage && setStep(2)}
-                />
-              </View>
-            ) : null}
-
-            {step === 2 && automaticPackage && selectedMushroom ? (
-              <View style={styles.section}>
-                <View style={styles.sectionHeading}>
-                  <AppText variant="h3">Chọn số lượng khay</AppText>
-                  <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-                    {automaticPackage.package_name} ({automaticPackage.duration_days} ngày) được tự chọn theo giống nấm. Mỗi khay cần 2 đơn vị phôi; hệ thống sẽ kiểm tra khay và phôi trước khi giữ chỗ.
-                  </AppText>
+                    )
+                  ) : null}
                 </View>
-                <AppCard elevation="sm" style={styles.quantityCard}>
-                  <AppText variant="label" color={theme.colors.text.muted}>
-                    {selectedMushroom.name} · {automaticPackage.duration_days} ngày
-                  </AppText>
-                  <View style={styles.quantityRow}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Giảm số khay"
-                      accessibilityState={{ disabled: trayQuantity <= 1 }}
-                      disabled={trayQuantity <= 1}
-                      onPress={() => setTrayQuantity((quantity) => Math.max(1, quantity - 1))}
-                      style={[styles.quantityButton, trayQuantity <= 1 && styles.quantityButtonDisabled]}
-                    >
-                      <Ionicons name="remove" size={24} color={theme.colors.primary[700]} />
-                    </Pressable>
-                    <View style={styles.quantityValue}>
-                      <AppText variant="h2" weight="bold">
-                        {trayQuantity}
-                      </AppText>
-                      <AppText variant="caption" color={theme.colors.text.secondary}>
-                        khay
+              ) : null}
+
+              {step === 2 && automaticPackage && selectedMushroom ? (
+                <View style={styles.section}>
+                  <View style={styles.sectionHeading}>
+                    <AppText variant="h3">Chọn số lượng khay</AppText>
+                    <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+                      {automaticPackage.package_name} ({automaticPackage.duration_days} ngày) được
+                      tự chọn theo giống nấm. Mỗi khay cần 2 đơn vị phôi; hệ thống sẽ kiểm tra khay
+                      và phôi trước khi giữ chỗ.
+                    </AppText>
+                  </View>
+                  <AppCard elevation="sm" style={styles.quantityCard}>
+                    <AppText variant="label" color={theme.colors.text.muted}>
+                      {selectedMushroom.name} · {automaticPackage.duration_days} ngày
+                    </AppText>
+                    <View style={styles.quantityRow}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Giảm số khay"
+                        accessibilityState={{ disabled: trayQuantity <= 1 }}
+                        disabled={trayQuantity <= 1}
+                        onPress={() => setTrayQuantity((quantity) => Math.max(1, quantity - 1))}
+                        style={[
+                          styles.quantityButton,
+                          trayQuantity <= 1 && styles.quantityButtonDisabled,
+                        ]}
+                      >
+                        <Ionicons name="remove" size={24} color={theme.colors.primary[700]} />
+                      </Pressable>
+                      <View style={styles.quantityValue}>
+                        <AppText variant="h2" weight="bold">
+                          {trayQuantity}
+                        </AppText>
+                        <AppText variant="caption" color={theme.colors.text.secondary}>
+                          khay
+                        </AppText>
+                      </View>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Tăng số khay"
+                        onPress={() => setTrayQuantity((quantity) => quantity + 1)}
+                        style={styles.quantityButton}
+                      >
+                        <Ionicons name="add" size={24} color={theme.colors.primary[700]} />
+                      </Pressable>
+                    </View>
+                    <AppDivider spacing="sm" />
+                    <View style={styles.priceRow}>
+                      <AppText variant="body">Tạm tính / khay</AppText>
+                      <AppText variant="body" weight="bold">
+                        {formatVND(automaticPackage.price + selectedMushroom.price)}
                       </AppText>
                     </View>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Tăng số khay"
-                      onPress={() => setTrayQuantity((quantity) => quantity + 1)}
-                      style={styles.quantityButton}
-                    >
-                      <Ionicons name="add" size={24} color={theme.colors.primary[700]} />
-                    </Pressable>
-                  </View>
-                  <AppDivider spacing="sm" />
-                  <View style={styles.priceRow}>
-                    <AppText variant="body">Tạm tính / khay</AppText>
-                    <AppText variant="body" weight="bold">
-                      {formatVND(automaticPackage.price + selectedMushroom.price)}
-                    </AppText>
-                  </View>
-                  <View style={styles.priceRow}>
-                    <AppText variant="body">Tổng cộng</AppText>
-                    <AppText variant="title" weight="bold" color={theme.colors.primary[600]}>
-                      {formatVND(totalAmount)}
-                    </AppText>
-                  </View>
-                </AppCard>
-                <AppButton title="Tiếp tục xác nhận" onPress={() => setStep(3)} />
-              </View>
-            ) : null}
-
-            {step === 3 && automaticPackage && selectedMushroom ? (
-              <View style={styles.section}>
-                <View style={styles.sectionHeading}>
-                  <AppText variant="h3">Xác nhận đơn trồng nấm</AppText>
-                  <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-                    Kiểm tra đơn hàng trước khi hệ thống kiểm tra sức chứa và giữ khay tạm thời.
-                  </AppText>
+                    <View style={styles.priceRow}>
+                      <AppText variant="body">Tổng cộng</AppText>
+                      <AppText variant="title" weight="bold" color={theme.colors.primary[600]}>
+                        {formatVND(totalAmount)}
+                      </AppText>
+                    </View>
+                  </AppCard>
+                  <AppButton title="Tiếp tục xác nhận" onPress={() => setStep(3)} />
                 </View>
-                <AppCard elevation="sm" style={styles.summaryCard}>
-                  <AppText variant="label" color={theme.colors.text.muted}>
-                    CHI TIẾT DỊCH VỤ
-                  </AppText>
-                  <SummaryRow label="Loại nấm" value={selectedMushroom.name} />
-                  <SummaryRow
-                    label="Gói dịch vụ (tự động)"
-                    value={`${automaticPackage.package_name} (${automaticPackage.duration_days} ngày)`}
-                  />
-                  <SummaryRow label="Số lượng khay" value={`${trayQuantity} khay`} />
-                  <AppDivider spacing="xs" />
-                  <SummaryRow
-                    label={`Gói trồng (${trayQuantity} khay)`}
-                    value={formatVND(automaticPackage.price * trayQuantity)}
-                  />
-                  <SummaryRow
-                    label={`Phôi nấm (${trayQuantity} khay)`}
-                    value={formatVND(selectedMushroom.price * trayQuantity)}
-                  />
-                  <AppDivider spacing="xs" />
-                  <View style={styles.totalRow}>
-                    <AppText variant="title" weight="bold">
-                      Tổng thanh toán
-                    </AppText>
-                    <AppText variant="h2" weight="bold" color={theme.colors.primary[600]}>
-                      {formatVND(totalAmount)}
+              ) : null}
+
+              {step === 3 && automaticPackage && selectedMushroom ? (
+                <View style={styles.section}>
+                  <View style={styles.sectionHeading}>
+                    <AppText variant="h3">Xác nhận đơn trồng nấm</AppText>
+                    <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+                      Kiểm tra đơn hàng trước khi hệ thống kiểm tra sức chứa và giữ khay tạm thời.
                     </AppText>
                   </View>
-                  <View style={styles.holdNotice}>
-                    <Ionicons
-                      name="time-outline"
-                      size={19}
-                      color={theme.colors.warning.dark}
+                  <AppCard elevation="sm" style={styles.summaryCard}>
+                    <AppText variant="label" color={theme.colors.text.muted}>
+                      CHI TIẾT DỊCH VỤ
+                    </AppText>
+                    <SummaryRow label="Loại nấm" value={selectedMushroom.name} />
+                    <SummaryRow
+                      label="Gói dịch vụ (tự động)"
+                      value={`${automaticPackage.package_name} (${automaticPackage.duration_days} ngày)`}
                     />
-                    <AppText variant="caption" color={theme.colors.text.secondary} style={styles.flexContent}>
-                      Khay và phôi sẽ được kiểm tra, giữ tạm 15 phút sau khi tạo đơn. Vui lòng hoàn tất thanh toán trong thời gian này.
-                    </AppText>
-                  </View>
-                  <AppButton
-                    title="Kiểm tra & tạo đơn"
-                    variant="primary"
-                    size="lg"
-                    loading={submitting}
-                    disabled={submitting}
-                    leftIcon={<Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" />}
-                    onPress={handleCreateOrder}
-                    style={styles.confirmButton}
-                  />
-                </AppCard>
-              </View>
-            ) : null}
-          </>
-        )}
-      </View>
+                    <SummaryRow label="Số lượng khay" value={`${trayQuantity} khay`} />
+                    <AppDivider spacing="xs" />
+                    <SummaryRow
+                      label={`Gói trồng (${trayQuantity} khay)`}
+                      value={formatVND(automaticPackage.price * trayQuantity)}
+                    />
+                    <SummaryRow
+                      label={`Phôi nấm (${trayQuantity} khay)`}
+                      value={formatVND(selectedMushroom.price * trayQuantity)}
+                    />
+                    <AppDivider spacing="xs" />
+                    <View style={styles.totalRow}>
+                      <AppText variant="title" weight="bold">
+                        Tổng thanh toán
+                      </AppText>
+                      <AppText variant="h2" weight="bold" color={theme.colors.primary[600]}>
+                        {formatVND(totalAmount)}
+                      </AppText>
+                    </View>
+                    <View style={styles.holdNotice}>
+                      <Ionicons name="time-outline" size={19} color={theme.colors.warning.dark} />
+                      <AppText
+                        variant="caption"
+                        color={theme.colors.text.secondary}
+                        style={styles.flexContent}
+                      >
+                        Khay và phôi sẽ được kiểm tra, giữ tạm 15 phút sau khi tạo đơn. Vui lòng
+                        hoàn tất thanh toán trong thời gian này.
+                      </AppText>
+                    </View>
+                    <AppButton
+                      title="Kiểm tra & tạo đơn"
+                      variant="primary"
+                      size="lg"
+                      loading={submitting}
+                      disabled={submitting}
+                      leftIcon={
+                        <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" />
+                      }
+                      onPress={handleCreateOrder}
+                      style={styles.confirmButton}
+                    />
+                  </AppCard>
+                </View>
+              ) : null}
+            </>
+          )}
+        </View>
+      </ScrollView>
+
+      {step === 1 && selectedMushroom ? (
+        <View style={styles.stickyAction}>
+          <AppButton
+            title="Tiếp tục chọn khay"
+            size="lg"
+            disabled={!automaticPackage}
+            onPress={() => automaticPackage && setStep(2)}
+          />
+        </View>
+      ) : null}
 
       {createdOrderId ? (
         <PaymentQrModal
@@ -430,14 +470,14 @@ export const RentalFlowScreen: React.FC = () => {
           orderId={createdOrderId}
           onClose={() => {
             setPaymentModalVisible(false);
-            router.replace('/(tabs)/orders' as any);
+            router.replace('/customer-orders' as Href);
           }}
           onPaymentSuccess={() => {
             setPaymentModalVisible(false);
             Alert.alert('Thành công', 'Thanh toán thành công! Đơn hàng đã được xác nhận.', [
               {
                 text: 'Xem đơn hàng',
-                onPress: () => router.replace('/(tabs)/orders' as any),
+                onPress: () => router.replace('/customer-orders' as Href),
               },
             ]);
           }}
@@ -468,11 +508,27 @@ const SummaryRow: React.FC<{ label: string; value: string }> = ({ label, value }
 );
 
 const styles = StyleSheet.create({
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
   content: {
     paddingHorizontal: theme.spacing.lg,
     paddingTop: theme.spacing.md,
     paddingBottom: theme.spacing['2xl'],
     gap: theme.spacing.md,
+  },
+  contentWithStickyAction: {
+    paddingBottom: 96,
+  },
+  stickyAction: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border.light,
+    backgroundColor: theme.colors.background.paper,
   },
   centerState: {
     flex: 1,

@@ -34,10 +34,10 @@ const TAB_CONFIGS: Record<string, TabConfig> = {
     accessibilityLabel: 'Tab Quản lý khay trồng',
   },
   orders: {
-    label: 'Đơn hàng',
-    activeIcon: 'receipt',
-    inactiveIcon: 'receipt-outline',
-    accessibilityLabel: 'Tab Đơn hàng',
+    label: 'Phiên trồng',
+    activeIcon: 'albums',
+    inactiveIcon: 'albums-outline',
+    accessibilityLabel: 'Tab Phiên trồng',
   },
   notifications: {
     label: 'Thông báo',
