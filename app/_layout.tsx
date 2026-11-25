@@ -4,6 +4,7 @@ import { AppProvider } from '../src/app/providers';
 import { setOnUnauthorized } from '../src/core/api/axiosClient';
 import { useAuth } from '../src/features/auth';
 import { AppLoading } from '../src/shared/components';
+import { LiveEnvironmentSync } from '../src/features/analytics/presentation/components/LiveEnvironmentSync';
 
 /**
  * NavigationGuard
@@ -204,6 +205,7 @@ function NavigationGuard() {
 export default function RootLayout() {
   return (
     <AppProvider>
+      <LiveEnvironmentSync />
       <NavigationGuard />
     </AppProvider>
   );

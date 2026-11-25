@@ -146,6 +146,52 @@ function localizeNotificationText(notification: CustomerNotification) {
   }
 
   if (type === 'MUSHROOM_DISEASE') {
+    if (title === 'New consultation message') {
+      return {
+        title: 'Tin nhắn tư vấn mới',
+        message: message === 'New photo attached' ? 'Đã gửi ảnh mới.' : notification.message,
+      };
+    }
+
+    if (title === 'Expert accepted consultation') {
+      return {
+        title: 'Chuyên gia đã nhận yêu cầu tư vấn',
+        message: 'Chuyên gia đã nhận yêu cầu tư vấn và đang xem xét.',
+      };
+    }
+
+    if (
+      title === 'Treatment update submitted' ||
+      title === 'Treatment approved' ||
+      title === 'More treatment required' ||
+      title === 'Issue resolved'
+    ) {
+      const issueId = message.match(/issue\s+#?(\d+)/i)?.[1];
+      const issue = issueId ? `sự cố #${issueId}` : 'sự cố';
+      if (title === 'Treatment update submitted') {
+        return {
+          title: 'Đã gửi cập nhật xử lý',
+          message: `Nhân viên trang trại đã gửi cập nhật xử lý cho ${issue}, chờ chuyên gia đánh giá.`,
+        };
+      }
+      if (title === 'Treatment approved') {
+        return {
+          title: 'Chuyên gia đã duyệt kết quả xử lý',
+          message: `Chuyên gia đã duyệt kết quả xử lý; ${issue} vẫn đang được theo dõi.`,
+        };
+      }
+      if (title === 'More treatment required') {
+        return {
+          title: 'Cần xử lý bổ sung',
+          message: `Chuyên gia yêu cầu xử lý bổ sung cho ${issue}.`,
+        };
+      }
+      return {
+        title: 'Sự cố đã được giải quyết',
+        message: `Chuyên gia đã xác nhận ${issue} đã được giải quyết.`,
+      };
+    }
+
     if (title === 'New mushroom diagnosis request') {
       const issueId = message.match(/issue\s+#?(\d+)/i)?.[1];
       return {
@@ -179,7 +225,7 @@ function localizeNotificationText(notification: CustomerNotification) {
             ? `Chuyên gia cần thêm thông tin về sự cố “${issueTitle}”.`
             : `Chuyên gia đã gửi kết quả chẩn đoán và phương án xử lý cho sự cố “${issueTitle}”.`
           : needsMoreInfo
-            ? 'Chuyên gia cần thêm thông tin về sự cố nấm.'
+            ? message || 'Chuyên gia cần thêm thông tin về sự cố nấm.'
             : 'Chuyên gia đã gửi kết quả chẩn đoán và phương án xử lý sự cố nấm.',
       };
     }
