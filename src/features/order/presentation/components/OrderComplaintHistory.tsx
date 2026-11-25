@@ -5,11 +5,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { theme } from '../../../../core/theme';
 import { formatVietnamDateTime } from '../../../../core/utils';
-import { AppBottomSheet, AppButton, AppInput, AppText } from '../../../../shared/components';
+import { AppBottomSheet, AppButton, AppCard, AppInput, AppText } from '../../../../shared/components';
 import { AppAlert } from '../../../../shared/components/feedback/AppDialog';
 import {
   useGetMyComplaintDetailQuery,
   useReplyToComplaintMutation,
+  type ComplaintReply,
   type OrderComplaint,
 } from '../../data/complaintApi';
 
@@ -135,7 +136,6 @@ export function CustomerComplaintDetail({
 
   const closed = ['RESOLVED', 'REJECTED', 'CLOSED'].includes(complaint.status);
   const needsInformation = complaint.status === 'NEED_MORE_INFO';
-
   const selectImages = async (source: 'camera' | 'library') => {
     if (selectingImage || isReplying || replyImages.length >= MAX_REPLY_IMAGES) return;
     setSelectingImage(true);
@@ -194,48 +194,52 @@ export function CustomerComplaintDetail({
 
   return (
     <>
-      <View style={styles.card}>
+      <AppCard variant="outlined" style={styles.card}>
         <AppText weight="bold">Khiếu nại #{complaint.complaint_id}</AppText>
         <DetailRow label="Trạng thái" value={statusLabels[complaint.status] ?? complaint.status} />
         <DetailRow label="Loại khiếu nại" value={typeLabels[complaint.complaint_type] ?? complaint.complaint_type} />
         <DetailRow label="Ngày gửi" value={formatVietnamDateTime(complaint.created_at, 'Chưa cập nhật')} />
-        <DetailRow label="Nội dung" value={complaint.description} />
-      </View>
-      <View style={styles.section}>
+      </AppCard>
+      <AppCard variant="outlined" style={styles.sectionCard}>
+        <AppText weight="bold">Nội dung xử lý</AppText>
+        <AppText selectable>{complaint.resolution || 'Chưa có nội dung xử lý.'}</AppText>
+        {complaint.assigned_staff?.full_name ? (
+          <AppText variant="caption" color={theme.colors.text.secondary}>Người phụ trách: {complaint.assigned_staff.full_name}</AppText>
+        ) : null}
+      </AppCard>
+      <AppCard variant="outlined" style={styles.sectionCard}>
         <AppText weight="bold">Ảnh minh chứng</AppText>
         {complaint.image_urls?.length ? (
           complaint.image_urls.map((url, index) => (
             <Image key={`${url}-${index}`} source={{ uri: url }} style={styles.image} contentFit="contain" accessibilityLabel={`Ảnh minh chứng ${index + 1}`} />
           ))
         ) : <AppText color={theme.colors.text.secondary}>Không có ảnh đính kèm.</AppText>}
-      </View>
-      <View style={styles.section}>
-        <AppText weight="bold">Nội dung xử lý</AppText>
-        <AppText selectable>{complaint.resolution || 'Chưa có nội dung xử lý.'}</AppText>
-        {complaint.assigned_staff?.full_name ? (
-          <AppText variant="caption" color={theme.colors.text.secondary}>Người phụ trách: {complaint.assigned_staff.full_name}</AppText>
-        ) : null}
-      </View>
-      <View style={styles.section}>
-        <AppText weight="bold">Phản hồi</AppText>
-        {complaint.replies?.length ? complaint.replies.map((reply) => (
-          <View key={reply.reply_id} style={styles.card}>
-            <AppText variant="bodySmall" weight="bold">
-              {reply.sender_role_id === 3 ? 'Khách hàng' : 'Nhân viên'}{reply.sender_name ? ` · ${reply.sender_name}` : ''}
-            </AppText>
-            <AppText variant="caption" color={theme.colors.text.secondary}>
-              {formatVietnamDateTime(reply.created_at, 'Chưa cập nhật')}
-            </AppText>
-            <AppText selectable>{reply.message}</AppText>
-          </View>
-        )) : <AppText color={theme.colors.text.secondary}>Chưa có phản hồi.</AppText>}
-      </View>
-      {closed ? (
-        <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-          Khiếu nại đã hoàn tất. Lịch sử trao đổi được giữ lại để bạn theo dõi.
+      </AppCard>
+      <AppCard variant="outlined" style={styles.sectionCard}>
+        <AppText weight="bold">Trao đổi khiếu nại</AppText>
+        <AppText variant="caption" color={theme.colors.text.secondary}>
+          Theo dõi nội dung khiếu nại và phản hồi của nhân viên tại đây.
         </AppText>
+        <ComplaintConversation
+          initialMessage={{
+            id: complaint.complaint_id,
+            senderName: 'Bạn',
+            senderRoleId: 3,
+            message: complaint.description,
+            createdAt: complaint.created_at,
+          }}
+          replies={complaint.replies}
+          ownRoleId={3}
+        />
+      </AppCard>
+      {closed ? (
+        <AppCard variant="outlined" style={styles.sectionCard}>
+          <AppText variant="bodySmall" color={theme.colors.text.secondary}>
+            Khiếu nại đã hoàn tất. Lịch sử trao đổi được giữ lại để bạn theo dõi.
+          </AppText>
+        </AppCard>
       ) : needsInformation ? (
-        <View style={styles.replyForm}>
+        <AppCard variant="outlined" style={styles.replyForm}>
           <AppText variant="bodySmall" color={theme.colors.warning.dark}>
             Nhân viên đang cần thêm thông tin. Hãy bổ sung nội dung và ảnh bằng chứng để tiếp tục xử lý.
           </AppText>
@@ -300,9 +304,66 @@ export function CustomerComplaintDetail({
             disabled={isReplying || selectingImage || !reply.trim()}
             onPress={() => void submitReply()}
           />
-        </View>
+        </AppCard>
       ) : null}
     </>
+  );
+}
+
+export function ComplaintConversation({
+  initialMessage,
+  replies,
+  ownRoleId,
+}: {
+  initialMessage: {
+    id: string | number;
+    senderName: string;
+    senderRoleId: number;
+    message: string;
+    createdAt: string;
+  };
+  replies: ComplaintReply[];
+  ownRoleId: number;
+}) {
+  const messages = [
+    {
+      id: initialMessage.id,
+      senderName: initialMessage.senderName,
+      senderRoleId: initialMessage.senderRoleId,
+      message: initialMessage.message,
+      createdAt: initialMessage.createdAt,
+    },
+    ...replies.map((reply) => ({
+      id: reply.reply_id,
+      senderName: reply.sender_name,
+      senderRoleId: reply.sender_role_id,
+      message: reply.message,
+      createdAt: reply.created_at,
+    })),
+  ];
+
+  return (
+    <View style={styles.conversation}>
+      {messages.map((message) => {
+        const mine = message.senderRoleId === ownRoleId;
+        return (
+          <View
+            key={message.id}
+            style={[styles.message, mine ? styles.ownMessage : styles.otherMessage]}
+          >
+            <AppText variant="caption" weight="bold">
+              {mine ? 'Bạn' : message.senderName || (message.senderRoleId === 3 ? 'Khách hàng' : 'Nhân viên')}
+              {' · '}
+              {message.senderRoleId === 3 ? 'Khách hàng' : 'Nhân viên'}
+            </AppText>
+            <AppText selectable>{message.message}</AppText>
+            <AppText variant="caption" color={theme.colors.text.secondary}>
+              {formatVietnamDateTime(message.createdAt, 'Chưa cập nhật')}
+            </AppText>
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
@@ -320,6 +381,21 @@ const styles = StyleSheet.create({
   sheetContent: { flex: 1 },
   content: { gap: theme.spacing.md, paddingBottom: theme.spacing.lg },
   section: { gap: theme.spacing.xs },
+  conversation: { gap: theme.spacing.sm },
+  message: {
+    maxWidth: '92%',
+    gap: theme.spacing.xs,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+  },
+  ownMessage: {
+    alignSelf: 'flex-end',
+    backgroundColor: theme.colors.primary[50],
+  },
+  otherMessage: {
+    alignSelf: 'flex-start',
+    backgroundColor: theme.colors.neutral[100],
+  },
   card: {
     gap: theme.spacing.sm,
     padding: theme.spacing.md,
@@ -327,6 +403,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.light,
     borderRadius: theme.borderRadius.md,
   },
+  sectionCard: { gap: theme.spacing.sm },
   image: {
     width: '100%',
     height: 200,

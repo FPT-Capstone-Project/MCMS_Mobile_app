@@ -39,14 +39,19 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const insets = useSafeAreaInsets();
   const isAuthRoute = segments[0] === '(auth)';
   const isHomeRoute = pathname === '/';
-  const shouldShowHome = showHome && !isAuthRoute && !isHomeRoute;
-  const hasLeadingAction = shouldShowHome || showBack || Boolean(leftAction);
+  const shouldShowBack =
+    showBack && (Boolean(onBack) || router.canGoBack() || isAuthRoute || !showHome);
+  const shouldShowHome =
+    !shouldShowBack && !leftAction && showHome && !isAuthRoute && !isHomeRoute;
+  const hasLeadingAction = shouldShowBack || shouldShowHome || Boolean(leftAction);
 
   const handleBack = () => {
     if (onBack) {
       onBack();
     } else if (router.canGoBack()) {
       router.back();
+    } else {
+      router.replace('/' as Href);
     }
   };
 
@@ -80,7 +85,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               size="sm"
             />
           ) : null}
-          {showBack && !shouldShowHome ? (
+          {shouldShowBack ? (
             <AppIconButton
               icon={
                 <Ionicons
@@ -94,7 +99,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               size="sm"
             />
           ) : null}
-          {!showBack ? leftAction : null}
+          {!shouldShowBack ? leftAction : null}
         </View>
 
         <View
