@@ -41,8 +41,6 @@ export const AccessDeniedScreen: React.FC<AccessDeniedScreenProps> = ({
       <AppHeader
         title="Quyền truy cập"
         subtitle="Giới hạn phân quyền người dùng"
-        showBack
-        onBack={() => router.replace('/(tabs)' as any)}
       />
 
       <View style={styles.container}>

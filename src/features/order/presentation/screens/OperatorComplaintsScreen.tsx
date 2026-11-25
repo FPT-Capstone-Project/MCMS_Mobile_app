@@ -22,6 +22,7 @@ import {
   ScreenContainer,
 } from '../../../../shared/components';
 import { AppAlert } from '../../../../shared/components/feedback/AppDialog';
+import { ComplaintConversation } from '../components/OrderComplaintHistory';
 
 const PAGE_SIZE = 20;
 
@@ -103,6 +104,7 @@ export function OperatorComplaintsScreen() {
               queue={queue}
               accountId={String(user?.id ?? '')}
               operatorId={Number(user?.id)}
+              ownRoleId={Number(user?.role_id ?? 0)}
               expanded={expandedComplaintId === item.complaint_id}
               onToggle={() => setExpandedComplaintId((current) =>
                 current === item.complaint_id ? null : item.complaint_id)}
@@ -183,6 +185,7 @@ function ComplaintCard({
   queue,
   accountId,
   operatorId,
+  ownRoleId,
   expanded,
   onToggle,
 }: {
@@ -190,6 +193,7 @@ function ComplaintCard({
   queue: StaffComplaintQueue;
   accountId: string;
   operatorId: number;
+  ownRoleId: number;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -230,6 +234,7 @@ function ComplaintCard({
           accountId={accountId}
           complaintId={complaint.complaint_id}
           canRespond={canRespond}
+          ownRoleId={ownRoleId}
         />
       ) : null}
     </AppCard>
@@ -240,10 +245,12 @@ function StaffComplaintDetail({
   accountId,
   complaintId,
   canRespond,
+  ownRoleId,
 }: {
   accountId: string;
   complaintId: number;
   canRespond: boolean;
+  ownRoleId: number;
 }) {
   const [active, setActive] = useState(AppState.currentState === 'active');
   useEffect(() => {
@@ -310,14 +317,48 @@ function StaffComplaintDetail({
 
   return (
     <View style={styles.details}>
-      <DetailRow label="Loại khiếu nại" value={complaint.complaint_type} />
-      <DetailRow label="Trạng thái" value={complaintStatusLabel(complaint.status)} />
-      <DetailRow label="Ngày gửi" value={formatDate(complaint.created_at)} />
-      <DetailRow label="Nội dung khách hàng" value={complaint.description} />
-      {complaint.assigned_staff ? (
-        <DetailRow label="Người được giao" value={complaint.assigned_staff.full_name} />
-      ) : null}
-      <View style={styles.detailSection}>
+      <AppCard variant="outlined" style={styles.detailCard}>
+        <AppText variant="bodyMedium" weight="bold">Thông tin khiếu nại</AppText>
+        <DetailRow label="Loại khiếu nại" value={complaint.complaint_type} />
+        <DetailRow label="Trạng thái" value={complaintStatusLabel(complaint.status)} />
+        <DetailRow label="Ngày gửi" value={formatDate(complaint.created_at)} />
+        {complaint.assigned_staff ? (
+          <DetailRow label="Người được giao" value={complaint.assigned_staff.full_name} />
+        ) : null}
+      </AppCard>
+      <AppCard variant="outlined" style={styles.detailCard}>
+        <AppText variant="bodyMedium" weight="bold">Nội dung xử lý</AppText>
+        {canRespond ? (
+          <>
+            <AppInput
+              label="Nội dung phản hồi"
+              placeholder="Ghi rõ giải pháp khắc phục cho khách hàng"
+              multiline
+              maxLength={10000}
+              value={resolution}
+              onChangeText={setResolutionDraft}
+              disabled={isBusy}
+              inputStyle={styles.resolutionInput}
+            />
+            <AppButton
+              title="Gửi phản hồi"
+              disabled={isBusy || !resolution.trim()}
+              loading={resolutionState.isLoading}
+              onPress={() => void resolveComplaint()}
+            />
+          </>
+        ) : (
+          <>
+            <AppText selectable>{complaint.resolution || 'Chưa có nội dung xử lý.'}</AppText>
+            {complaint.resolved_at ? (
+              <AppText variant="caption" color={theme.colors.text.secondary}>
+                Đã phản hồi lúc: {formatDate(complaint.resolved_at)}
+              </AppText>
+            ) : null}
+          </>
+        )}
+      </AppCard>
+      <AppCard variant="outlined" style={styles.detailCard}>
         <AppText variant="caption" color={theme.colors.text.secondary}>Ảnh minh chứng</AppText>
         {complaint.image_urls.length ? complaint.image_urls.map((url, index) => (
           <Image
@@ -328,9 +369,26 @@ function StaffComplaintDetail({
             accessibilityLabel={`Ảnh minh chứng ${index + 1}`}
           />
         )) : <AppText variant="bodySmall">Không có ảnh đính kèm.</AppText>}
-      </View>
-      <View style={styles.detailSection}>
-        <AppText variant="caption" color={theme.colors.text.secondary}>Trao đổi với khách hàng</AppText>
+      </AppCard>
+      <AppCard variant="outlined" style={styles.detailCard}>
+        <AppText variant="bodyMedium" weight="bold">Trao đổi khiếu nại</AppText>
+        <AppText variant="caption" color={theme.colors.text.secondary}>
+          Nội dung khách hàng gửi và lịch sử phản hồi được hiển thị như một cuộc hội thoại.
+        </AppText>
+        <ComplaintConversation
+          initialMessage={{
+            id: complaint.complaint_id,
+            senderName: complaint.customer_name || 'Khách hàng',
+            senderRoleId: 3,
+            message: complaint.description,
+            createdAt: complaint.created_at,
+          }}
+          replies={complaint.replies}
+          ownRoleId={ownRoleId}
+        />
+      </AppCard>
+      <AppCard variant="outlined" style={styles.detailCard}>
+        <AppText variant="bodyMedium" weight="bold">Trao đổi với khách hàng</AppText>
         {canRespond ? (
           <>
             <AppInput
@@ -356,56 +414,7 @@ function StaffComplaintDetail({
             </AppText>
           </>
         ) : null}
-      </View>
-      <View style={styles.detailSection}>
-        <AppText variant="caption" color={theme.colors.text.secondary}>Giải pháp khắc phục</AppText>
-        {canRespond ? (
-          <>
-            <AppInput
-              label="Nội dung phản hồi"
-              placeholder="Ghi rõ giải pháp khắc phục cho khách hàng"
-              multiline
-              maxLength={10000}
-              value={resolution}
-              onChangeText={setResolutionDraft}
-              disabled={isBusy}
-              inputStyle={styles.resolutionInput}
-            />
-            <AppButton
-              title="Gửi phản hồi"
-              disabled={isBusy || !resolution.trim()}
-              loading={resolutionState.isLoading}
-              onPress={() => void resolveComplaint()}
-            />
-          </>
-        ) : (
-          <>
-            <AppText selectable>{complaint.resolution || 'Chưa có nội dung phản hồi.'}</AppText>
-            {complaint.resolved_at ? (
-              <AppText variant="caption" color={theme.colors.text.secondary}>
-                Đã phản hồi lúc: {formatDate(complaint.resolved_at)}
-              </AppText>
-            ) : null}
-          </>
-        )}
-      </View>
-      {complaint.replies.length ? (
-        <View style={styles.detailSection}>
-          <AppText variant="caption" color={theme.colors.text.secondary}>Lịch sử trao đổi</AppText>
-          {complaint.replies.map((reply) => (
-            <View key={reply.reply_id} style={styles.reply}>
-              <AppText variant="captionMedium" weight="bold">
-                {reply.sender_role_id === 3 ? 'Khách hàng' : 'Nhân viên'}
-                {reply.sender_name ? ` · ${reply.sender_name}` : ''}
-              </AppText>
-              <AppText variant="caption" color={theme.colors.text.secondary}>
-                {formatDate(reply.created_at)}
-              </AppText>
-              <AppText selectable>{reply.message}</AppText>
-            </View>
-          ))}
-        </View>
-      ) : null}
+      </AppCard>
     </View>
   );
 }
@@ -431,6 +440,7 @@ const styles = StyleSheet.create({
   pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing.sm },
   details: { gap: theme.spacing.md, paddingTop: theme.spacing.sm },
   detailSection: { gap: theme.spacing.xs },
+  detailCard: { gap: theme.spacing.sm },
   image: {
     width: '100%',
     height: 200,
@@ -440,11 +450,4 @@ const styles = StyleSheet.create({
   resolutionInput: { minHeight: 120, textAlignVertical: 'top' },
   replyInput: { minHeight: 96, textAlignVertical: 'top' },
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
-  reply: {
-    gap: theme.spacing.xs,
-    padding: theme.spacing.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border.light,
-    borderRadius: theme.borderRadius.md,
-  },
 });
