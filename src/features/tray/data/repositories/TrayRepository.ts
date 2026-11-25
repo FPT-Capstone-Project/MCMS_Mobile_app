@@ -124,8 +124,17 @@ export class TrayRepository implements ITrayRepository {
 
       return {
         session_id: sessionId,
+        mushroom_name: sessionStatus?.mushroom_name,
+        required_trays: sessionStatus?.required_trays,
+        tray_quantity: sessionStatus?.tray_quantity,
+        spawn_quantity: sessionStatus?.spawn_quantity,
+        spawn_status: sessionStatus?.spawn_status,
+        spawn_issued: sessionStatus?.spawn_issued,
+        floor_name: sessionStatus?.floor_name,
         cultivation_status: sessionStatus?.status,
         harvest_status: sessionStatus?.harvest_status,
+        expected_harvest_date: sessionStatus?.harvest_date,
+        condition: sessionStatus?.condition ?? growthHistory[growthHistory.length - 1]?.condition,
         current_stage: sessionStatus?.current_stage,
         progress_percent: progressPercent,
         growth_history: growthHistory,

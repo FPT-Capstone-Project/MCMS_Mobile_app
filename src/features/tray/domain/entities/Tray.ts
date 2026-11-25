@@ -52,6 +52,9 @@ export interface CustomerTrayCard {
   orderId?: number;
   floorId?: number;
   floorNumber?: number;
+  floorName?: string;
+  rowNumber?: number;
+  columnNumber?: number;
   pastSessions?: {
     sessionId: number;
     mushroomName?: string;
@@ -112,8 +115,17 @@ export interface CustomerEnvironmentHistoryPoint {
 
 export interface CustomerTrayDetails {
   session_id: number;
+  mushroom_name?: string;
+  required_trays?: number | null;
+  tray_quantity?: number | null;
+  spawn_quantity?: number | null;
+  spawn_status?: string | null;
+  spawn_issued?: boolean;
+  floor_name?: string | null;
   cultivation_status?: string;
   harvest_status?: string | null;
+  expected_harvest_date?: string | null;
+  condition?: string | null;
   current_stage?: string | null;
   progress_percent?: number | null;
   growth_history: CustomerGrowthHistoryItem[];

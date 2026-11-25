@@ -5,7 +5,7 @@ import { ENV } from '../../core/config/env';
 import { theme } from '../../core/theme';
 
 function bundledMushroomImage(name?: string | null): ImageSourcePropType | undefined {
-  const key = name?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/Ä‘/g, 'd').toLowerCase().trim();
+  const key = name?.replace(/[đĐ]/g, 'd').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   switch (key) {
     case 'nam so trang': case 'nam bao ngu trang': case 'bao ngu trang':
       return require('../../../assets/cong-dung-nam-bao-ngu-trang.png');

@@ -1,6 +1,6 @@
 import { AppAlert as Alert, AppModal as Modal } from '../../../../shared/components/feedback/AppDialog';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Href, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   Keyboard,
@@ -309,7 +309,7 @@ export function ProfileScreen() {
 
           {user?.role !== 'EXPERT' ? (
             <>
-              <Pressable style={styles.settingItem} onPress={() => router.push('/(tabs)/orders')}>
+              <Pressable style={styles.settingItem} onPress={() => router.push('/customer-orders' as Href)}>
                 <View style={styles.settingLeft}>
                   <Ionicons
                     name={isCustomer ? 'receipt-outline' : 'albums-outline'}

@@ -1,11 +1,34 @@
 import type { CustomerTrayCard } from '../../tray/domain/entities/Tray';
-import type { CustomerSession, CustomerSessionTray } from './entities/Order';
+import type {
+  CustomerCultivationStatus,
+  CustomerSession,
+  CustomerSessionTray,
+} from './entities/Order';
+
+type CustomerCultivationSession = CustomerCultivationStatus['sessions'][number];
+
+export function customerCanChooseHarvestMethod(session: CustomerCultivationSession): boolean {
+  const status = session.status.toUpperCase();
+  return (
+    (status === 'HARVEST_READY' || session.harvest_status?.toUpperCase() === 'HARVEST_READY') &&
+    !['COMPLETED', 'CANCELLED'].includes(status) &&
+    session.harvest_request_status?.toUpperCase() !== 'COMPLETED' &&
+    !session.harvest_method
+  );
+}
+
+export function customerSessionTrayLabel(session: CustomerSession, tray: CustomerSessionTray): string {
+  const index = session.trays.findIndex(
+    (sessionTray) => sessionTray.session_tray_id === tray.session_tray_id
+  );
+  return `Khay ${index >= 0 ? index + 1 : tray.tray_id}`;
+}
 
 export function customerSessionTrayDetail(session: CustomerSession, tray: CustomerSessionTray): CustomerTrayCard {
   const active = tray.assignment_status.toUpperCase() === 'ACTIVE';
   return {
     id: tray.tray_id,
-    code: tray.tray_code || `Khay #${tray.tray_id}`,
+    code: customerSessionTrayLabel(session, tray),
     usage: 'MY_CULTIVATION',
     mushroomName: session.mushroom_name,
     sessionId: session.session_id,
@@ -13,6 +36,9 @@ export function customerSessionTrayDetail(session: CustomerSession, tray: Custom
     orderId: session.order_id,
     floorId: active ? tray.floor_id ?? undefined : undefined,
     floorNumber: active ? tray.floor_number ?? undefined : undefined,
+    floorName: active ? tray.floor_name ?? undefined : undefined,
+    rowNumber: active ? tray.row_number ?? undefined : undefined,
+    columnNumber: active ? tray.column_number ?? undefined : undefined,
   };
 }
 

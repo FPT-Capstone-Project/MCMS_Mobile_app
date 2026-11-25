@@ -97,7 +97,13 @@ export interface CustomerCultivationStatus {
     mushroom_type_id?: number;
     harvest_request_id?: number | null;
     status: string;
+    spawn_status?: string | null;
+    spawn_issued?: boolean;
+    spawn_quantity?: number | null;
+    required_trays?: number | null;
     tray_quantity?: number | null;
+    floor_id?: number | null;
+    floor_name?: string | null;
     start_at?: string | null;
     end_at?: string | null;
     harvest_status?: string | null;
@@ -108,9 +114,11 @@ export interface CustomerCultivationStatus {
     delivery_address?: string | null;
     handover_completed_at?: string | null;
     harvest_date?: string | null;
+    condition?: string | null;
     current_stage?: string | null;
     progress_percent?: number | string | null;
     mushroom_name: string;
+    mushroom_image_url?: string | null;
     assigned_trays: {
       tray_id: number;
       tray_code?: string;

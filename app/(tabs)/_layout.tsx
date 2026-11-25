@@ -5,7 +5,7 @@ import { useAuth } from '../../src/features/auth';
 
 /**
  * App Shell Bottom Tabs Layout
- * Provides five core tabs: Trang chủ, Khay của tôi / Phòng tầng khay, Đơn hàng, Thông báo, and Hồ sơ.
+ * Provides five core tabs: Trang chủ, Khay của tôi / Phòng tầng khay, Phiên trồng, Thông báo, and Hồ sơ.
  */
 export default function TabsLayout() {
   const { canControlIot } = useAuth();
@@ -32,7 +32,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="orders"
         options={{
-          title: canControlIot ? 'Phiên trồng' : 'Đơn hàng',
+          title: 'Phiên trồng',
         }}
       />
       <Tabs.Screen

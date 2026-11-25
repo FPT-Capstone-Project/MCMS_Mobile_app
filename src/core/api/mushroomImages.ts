@@ -18,7 +18,12 @@ export async function getMushroomImages(): Promise<MushroomImageEntry[]> {
   return pending;
 }
 export function findMushroomImage(entries: MushroomImageEntry[], id?: number | null, name?: string | null): string | undefined {
-  const entry = id != null ? entries.find(item => Number(item.mushroom_type_id) === Number(id))
-    : entries.find(item => item.name.trim().toLocaleLowerCase('vi') === name?.trim().toLocaleLowerCase('vi'));
+  const entryById = id != null
+    ? entries.find(item => Number(item.mushroom_type_id) === Number(id))
+    : undefined;
+  const entryByName = name
+    ? entries.find(item => item.name.trim().toLocaleLowerCase('vi') === name.trim().toLocaleLowerCase('vi'))
+    : undefined;
+  const entry = entryById ?? entryByName;
   return entry?.image_url?.trim() || undefined;
 }
