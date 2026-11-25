@@ -308,7 +308,7 @@ export const RentalFlowScreen: React.FC = () => {
                 <View style={styles.sectionHeading}>
                   <AppText variant="h3">Chọn số lượng khay</AppText>
                   <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-                    Gói {automaticPackage.package_name} ({automaticPackage.duration_days} ngày) được tự chọn theo giống nấm. Mỗi khay cần 3 đơn vị phôi; hệ thống sẽ kiểm tra khay và phôi trước khi giữ chỗ.
+                    {automaticPackage.package_name} ({automaticPackage.duration_days} ngày) được tự chọn theo giống nấm. Mỗi khay cần 2 đơn vị phôi; hệ thống sẽ kiểm tra khay và phôi trước khi giữ chỗ.
                   </AppText>
                 </View>
                 <AppCard elevation="sm" style={styles.quantityCard}>
