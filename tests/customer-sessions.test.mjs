@@ -13,6 +13,9 @@ const {
   customerSessionDeviceHistoryAvailable,
   customerSessionTrayLabel,
   customerCanChooseHarvestMethod,
+  customerSessionIsHarvestReady,
+  customerSessionNeedsReceivingFollowup,
+  customerSessionMatchesFilter,
 } = loaded.exports;
 
 const active = {
@@ -47,7 +50,7 @@ test('released assignments cannot expose a reused tray floor or device history',
   assert.equal(customerSessionDeviceHistoryAvailable({ ...session, trays: [active, released] }), false);
 });
 
-test('receiving-method filter only includes harvest-ready sessions without a selected method', () => {
+test('receiving-method filter includes harvest-ready sessions until handover is completed', () => {
   const eligible = {
     status: 'CULTIVATING',
     harvest_status: 'HARVEST_READY',
@@ -55,8 +58,23 @@ test('receiving-method filter only includes harvest-ready sessions without a sel
     harvest_method: null,
   };
   assert.equal(customerCanChooseHarvestMethod(eligible), true);
+  assert.equal(customerSessionIsHarvestReady(eligible), true);
   assert.equal(customerCanChooseHarvestMethod({ ...eligible, harvest_method: 'DELIVERY' }), false);
+  assert.equal(customerSessionNeedsReceivingFollowup({ ...eligible, harvest_method: 'DELIVERY' }), true);
+  assert.equal(customerSessionNeedsReceivingFollowup({ ...eligible, harvest_method: 'PICKUP' }), true);
   assert.equal(customerCanChooseHarvestMethod({ ...eligible, status: 'COMPLETED' }), false);
   assert.equal(customerCanChooseHarvestMethod({ ...eligible, harvest_request_status: 'COMPLETED' }), false);
   assert.equal(customerCanChooseHarvestMethod({ ...eligible, harvest_status: 'NOT_READY' }), false);
+  assert.equal(customerSessionIsHarvestReady({ ...eligible, harvest_status: 'NOT_READY' }), false);
+  assert.equal(customerSessionIsHarvestReady({ ...eligible, status: 'HARVEST_READY' }), true);
+  assert.equal(customerSessionMatchesFilter(eligible, 'RECEIVING_METHOD'), true);
+  assert.equal(customerSessionMatchesFilter(
+    { ...eligible, harvest_method: 'DELIVERY' },
+    'RECEIVING_METHOD',
+  ), true);
+  assert.equal(customerSessionMatchesFilter(eligible, 'GROWING'), false);
+  assert.equal(customerSessionMatchesFilter(
+    { ...eligible, harvest_status: 'NOT_READY' },
+    'GROWING',
+  ), true);
 });

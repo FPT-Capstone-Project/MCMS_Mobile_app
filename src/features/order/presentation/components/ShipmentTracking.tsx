@@ -339,8 +339,12 @@ export function ShipmentTracking({ orderId, disabled = false, onCompleted }: { o
           {shipment.status === 'CANCELLED' && <AppText variant="caption">Vận đơn đã hủy; không có nghĩa là đơn nuôi trồng đã bị hủy.</AppText>}
           <AppText>{shipment.recipient_name} · {shipment.recipient_phone}</AppText>
           <AppText color={theme.colors.text.secondary}>{shipment.address}</AppText>
-          <AppText variant="caption">Đơn vị vận chuyển: {shipment.carrier || 'Chưa cập nhật'}</AppText>
-          <AppText variant="caption">Mã vận đơn: {shipment.tracking_code || 'Chưa cập nhật'}</AppText>
+          {canManage ? (
+            <>
+              <AppText variant="caption">Đơn vị vận chuyển: {shipment.carrier || 'Chưa cập nhật'}</AppText>
+              <AppText variant="caption">Mã vận đơn: {shipment.tracking_code || 'Chưa cập nhật'}</AppText>
+            </>
+          ) : null}
           <AppText variant="caption">Phí giao hàng: {formatVND(Number(shipment.shipping_fee))}</AppText>
           {shipment.shipped_at && <AppText variant="caption">Bàn giao vận chuyển: {formatTimestamp(shipment.shipped_at)}</AppText>}
           {shipment.delivered_at && <AppText variant="caption">{shipment.status === 'RETURNED' ? 'Lần giao trước' : 'Đã giao lúc'}: {formatTimestamp(shipment.delivered_at)}</AppText>}

@@ -103,10 +103,11 @@ test('delivery shows the latest order-level shipment and does not mislabel retur
   const details = rows(tree);
   assert.equal(queryOptions.skip, false);
   assert.equal(details['Địa chỉ đã chọn'], 'Selected address');
-  assert.equal(details['Mã vận đơn nội bộ'], '#2');
+  assert.equal(details['Mã vận đơn nội bộ'], undefined);
   assert.equal(details['Người nhận'], 'New');
   assert.equal(details['Trạng thái giao'], 'Đã hoàn hàng');
   assert.equal(details['Phí giao hàng'], '10000đ');
+  assert.equal(details['Đơn vị vận chuyển'], undefined);
   assert.ok(details['Lần giao trước']);
   assert.equal(details['Đã giao lúc'], undefined);
   assert.ok(text(tree).some((item) => item.includes('không xác định riêng cho phiên này')));

@@ -39,6 +39,30 @@ test('missing, cancelled, pending and unknown delivery statuses do not imply cus
   }
   assert.match(shipmentDomain.shipmentLabel('NEW_BACKEND_STATUS'), /NEW_BACKEND_STATUS/);
 });
+
+test('customers can confirm receipt only for eligible sessions with a shipment', () => {
+  const session = {
+    status: 'HARVESTING',
+    harvest_method: 'DELIVERY',
+    harvest_request_id: 12,
+    harvest_request_status: 'PENDING',
+  };
+  assert.equal(shipmentDomain.canCustomerConfirmDeliveryReceipt(session, []), false);
+  assert.equal(shipmentDomain.canCustomerConfirmDeliveryReceipt(session, [
+    { shipment_id: 2, status: 'PENDING' },
+  ]), true);
+  assert.equal(shipmentDomain.canCustomerConfirmDeliveryReceipt(session, [
+    { shipment_id: 2, status: 'DELIVERED' },
+  ]), true);
+  assert.equal(shipmentDomain.canCustomerConfirmDeliveryReceipt(session, [
+    { shipment_id: 2, status: 'RETURNED' },
+  ]), false);
+  assert.equal(shipmentDomain.canCustomerConfirmDeliveryReceipt(
+    { ...session, harvest_request_status: 'COMPLETED' },
+    [{ shipment_id: 2, status: 'SHIPPED' }],
+  ), false);
+});
+
 const now = new Date('2026-11-18T08:16:00+07:00');
 
 test('pickup uses quarter-hour slots and keeps the closing-time slot', () => {

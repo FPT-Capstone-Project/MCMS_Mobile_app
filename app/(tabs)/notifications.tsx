@@ -11,6 +11,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  ScrollViewInstance,
   StyleSheet,
   TextInput,
   View,
@@ -37,6 +38,7 @@ import {
   AppHeader,
   AppText,
   ScreenContainer,
+  ScrollToTopButton,
 } from '../../src/shared/components';
 
 type NotificationFilter = 'all' | 'unread' | 'read';
@@ -303,6 +305,8 @@ function formatIncidentLocation(incident?: DeviceIncident | null): string {
 }
 
 export default function NotificationsScreen() {
+  const scrollViewRef = useRef<ScrollViewInstance>(null);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
   const [readNotification] = useReadNotificationMutation();
   const [readAllNotifications] = useReadAllNotificationsMutation();
   const router = useRouter();
@@ -713,7 +717,10 @@ export default function NotificationsScreen() {
         }
       />
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={styles.content}
+        onScroll={(event) => setShowScrollToTop(event.nativeEvent.contentOffset.y > 300)}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
@@ -969,6 +976,10 @@ export default function NotificationsScreen() {
           </>
         )}
       </ScrollView>
+      <ScrollToTopButton
+        visible={showScrollToTop}
+        onPress={() => scrollViewRef.current?.scrollTo({ y: 0, animated: true })}
+      />
 
       {/* ================= MODAL: CHI TIẾT THÔNG BÁO ================= */}
       <Modal
