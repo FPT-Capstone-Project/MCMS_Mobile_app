@@ -354,12 +354,10 @@ function HandoverDetails({ orderId, session, method }: {
             <AppText variant="caption" color={theme.colors.text.secondary}>Chưa có vận đơn cho đơn hàng.</AppText>
           ) : (
             <>
-              <ReportRow label="Mã vận đơn nội bộ" value={`#${shipment.shipment_id}`} />
               <ReportRow label="Trạng thái giao" value={shipmentLabel(shipment.status)} />
               <ReportRow label="Người nhận" value={shipment.recipient_name || 'Chưa ghi nhận'} />
               <ReportRow label="Số điện thoại" value={shipment.recipient_phone || 'Chưa ghi nhận'} />
               <ReportRow label="Địa chỉ vận đơn" value={shipment.address || 'Chưa ghi nhận'} />
-              <ReportRow label="Đơn vị vận chuyển" value={shipment.carrier || 'Chưa ghi nhận'} />
               <ReportRow label="Phí giao hàng" value={feeValue} />
               <ReportRow label="Gửi vận chuyển" value={formatTimestamp(shipment.shipped_at)} />
               {shipment.status === 'DELIVERED' || shipment.status === 'RETURNED' ? (

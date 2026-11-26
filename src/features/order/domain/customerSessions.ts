@@ -1,20 +1,47 @@
 import type { CustomerTrayCard } from '../../tray/domain/entities/Tray';
 import type {
   CustomerCultivationStatus,
+  CustomerSessionFilter,
   CustomerSession,
   CustomerSessionTray,
 } from './entities/Order';
 
 type CustomerCultivationSession = CustomerCultivationStatus['sessions'][number];
 
+export function customerSessionIsHarvestReady(session: CustomerCultivationSession): boolean {
+  return session.status.toUpperCase() === 'HARVEST_READY' ||
+    session.harvest_status?.toUpperCase() === 'HARVEST_READY';
+}
+
 export function customerCanChooseHarvestMethod(session: CustomerCultivationSession): boolean {
   const status = session.status.toUpperCase();
   return (
-    (status === 'HARVEST_READY' || session.harvest_status?.toUpperCase() === 'HARVEST_READY') &&
+    customerSessionIsHarvestReady(session) &&
     !['COMPLETED', 'CANCELLED'].includes(status) &&
     session.harvest_request_status?.toUpperCase() !== 'COMPLETED' &&
     !session.harvest_method
   );
+}
+
+export function customerSessionNeedsReceivingFollowup(session: CustomerCultivationSession): boolean {
+  const status = session.status.toUpperCase();
+  return (
+    customerSessionIsHarvestReady(session) &&
+    !['COMPLETED', 'CANCELLED'].includes(status) &&
+    session.harvest_request_status?.toUpperCase() !== 'COMPLETED'
+  );
+}
+
+export function customerSessionMatchesFilter(
+  session: CustomerCultivationSession,
+  filter: CustomerSessionFilter | 'RECEIVING_METHOD',
+): boolean {
+  if (filter === 'ALL') return true;
+  if (filter === 'RECEIVING_METHOD') return customerSessionNeedsReceivingFollowup(session);
+  const status = session.status.toUpperCase();
+  return filter === 'COMPLETED'
+    ? status === 'COMPLETED'
+    : !['COMPLETED', 'CANCELLED'].includes(status) && !customerSessionIsHarvestReady(session);
 }
 
 export function customerSessionTrayLabel(session: CustomerSession, tray: CustomerSessionTray): string {

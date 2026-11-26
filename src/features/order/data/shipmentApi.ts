@@ -71,6 +71,20 @@ export const shipmentApi = baseApi.injectEndpoints({
         { type: 'Shipment', id: 'LIST' },
       ],
     }),
+    confirmDeliveryReceipt: builder.mutation<void, { orderId: number; requestId: number }>({
+      query: ({ requestId }) => ({
+        url: API_ENDPOINTS.HARVEST_REQUESTS.COMPLETE(requestId),
+        method: 'POST',
+      }),
+      invalidatesTags: (_result, _error, { orderId }) => [
+        { type: 'Shipment', id: orderId },
+        { type: 'Shipment', id: 'LIST' },
+        'Order',
+        'IoT',
+        'Tray',
+        'Notification',
+      ],
+    }),
   }),
 });
 
@@ -80,4 +94,5 @@ export const {
   useUpdateShipmentStatusMutation,
   useUpdateShipmentDetailsMutation,
   useCreateShipmentMutation,
+  useConfirmDeliveryReceiptMutation,
 } = shipmentApi;

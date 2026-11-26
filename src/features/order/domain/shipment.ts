@@ -73,6 +73,30 @@ export function latestShipment(shipments: readonly Shipment[]): Shipment | undef
     !latest || shipment.shipment_id > latest.shipment_id ? shipment : latest, undefined);
 }
 
+export function canCustomerConfirmDeliveryReceipt(
+  session: {
+    status?: string;
+    harvest_method?: string | null;
+    harvest_request_id?: number | null;
+    harvest_request_status?: string | null;
+  },
+  shipments: readonly Shipment[],
+): boolean {
+  const shipment = latestShipment(shipments);
+  if (
+    session.harvest_method !== 'DELIVERY' ||
+    !session.harvest_request_id ||
+    session.status !== 'HARVESTING' ||
+    ['COMPLETED', 'CANCELLED'].includes(session.harvest_request_status?.toUpperCase() ?? '') ||
+    !shipment
+  ) {
+    return false;
+  }
+  return ['PENDING', 'SHIPPED', 'IN_TRANSIT', 'DELIVERED'].includes(
+    shipment.status.toUpperCase(),
+  );
+}
+
 // Shipments belong to an order, not an individual cultivation session.
 export function deliveryHandoverAllowed(shipments: readonly Shipment[]): boolean {
   return latestShipment(shipments)?.status === 'DELIVERED';

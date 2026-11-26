@@ -3,6 +3,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ScrollViewInstance,
+  ScrollViewProps,
   StyleSheet,
   View,
   ViewStyle,
@@ -19,6 +21,9 @@ export interface ScreenContainerProps {
   contentContainerStyle?: ViewStyle;
   keyboardAvoiding?: boolean;
   refreshControl?: React.ReactElement;
+  scrollViewRef?: React.RefObject<ScrollViewInstance | null>;
+  onScroll?: ScrollViewProps['onScroll'];
+  scrollEventThrottle?: number;
 }
 
 export const ScreenContainer: React.FC<ScreenContainerProps> = ({
@@ -30,9 +35,13 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
   contentContainerStyle,
   keyboardAvoiding = true,
   refreshControl,
+  scrollViewRef,
+  onScroll,
+  scrollEventThrottle,
 }) => {
   const content = scrollable ? (
     <ScrollView
+      ref={scrollViewRef}
       style={styles.container}
       contentContainerStyle={[styles.contentContainer, contentContainerStyle]}
       keyboardShouldPersistTaps="handled"
@@ -40,6 +49,8 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
       contentInsetAdjustmentBehavior="automatic"
       showsVerticalScrollIndicator={false}
       refreshControl={refreshControl}
+      onScroll={onScroll}
+      scrollEventThrottle={scrollEventThrottle}
     >
       {children}
     </ScrollView>

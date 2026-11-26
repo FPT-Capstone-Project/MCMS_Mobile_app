@@ -1,12 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Href, useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, ScrollViewInstance, StyleSheet, View } from 'react-native';
 import { theme } from '../../../../core/theme';
 import { formatVND } from '../../../../core/utils/currency';
 import { GROWTH_STAGE_LABELS } from '../../../../core/constants/growthStages';
-import { AppButton, AppCard, AppEmptyState, AppHeader, AppText, ScreenContainer } from '../../../../shared/components';
-import { AppModal } from '../../../../shared/components/feedback/AppDialog';
+import { AppButton, AppCard, AppEmptyState, AppHeader, AppText, ScreenContainer, ScrollToTopButton } from '../../../../shared/components';
+import { AppAlert, AppModal } from '../../../../shared/components/feedback/AppDialog';
 import { MushroomImage } from '../../../../shared/components/MushroomImage';
 import { useAuth } from '../../../auth';
 import { ABOUT_US_INFO } from '../../../profile/data/policiesData';
@@ -16,16 +16,22 @@ import { CustomerTrayDetail } from '../../../tray/presentation/components/Custom
 import { useGetMyComplaintsQuery, type OrderComplaint } from '../../data/complaintApi';
 import { useGetAllCustomerSessionsQuery } from '../../data/customerSessionApi';
 import { orderRepository } from '../../data/repositories/OrderRepository';
-import { useGetOrderShipmentsQuery } from '../../data/shipmentApi';
+import { useConfirmDeliveryReceiptMutation, useGetOrderShipmentsQuery } from '../../data/shipmentApi';
 import { CompletedOrderReportModal } from '../components/CompletedOrderReportModal';
 import { HarvestReceivingModal } from '../components/HarvestReceivingModal';
 import { OrderComplaintHistory } from '../components/OrderComplaintHistory';
 import { OrderDeliveryActions } from '../components/OrderDeliveryActions';
 import { canCustomerUpdateHarvestMethod } from '../../domain/harvestSchedule';
-import { canTrackSessionShipment, latestShipment, shipmentLabel } from '../../domain/shipment';
+import {
+  canCustomerConfirmDeliveryReceipt,
+  canTrackSessionShipment,
+  latestShipment,
+  shipmentLabel,
+} from '../../domain/shipment';
 import {
   customerSessionDeviceHistoryAvailable,
   customerCanChooseHarvestMethod,
+  customerSessionMatchesFilter,
   customerSessionTrayLabel,
   customerSessionTrayDetail,
   customerTrayAssignmentLabel,
@@ -54,15 +60,6 @@ const sessionFilters: { value: SessionTimelineFilter; label: string }[] = [
   { value: 'COMPLETED', label: 'Đã hoàn thành' },
   { value: 'RECEIVING_METHOD', label: 'Cần chọn cách nhận' },
 ];
-
-function matchesSessionFilter(session: CultivationSession, filter: SessionTimelineFilter): boolean {
-  if (filter === 'ALL') return true;
-  if (filter === 'RECEIVING_METHOD') return customerCanChooseHarvestMethod(session);
-  const status = session.status.toUpperCase();
-  return filter === 'COMPLETED'
-    ? status === 'COMPLETED'
-    : !['COMPLETED', 'CANCELLED'].includes(status);
-}
 
 function normalizeMushroomName(name?: string | null): string {
   return name?.replace(/[đĐ]/g, 'd').normalize('NFD')
@@ -114,21 +111,22 @@ function sessionProgressLabel(session: CultivationSession): string {
 }
 
 function SessionHandoverDetails({
-  orderId,
   session,
-  accountId,
+  shipment,
+  isFetching,
+  isError,
+  canConfirmReceipt,
+  confirmingReceipt,
+  onConfirmReceipt,
 }: {
-  orderId: number;
   session: CultivationSession;
-  accountId: string;
+  shipment: ReturnType<typeof latestShipment>;
+  isFetching: boolean;
+  isError: boolean;
+  canConfirmReceipt: boolean;
+  confirmingReceipt: boolean;
+  onConfirmReceipt: () => void;
 }) {
-  const isDelivery = session.harvest_method === 'DELIVERY';
-  const { currentData: shipments, isFetching, isError } = useGetOrderShipmentsQuery(
-    { orderId, accountId },
-    { skip: !isDelivery || !accountId, refetchOnMountOrArgChange: true },
-  );
-  const shipment = latestShipment(shipments ?? []);
-
   if (!session.harvest_method) {
     return (
       <AppText variant="caption" color={theme.colors.text.secondary}>
@@ -174,12 +172,6 @@ function SessionHandoverDetails({
       <AppText variant="caption" color={theme.colors.text.secondary}>
         Địa chỉ: {shipment.address || session.delivery_address || 'Chưa cập nhật'}
       </AppText>
-      <AppText variant="caption" color={theme.colors.text.secondary}>
-        Đơn vị vận chuyển: {shipment.carrier || 'Chờ cập nhật'}
-      </AppText>
-      <AppText variant="caption" color={theme.colors.text.secondary}>
-        Mã vận đơn: {shipment.tracking_code || 'Chờ cập nhật'}
-      </AppText>
       {shipment.shipped_at ? (
         <AppText variant="caption" color={theme.colors.text.secondary}>
           Bàn giao vận chuyển: {formatDateTime(shipment.shipped_at)}
@@ -189,6 +181,16 @@ function SessionHandoverDetails({
         <AppText variant="caption" color={theme.colors.text.secondary}>
           Giao hàng lúc: {formatDateTime(shipment.delivered_at)}
         </AppText>
+      ) : null}
+      {canConfirmReceipt ? (
+        <AppButton
+          title="Xác nhận đã nhận nấm"
+          size="sm"
+          loading={confirmingReceipt}
+          disabled={confirmingReceipt}
+          leftIcon={<Ionicons name="checkmark-circle-outline" size={18} color={theme.colors.text.inverse} />}
+          onPress={onConfirmReceipt}
+        />
       ) : null}
     </View>
   );
@@ -200,6 +202,7 @@ function SessionTimelineCard({
   imageUri,
   sessionDetail,
   accountId,
+  onReceiptConfirmed,
   onOpen,
   onChooseReceiving,
 }: {
@@ -208,6 +211,7 @@ function SessionTimelineCard({
   imageUri?: string;
   sessionDetail?: CustomerSession;
   accountId: string;
+  onReceiptConfirmed: () => void;
   onOpen: () => void;
   onChooseReceiving: () => void;
 }) {
@@ -217,6 +221,11 @@ function SessionTimelineCard({
     { skip: !isDelivery || !accountId, refetchOnMountOrArgChange: true },
   );
   const latestOrderShipment = latestShipment(shipmentQuery.currentData ?? []);
+  const [confirmReceipt, confirmReceiptState] = useConfirmDeliveryReceiptMutation();
+  const canConfirmReceipt = canCustomerConfirmDeliveryReceipt(
+    session,
+    shipmentQuery.currentData ?? [],
+  );
   const canUpdateMethod = session.harvest_request_status !== 'COMPLETED' &&
     !['COMPLETED', 'CANCELLED'].includes(session.status) &&
     Boolean(session.harvest_method) &&
@@ -226,6 +235,35 @@ function SessionTimelineCard({
       !shipmentQuery.isError &&
       latestOrderShipment?.status === 'PENDING'
     ));
+  const confirmReceived = () => {
+    const requestId = session.harvest_request_id;
+    if (!requestId || !canConfirmReceipt || confirmReceiptState.isLoading) return;
+    AppAlert.alert(
+      'Xác nhận đã nhận nấm',
+      `Bạn xác nhận đã nhận đầy đủ nấm của phiên #${session.session_id}? Hành động này sẽ hoàn tất bàn giao phiên.`,
+      [
+        { text: 'Chưa nhận', style: 'cancel' },
+        {
+          text: 'Đã nhận nấm',
+          onPress: async () => {
+            try {
+              await confirmReceipt({
+                orderId,
+                requestId,
+              }).unwrap();
+              onReceiptConfirmed();
+              AppAlert.alert('Đã xác nhận', 'Phiên đã được cập nhật thành đã nhận nấm.');
+            } catch (error) {
+              const message = typeof error === 'object' && error !== null && 'message' in error
+                ? String(error.message)
+                : 'Không thể xác nhận nhận nấm. Vui lòng thử lại.';
+              AppAlert.alert('Chưa xác nhận được', message);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <AppCard variant="outlined" style={styles.sessionCard}>
@@ -258,7 +296,15 @@ function SessionTimelineCard({
           ) : null}
         </View>
       ) : null}
-      <SessionHandoverDetails orderId={orderId} session={session} accountId={accountId} />
+      <SessionHandoverDetails
+        session={session}
+        shipment={latestOrderShipment}
+        isFetching={shipmentQuery.isFetching}
+        isError={shipmentQuery.isError}
+        canConfirmReceipt={canConfirmReceipt}
+        confirmingReceipt={confirmReceiptState.isLoading}
+        onConfirmReceipt={confirmReceived}
+      />
       {sessionDetail ? (
         <AppButton title="Xem chi tiết phiên và khay" variant="outline" size="sm" onPress={onOpen} />
       ) : (
@@ -279,6 +325,7 @@ function OrderTimelineCard({
   complaintsReady,
   accountId,
   onRetryCultivation,
+  onReceiptConfirmed,
   onOpenSession,
   onChooseReceiving,
   onOpenReport,
@@ -291,12 +338,13 @@ function OrderTimelineCard({
   complaintsReady: boolean;
   accountId: string;
   onRetryCultivation: () => void;
+  onReceiptConfirmed: (orderId: number) => void;
   onOpenSession: (session: CustomerSession) => void;
   onChooseReceiving: (session: CultivationSession) => void;
   onOpenReport: () => void;
 }) {
   const sessions = cultivation?.data?.sessions ?? [];
-  const visibleSessions = sessions.filter((session) => matchesSessionFilter(session, sessionFilter));
+  const visibleSessions = sessions.filter((session) => customerSessionMatchesFilter(session, sessionFilter));
   const deliverySelected = sessions.some((session) =>
     session.harvest_method === 'DELIVERY' && canTrackSessionShipment(session)
   );
@@ -340,6 +388,7 @@ function OrderTimelineCard({
           imageUri={sessionMushroomImage(order, session)}
           sessionDetail={sessionDetails.get(session.session_id)}
           accountId={accountId}
+          onReceiptConfirmed={() => onReceiptConfirmed(order.order_id)}
           onOpen={() => {
             const detail = sessionDetails.get(session.session_id);
             if (detail) onOpenSession(detail);
@@ -455,6 +504,8 @@ function SessionDetail({ session, onClose }: { session: CustomerSession; onClose
 
 export function CustomerSessionsScreen() {
   const router = useRouter();
+  const scrollViewRef = useRef<ScrollViewInstance>(null);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
   const { user, updateProfile } = useAuth();
   const accountId = user?.id ?? '';
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
@@ -503,7 +554,7 @@ export function CustomerSessionsScreen() {
     if (sessionFilter === 'ALL') return true;
     const cultivation = cultivationByOrder[order.order_id];
     if (!cultivation?.data || cultivation.loading || cultivation.error) return true;
-    return cultivation.data.sessions.some((session) => matchesSessionFilter(session, sessionFilter));
+    return cultivation.data.sessions.some((session) => customerSessionMatchesFilter(session, sessionFilter));
   }), [cultivationByOrder, orders, sessionFilter]);
 
   const loadCultivationStatus = useCallback(async (orderId: number) => {
@@ -594,7 +645,14 @@ export function CustomerSessionsScreen() {
           />
         }
       />
-      <ScreenContainer scrollable edges={['left', 'right', 'bottom']} keyboardAvoiding={false}>
+      <ScreenContainer
+        scrollable
+        edges={['left', 'right', 'bottom']}
+        keyboardAvoiding={false}
+        scrollViewRef={scrollViewRef}
+        onScroll={(event) => setShowScrollToTop(event.nativeEvent.contentOffset.y > 300)}
+        scrollEventThrottle={16}
+      >
         <View style={styles.content}>
           <AppText variant="bodySmall" color={theme.colors.text.secondary}>
             Theo dõi quá trình chuẩn bị, nuôi trồng, thu hoạch và nhận nấm của từng đơn hàng.
@@ -661,6 +719,7 @@ export function CustomerSessionsScreen() {
                 complaintsReady={Boolean(complaints) && !complaintsError && !complaintsFetching}
                 accountId={accountId}
                 onRetryCultivation={() => void loadCultivationStatus(order.order_id)}
+                onReceiptConfirmed={(orderId) => void loadCultivationStatus(orderId)}
                 onOpenSession={setSelectedSession}
                 onChooseReceiving={(session) => setReceivingContext({ orderId: order.order_id, session })}
                 onOpenReport={() => setReportOrderId(order.order_id)}
@@ -679,6 +738,10 @@ export function CustomerSessionsScreen() {
           ) : null}
         </View>
       </ScreenContainer>
+      <ScrollToTopButton
+        visible={showScrollToTop}
+        onPress={() => scrollViewRef.current?.scrollTo({ y: 0, animated: true })}
+      />
 
       {selectedSession ? (
         <SessionDetail session={selectedSession} onClose={() => setSelectedSession(null)} />
