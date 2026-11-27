@@ -17,7 +17,7 @@ import { useAuth } from '../../../auth';
 import { CompletedSessionReportData, CultivationProgressEntry, CustomerCultivationStatus, OrderHarvestHistory } from '../../domain/entities/Order';
 import { orderRepository } from '../../data/repositories/OrderRepository';
 import { useGetOrderShipmentsQuery } from '../../data/shipmentApi';
-import { latestShipment, shipmentLabel } from '../../domain/shipment';
+import { latestShipment, shipmentForRequest, shipmentLabel } from '../../domain/shipment';
 import { lifecycleStatusLabel } from '../../../cultivation/domain/sessionWorkflow';
 import { CustomerEnvironmentHistoryChart } from '../../../tray/presentation/components/CustomerEnvironmentHistoryChart';
 
@@ -319,7 +319,9 @@ function HandoverDetails({ orderId, session, method }: {
     { orderId: orderId ?? 0, accountId: user?.id || '' },
     { skip: !user || orderId === null || method !== 'DELIVERY', refetchOnMountOrArgChange: true }
   );
-  const shipment = currentData ? latestShipment(currentData) : undefined;
+  const shipment = currentData?.some(item => item.harvest_request_id != null)
+    ? shipmentForRequest(currentData, session.harvest_request_id)
+    : latestShipment(currentData ?? []);
   const fee = shipment?.shipping_fee;
   const feeValue = fee != null && String(fee).trim() !== '' && Number.isFinite(Number(fee))
     ? formatVND(Number(fee))

@@ -16,7 +16,7 @@ import { CustomerTrayDetail } from '../../../tray/presentation/components/Custom
 import { useGetMyComplaintsQuery, type OrderComplaint } from '../../data/complaintApi';
 import { useGetAllCustomerSessionsQuery } from '../../data/customerSessionApi';
 import { orderRepository } from '../../data/repositories/OrderRepository';
-import { useConfirmDeliveryReceiptMutation, useGetOrderShipmentsQuery } from '../../data/shipmentApi';
+import { useCancelHarvestRequestMutation, useConfirmDeliveryReceiptMutation, useGetOrderShipmentsQuery } from '../../data/shipmentApi';
 import { CompletedOrderReportModal } from '../components/CompletedOrderReportModal';
 import { HarvestReceivingModal } from '../components/HarvestReceivingModal';
 import { OrderComplaintHistory } from '../components/OrderComplaintHistory';
@@ -25,7 +25,7 @@ import { canCustomerUpdateHarvestMethod } from '../../domain/harvestSchedule';
 import {
   canCustomerConfirmDeliveryReceipt,
   canTrackSessionShipment,
-  latestShipment,
+  shipmentForRequest,
   shipmentLabel,
 } from '../../domain/shipment';
 import {
@@ -120,7 +120,7 @@ function SessionHandoverDetails({
   onConfirmReceipt,
 }: {
   session: CultivationSession;
-  shipment: ReturnType<typeof latestShipment>;
+  shipment: ReturnType<typeof shipmentForRequest>;
   isFetching: boolean;
   isError: boolean;
   canConfirmReceipt: boolean;
@@ -220,24 +220,19 @@ function SessionTimelineCard({
     { orderId, accountId },
     { skip: !isDelivery || !accountId, refetchOnMountOrArgChange: true },
   );
-  const latestOrderShipment = latestShipment(shipmentQuery.currentData ?? []);
+  const sessionShipment = shipmentForRequest(shipmentQuery.currentData ?? [], session.harvest_request_id);
+  const [cancelRequest, cancelState] = useCancelHarvestRequestMutation();
   const [confirmReceipt, confirmReceiptState] = useConfirmDeliveryReceiptMutation();
   const canConfirmReceipt = canCustomerConfirmDeliveryReceipt(
     session,
     shipmentQuery.currentData ?? [],
   );
-  const canUpdateMethod = session.harvest_request_status !== 'COMPLETED' &&
-    !['COMPLETED', 'CANCELLED'].includes(session.status) &&
-    Boolean(session.harvest_method) &&
-    canCustomerUpdateHarvestMethod(session.harvest_ready_at) &&
-    (!isDelivery || (
-      !shipmentQuery.isFetching &&
-      !shipmentQuery.isError &&
-      latestOrderShipment?.status === 'PENDING'
-    ));
+  const canCancel = !!session.harvest_request_id && isHarvestReady(session) &&
+    !['HARVESTING', 'COMPLETED', 'CANCELLED'].includes(session.status) &&
+    !['COMPLETED', 'CANCELLED'].includes(session.harvest_request_status ?? '');
+  const canUpdateMethod = canCancel && canCustomerUpdateHarvestMethod(session.harvest_ready_at);
   const confirmReceived = () => {
-    const requestId = session.harvest_request_id;
-    if (!requestId || !canConfirmReceipt || confirmReceiptState.isLoading) return;
+    if (!sessionShipment || !canConfirmReceipt || confirmReceiptState.isLoading) return;
     AppAlert.alert(
       'Xác nhận đã nhận nấm',
       `Bạn xác nhận đã nhận đầy đủ nấm của phiên #${session.session_id}? Hành động này sẽ hoàn tất bàn giao phiên.`,
@@ -249,7 +244,7 @@ function SessionTimelineCard({
             try {
               await confirmReceipt({
                 orderId,
-                requestId,
+                shipmentId: sessionShipment.shipment_id,
               }).unwrap();
               onReceiptConfirmed();
               AppAlert.alert('Đã xác nhận', 'Phiên đã được cập nhật thành đã nhận nấm.');
@@ -291,6 +286,13 @@ function SessionTimelineCard({
           {customerCanChooseHarvestMethod(session) ? (
             <AppButton title="Chọn cách nhận nấm" variant="outline" size="sm" onPress={onChooseReceiving} />
           ) : null}
+          {canCancel && <AppButton title="Hủy yêu cầu nhận" variant="ghost" loading={cancelState.isLoading} onPress={() =>
+            AppAlert.alert('Hủy yêu cầu nhận nấm?', 'Bạn có thể chọn lại phương thức nhận trước khi thu hoạch.', [
+              { text: 'Quay lại', style: 'cancel' }, { text: 'Hủy yêu cầu', onPress: async () => {
+                try { await cancelRequest(Number(session.harvest_request_id)).unwrap(); onReceiptConfirmed(); }
+                catch (e) { AppAlert.alert('Chưa hủy được', typeof e === 'object' && e && 'message' in e ? String(e.message) : 'Vui lòng tải lại phiên.'); }
+              } },
+            ])} />}
           {canUpdateMethod ? (
             <AppButton title="Cập nhật phương thức nhận" variant="outline" size="sm" onPress={onChooseReceiving} />
           ) : null}
@@ -298,7 +300,7 @@ function SessionTimelineCard({
       ) : null}
       <SessionHandoverDetails
         session={session}
-        shipment={latestOrderShipment}
+        shipment={sessionShipment}
         isFetching={shipmentQuery.isFetching}
         isError={shipmentQuery.isError}
         canConfirmReceipt={canConfirmReceipt}
@@ -770,7 +772,7 @@ export function CustomerSessionsScreen() {
           if (!receivingContext) return;
           await orderRepository.saveCustomerHarvestReceiving(
             receivingContext.session.session_id,
-            receivingContext.session.harvest_request_id,
+            receivingContext.session.harvest_request_status === 'CANCELLED' ? null : receivingContext.session.harvest_request_id,
             { harvestMethod: method, scheduledAt, deliveryAddress: address },
           );
           await loadCultivationStatus(receivingContext.orderId);

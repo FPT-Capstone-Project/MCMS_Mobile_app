@@ -91,7 +91,7 @@ export function OperatorExpertScreen() {
     }, [load])
   );
   return (
-    <ScreenContainer scrollable={false} edges={['top', 'left', 'right']}>
+    <ScreenContainer scrollable={false} edges={['left', 'right', 'bottom']}>
       <AppHeader
         title="Làm việc với chuyên gia"
         subtitle="Theo dõi tư vấn và kết quả xử lý"
@@ -260,23 +260,16 @@ function IssueDetail({ id, onClose }: { id: string; onClose: () => void }) {
     <Modal
       visible
       animationType="slide"
+      statusBarTranslucent presentationStyle="fullScreen"
       onRequestClose={() => {
-        if (!busy) onClose();
+        if (!lock.current) onClose();
       }}
     >
-      <ScrollView contentContainerStyle={styles.detail} keyboardShouldPersistTaps="handled">
-        <AppText variant="h3" weight="bold">
-          Chi tiết yêu cầu #{id}
-        </AppText>
-        <View style={styles.row}>
-          <AppButton title="Đóng" variant="ghost" disabled={busy} onPress={onClose} />
-          <AppButton
-            title="Tải lại"
-            variant="outline"
-            disabled={busy || loading}
-            onPress={refresh}
-          />
-        </View>
+      <ScreenContainer edges={['left', 'right', 'bottom']}>
+        <AppHeader title={`Chi tiết yêu cầu #${id}`} showBack backDisabled={busy}
+          onBack={() => { if (!lock.current) onClose(); }}
+          rightAction={<AppButton title="Tải lại" size="sm" variant="ghost" disabled={busy || loading} onPress={refresh} />} />
+        <ScrollView contentContainerStyle={styles.detail} keyboardShouldPersistTaps="handled">
         {loading && <ActivityIndicator />}
         {!!error && <AppText color={theme.colors.error.dark}>{error}</AppText>}
         {!!notice && <AppText color={theme.colors.success.dark}>{notice}</AppText>}
@@ -429,13 +422,14 @@ function IssueDetail({ id, onClose }: { id: string; onClose: () => void }) {
             )}
           </>
         )}
-      </ScrollView>
+        </ScrollView>
+      </ScreenContainer>
     </Modal>
   );
 }
 const styles = StyleSheet.create({
   content: { padding: 16, gap: 16, paddingBottom: 40 },
-  detail: { padding: 20, paddingTop: 56, paddingBottom: 48, gap: 16 },
+  detail: { padding: 20, paddingBottom: 48, gap: 16 },
   card: { padding: 16, gap: 10 },
   filters: { flexShrink: 0, paddingHorizontal: 12, paddingBottom: 8 },
   row: { flexDirection: 'row', gap: 8 },

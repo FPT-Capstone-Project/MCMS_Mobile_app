@@ -184,16 +184,12 @@ export const API_ENDPOINTS = {
       `/api/cultivation-sessions/admin/${sessionId}`,
     ADMIN_PROGRESS: (sessionId: number | string) =>
       `/api/cultivation-sessions/admin/${sessionId}/progress`,
-    ADMIN_GROWTH: (sessionId: number | string) =>
-      `/api/cultivation-sessions/admin/${sessionId}/growth`,
     ADMIN_HARVEST_READINESS: (sessionId: number | string) =>
       `/api/cultivation-sessions/admin/${sessionId}/harvest-readiness`,
     ADMIN_AVAILABLE_TRAYS: (floorId: number | string) =>
       `/api/cultivation-sessions/admin/available-trays?floorId=${floorId}`,
     ADMIN_ASSIGN_TRAYS: (sessionId: number | string) =>
       `/api/cultivation-sessions/admin/${sessionId}/trays`,
-    ADMIN_SESSION_TRAY_INSPECTION: (sessionTrayId: number | string) =>
-      `/api/cultivation-sessions/admin/session-trays/${sessionTrayId}/inspections`,
     ADMIN_INSPECTION_IMAGES: (inspectionId: number | string) =>
       `/api/cultivation-sessions/admin/inspections/${inspectionId}/images`,
     DAILY_INSPECTIONS: (sessionId: number | string) =>

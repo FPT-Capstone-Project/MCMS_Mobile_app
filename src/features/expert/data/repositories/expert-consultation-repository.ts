@@ -15,6 +15,10 @@ interface PaginationResponse {
 }
 
 export class ExpertConsultationRepository {
+  async close(id: string | number, diagnosis: string) {
+    await axiosClient.patch(`${API_ENDPOINTS.EXPERT.CONSULTATION(id)}/close`, { diagnosis });
+  }
+
   async listConsultations(page = 1, pageSize = 100): Promise<ExpertConsultationPage> {
     const response = await axiosClient.get<{
       data: ExpertConsultation[];

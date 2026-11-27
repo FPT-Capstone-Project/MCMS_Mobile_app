@@ -30,6 +30,15 @@ export const operatorConsultationRepository = {
     );
     return response.data.data;
   },
+  async requestForQrIssue(issueId: number, question: string) {
+    try {
+      await this.request(issueId, question);
+    } catch (error) {
+      // The server may have accepted the consultation before the connection dropped.
+      const issue = await axiosClient.get<{ data: ExpertIssue }>(endpoints.ISSUE(issueId)).catch(() => null);
+      if (!issue?.data.data.latest_consultation_id) throw error;
+    }
+  },
   async addMessage(id: number | string, message: string) {
     await axiosClient.post(endpoints.MESSAGES(id), { message });
   },

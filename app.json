@@ -32,6 +32,7 @@
       ],
       "expo-font",
       "expo-video",
+      ["expo-camera", { "cameraPermission": "Cho phép quét mã QR khay và chụp ảnh minh chứng.", "recordAudioAndroid": false, "microphonePermission": false }],
       "expo-asset",
       "expo-image",
       [

@@ -1,3 +1,5 @@
+import { trayQr, type GrowthOverview } from '../../data/trayQr';
+import { GROWTH_STAGE_LABELS } from '../../../../core/constants/growthStages';
 import { AppModal as Modal } from '../../../../shared/components/feedback/AppDialog';
 import { cultivationNote } from '../../domain/cultivationNotes';
 import { statusLabel } from '../../domain/sessionWorkflow';
@@ -13,7 +15,6 @@ import {
 import { theme } from '../../../../core/theme';
 import {
   CultivationSessionAdmin,
-  ProgressHistoryItem,
   SessionProgressResponse,
 } from '../../../iot/domain/entities/Iot';
 import { iotRepository } from '../../../iot/data/repositories/IotRepository';
@@ -24,14 +25,14 @@ import {
   AppIconButton,
   AppText,
 } from '../../../../shared/components';
-import { formatVietnameseDisplayDate } from './GrowthUpdateModal';
+import { formatVietnameseDisplayDate } from '../../domain/displayDate';
 
 interface SessionDetailModalProps {
   visible: boolean;
   onClose: () => void;
   session: CultivationSessionAdmin | null;
   onRefreshParent?: () => Promise<void> | void;
-  onOpenGrowthUpdate?: (session: CultivationSessionAdmin, latestProgress?: ProgressHistoryItem | null) => void;
+  onOpenGrowthUpdate?: (session: CultivationSessionAdmin) => void;
   onOpenHarvestReadiness?: (session: CultivationSessionAdmin) => void;
   onOpenHarvestAction?: (session: CultivationSessionAdmin) => void;
   onOpenSpawnInspection?: (session: CultivationSessionAdmin) => void;
@@ -97,7 +98,7 @@ const SessionDetailModalContent: React.FC<{
   onClose: () => void;
   session: CultivationSessionAdmin;
   onRefreshParent?: () => Promise<void> | void;
-  onOpenGrowthUpdate?: (session: CultivationSessionAdmin, latestProgress?: ProgressHistoryItem | null) => void;
+  onOpenGrowthUpdate?: (session: CultivationSessionAdmin) => void;
   onOpenHarvestReadiness?: (session: CultivationSessionAdmin) => void;
   onOpenHarvestAction?: (session: CultivationSessionAdmin) => void;
   onOpenSpawnInspection?: (session: CultivationSessionAdmin) => void;
@@ -122,6 +123,7 @@ const SessionDetailModalContent: React.FC<{
 }) => {
   const [loading, setLoading] = useState(true);
   const [sessionDetail, setSessionDetail] = useState<CultivationSessionAdmin | null>(null);
+  const [overview, setOverview] = useState<GrowthOverview | null>(null);
   const [progressData, setProgressData] = useState<SessionProgressResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -147,6 +149,7 @@ const SessionDetailModalContent: React.FC<{
         }
       }
 
+      setOverview(await trayQr.overview(session.session_id).catch(() => null));
       // 2. Fetch progress history
       try {
         const prog = await iotRepository.getSessionProgress(session.session_id);
@@ -308,6 +311,12 @@ const SessionDetailModalContent: React.FC<{
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
+            {!loading && !!overview?.trays.length && <AppCard variant="outlined">
+              <AppText weight="bold">Sinh trưởng từng khay</AppText>
+              <AppText>{overview.synchronization.updated_trays}/{overview.synchronization.total_trays} khay đã cập nhật · {overview.synchronization.is_synchronized ? 'Cùng giai đoạn' : 'Chưa đồng bộ'}</AppText>
+              {overview.trays.map(t => <AppText key={t.tray_id}>{t.tray_code} · {t.growth_status ? GROWTH_STAGE_LABELS[t.growth_status] : 'Chưa ghi nhận'}</AppText>)}
+            </AppCard>}
+
             {loading ? (
               <View style={styles.centerBox}>
                 <ActivityIndicator size="large" color={theme.colors.primary[600]} />
@@ -530,7 +539,7 @@ const SessionDetailModalContent: React.FC<{
                       </AppText>
                       {hasAssignedTrays && (
                         <AppText variant="caption" color={theme.colors.text.muted}>
-                          Chạm để chọn khay báo cáo
+                          Chọn khay để lọc lịch sử
                         </AppText>
                       )}
                     </View>
@@ -598,7 +607,7 @@ const SessionDetailModalContent: React.FC<{
                   {/* Actions for Daily Tray Report */}
                   <View style={styles.sectionButtonsRow}>
                     <AppButton
-                      title={hasAssignedTrays ? 'Tạo báo cáo khay' : 'Chưa gán khay'}
+                      title={hasAssignedTrays ? 'Báo cáo sự cố' : 'Chưa gán khay'}
                       variant="primary"
                       size="sm"
                       leftIcon={<Ionicons name="camera" size={16} color="#FFFFFF" />}
@@ -606,7 +615,7 @@ const SessionDetailModalContent: React.FC<{
                       onPress={() => {
                         if (!hasAssignedTrays) return;
                         onClose();
-                        onOpenDailyTrayInspection?.(current, selectedSessionTrayId);
+                        onOpenDailyTrayInspection?.(current);
                       }}
                       style={{ flex: 1 }}
                     />
@@ -764,7 +773,7 @@ const SessionDetailModalContent: React.FC<{
                 {/* Primary Daily Report row */}
                 <View style={styles.footerActionRow}>
                   <AppButton
-                    title="Báo cáo khay"
+                    title="Báo cáo sự cố"
                     variant="primary"
                     size="sm"
                     leftIcon={<Ionicons name="camera" size={16} color="#FFFFFF" />}
@@ -772,7 +781,7 @@ const SessionDetailModalContent: React.FC<{
                     onPress={() => {
                       if (!hasAssignedTrays) return;
                       onClose();
-                      onOpenDailyTrayInspection?.(current, selectedSessionTrayId);
+                      onOpenDailyTrayInspection?.(current);
                     }}
                     style={{ flex: 1 }}
                   />
@@ -800,31 +809,7 @@ const SessionDetailModalContent: React.FC<{
                       leftIcon={<Ionicons name="trending-up" size={16} color={theme.colors.primary[600]} />}
                       onPress={() => {
                         onClose();
-                        const latestProg: ProgressHistoryItem | null =
-                          progressData?.latest_progress ||
-                          (progressData
-                            ? {
-                                progress_id: 0,
-                                session_id: current.session_id,
-                                current_stage: (progressData.current_stage ||
-                                  progressData.growth_status ||
-                                  current.current_stage ||
-                                  current.growth_status ||
-                                  'FRUITING_INITIATION') as string,
-                                progress_percent:
-                                  progressData.progress_percent != null
-                                    ? Number(progressData.progress_percent)
-                                    : current.progress_percent != null
-                                    ? Number(current.progress_percent)
-                                    : 0,
-                                condition: formatConditionLabel(progressData.condition || current.condition),
-                                description: '',
-                                expected_harvest_date:
-                                  progressData.expected_harvest_date || current.harvest_date,
-                                created_at: new Date().toISOString(),
-                              }
-                            : null);
-                        onOpenGrowthUpdate(current, latestProg);
+                        onOpenGrowthUpdate(current);
                       }}
                       style={{ flex: 1 }}
                     />

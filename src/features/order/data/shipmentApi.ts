@@ -71,10 +71,14 @@ export const shipmentApi = baseApi.injectEndpoints({
         { type: 'Shipment', id: 'LIST' },
       ],
     }),
-    confirmDeliveryReceipt: builder.mutation<void, { orderId: number; requestId: number }>({
-      query: ({ requestId }) => ({
-        url: API_ENDPOINTS.HARVEST_REQUESTS.COMPLETE(requestId),
-        method: 'POST',
+    cancelHarvestRequest: builder.mutation<void, number>({
+      query: id => ({ url: `/api/harvest-requests/${id}/cancel`, method: 'PATCH' }),
+      invalidatesTags: ['Order', 'IoT'],
+    }),
+    confirmDeliveryReceipt: builder.mutation<void, { orderId: number; shipmentId: number }>({
+      query: ({ shipmentId }) => ({
+        url: `/api/shipments/${shipmentId}/confirm-received`,
+        method: 'PATCH',
       }),
       invalidatesTags: (_result, _error, { orderId }) => [
         { type: 'Shipment', id: orderId },
@@ -95,4 +99,5 @@ export const {
   useUpdateShipmentDetailsMutation,
   useCreateShipmentMutation,
   useConfirmDeliveryReceiptMutation,
+  useCancelHarvestRequestMutation,
 } = shipmentApi;

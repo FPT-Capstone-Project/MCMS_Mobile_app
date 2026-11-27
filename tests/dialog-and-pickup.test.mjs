@@ -49,11 +49,15 @@ test('customers can confirm receipt only for eligible sessions with a shipment',
   };
   assert.equal(shipmentDomain.canCustomerConfirmDeliveryReceipt(session, []), false);
   assert.equal(shipmentDomain.canCustomerConfirmDeliveryReceipt(session, [
-    { shipment_id: 2, status: 'PENDING' },
+    { shipment_id: 2, harvest_request_id: 12, status: 'PENDING' },
+    { shipment_id: 3, harvest_request_id: 13, status: 'DELIVERED' },
   ]), true);
   assert.equal(shipmentDomain.canCustomerConfirmDeliveryReceipt(session, [
-    { shipment_id: 2, status: 'DELIVERED' },
-  ]), true);
+    { shipment_id: 3, harvest_request_id: 13, status: 'PENDING' },
+  ]), false);
+  assert.equal(shipmentDomain.canCustomerConfirmDeliveryReceipt(session, [
+    { shipment_id: 2, harvest_request_id: 12, status: 'DELIVERED' },
+  ]), false);
   assert.equal(shipmentDomain.canCustomerConfirmDeliveryReceipt(session, [
     { shipment_id: 2, status: 'RETURNED' },
   ]), false);
@@ -155,7 +159,7 @@ const { completeDeliveryReceiving } = loadTypeScript('../src/features/order/doma
 
 test('shipment transitions move forward and terminal attempts cannot be reopened', () => {
   assert.deepEqual(shipmentDomain.nextShipmentStatuses('PENDING'), ['SHIPPED', 'CANCELLED']);
-  assert.deepEqual(shipmentDomain.nextShipmentStatuses('SHIPPED'), ['DELIVERED', 'RETURNED']);
+  assert.deepEqual(shipmentDomain.nextShipmentStatuses('SHIPPED'), ['RETURNED']);
   assert.deepEqual(shipmentDomain.nextShipmentStatuses('DELIVERED'), ['RETURNED']);
   for (const status of ['CANCELLED', 'RETURNED', 'UNKNOWN', 'toString']) {
     assert.deepEqual(shipmentDomain.nextShipmentStatuses(status), []);

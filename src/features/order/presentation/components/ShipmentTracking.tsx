@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { DateTimePicker } from '@expo/ui/community/datetime-picker';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { theme } from '../../../../core/theme';
 import { formatVND } from '../../../../core/utils/currency';
@@ -22,13 +22,8 @@ import {
   ShipmentStatus,
 } from '../../domain/shipment';
 
-import { completeDeliveryReceiving } from '../../domain/completeDelivery';
-import { iotRepository } from '../../../iot/data/repositories/IotRepository';
-import { useAppDispatch } from '../../../../app/store';
-import { baseApi } from '../../../../core/api/baseApi';
-
 /** Lazy-load order-level tracking only when the user opens the sheet. */
-export function ShipmentTrackingButton({ orderId }: { orderId: number }) {
+export function ShipmentTrackingButton({ orderId, cultivationOrder = false }: { orderId: number; cultivationOrder?: boolean }) {
   const [visible, setVisible] = useState(false);
   return (
     <>
@@ -48,7 +43,7 @@ export function ShipmentTrackingButton({ orderId }: { orderId: number }) {
             style={{ maxHeight: 520, flexShrink: 1 }}
             contentContainerStyle={{ paddingBottom: 16 }}
           >
-            <ShipmentTracking orderId={orderId} />
+            <ShipmentTracking orderId={orderId} cultivationOrder={cultivationOrder} />
           </ScrollView>
         </AppBottomSheet>
       )}
@@ -56,13 +51,7 @@ export function ShipmentTrackingButton({ orderId }: { orderId: number }) {
   );
 }
 
-export function ShipmentTracking({ orderId, disabled = false, onCompleted }: { orderId: number; disabled?: boolean; onCompleted?: () => Promise<void> | void }) {
-  const dispatch = useAppDispatch();
-  const [syncing, setSyncing] = useState(false);
-  const [syncError, setSyncError] = useState(false);
-  const syncingRef = useRef(false);
-  const onCompletedRef = useRef(onCompleted);
-  useEffect(() => { onCompletedRef.current = onCompleted; }, [onCompleted]);
+export function ShipmentTracking({ orderId, disabled = false, cultivationOrder = false }: { orderId: number; disabled?: boolean; cultivationOrder?: boolean }) {
   const { user } = useAuth();
   const canManage = user?.role === 'ADMIN' || user?.role === 'FARM_OPERATOR';
   const { currentData: shipments, isFetching, isError, refetch } = useGetOrderShipmentsQuery(
@@ -85,43 +74,16 @@ export function ShipmentTracking({ orderId, disabled = false, onCompleted }: { o
   const [editShippingFee, setEditShippingFee] = useState('');
   const [editShippedAt, setEditShippedAt] = useState('');
   const [editDeliveredAt, setEditDeliveredAt] = useState('');
-  const [deliveredAtDraft, setDeliveredAtDraft] = useState('');
   const busyRef = useRef(false);
-  const busy = syncing || disabled || isFetching || updateState.isLoading ||
+  const busy = disabled || isFetching || updateState.isLoading ||
     createState.isLoading || detailsState.isLoading;
   const latest = latestShipment(shipments || []);
-
-  const syncDelivery = useCallback(async () => {
-    if (syncingRef.current) return;
-    syncingRef.current = true;
-    setSyncing(true);
-    setSyncError(false);
-    try {
-      const fresh = await refetch().unwrap();
-      if (latestShipment(fresh)?.status !== 'DELIVERED') return;
-      const completed = await completeDeliveryReceiving(orderId, iotRepository);
-      dispatch(baseApi.util.invalidateTags(['Order', 'IoT', 'Tray', 'Notification']));
-      if (completed > 0) await onCompletedRef.current?.();
-    } catch {
-      setSyncError(true);
-    } finally {
-      syncingRef.current = false;
-      setSyncing(false);
-    }
-  }, [dispatch, orderId, refetch]);
-
-  useEffect(() => {
-    if (!canManage || latest?.status !== 'DELIVERED') return;
-    const timer = setTimeout(() => { void syncDelivery(); }, 0);
-    return () => clearTimeout(timer);
-  }, [canManage, latest?.shipment_id, latest?.status, syncDelivery]);
 
   const toggleStatusEditor = (shipment: Shipment) => {
     if (editingId === shipment.shipment_id) {
       setEditingId(null);
       return;
     }
-    setDeliveredAtDraft(formatDateTimeInput(shipment.delivered_at || new Date().toISOString()));
     setEditingId(shipment.shipment_id);
   };
 
@@ -140,14 +102,8 @@ export function ShipmentTracking({ orderId, disabled = false, onCompleted }: { o
 
   const confirmStatus = (shipment: Shipment, status: ShipmentStatus) => {
     if (!nextShipmentStatuses(shipment.status).includes(status)) return;
-    const deliveredAt = status === 'DELIVERED' ? parseDateTimeInput(deliveredAtDraft) : null;
-    if (status === 'DELIVERED' && !deliveredAt) {
-      AppAlert.alert('Chưa chọn thời gian', 'Vui lòng chọn thời gian giao hàng thành công.');
-      return;
-    }
     AppAlert.alert('Cập nhật giao hàng',
       `Chuyển vận đơn #${shipment.shipment_id} từ “${shipmentLabel(shipment.status)}” sang “${shipmentLabel(status)}”?` +
-      (status === 'DELIVERED' ? '\nChỉ xác nhận khi khách đã nhận hàng. Ứng dụng sẽ tự xác nhận nhận nấm và hoàn thành các phiên giao hàng đã thu hoạch xong trong đơn này.' : '') +
       (status === 'RETURNED' ? '\nHoàn hàng là hàng được trả về, không đồng nghĩa đã hoàn tiền cho khách.' : ''),
       [{ text: 'Quay lại', style: 'cancel' }, { text: 'Xác nhận', onPress: async () => {
         if (busyRef.current || busy) return;
@@ -163,7 +119,6 @@ export function ShipmentTracking({ orderId, disabled = false, onCompleted }: { o
             orderId,
             shipmentId: shipment.shipment_id,
             status,
-            ...(deliveredAt ? { deliveredAt } : {}),
           }).unwrap();
           setEditingId(null);
           AppAlert.alert('Đã cập nhật', `Vận đơn #${shipment.shipment_id}: ${shipmentLabel(status)}.`);
@@ -231,17 +186,9 @@ export function ShipmentTracking({ orderId, disabled = false, onCompleted }: { o
                 trackingCode: editTrackingCode.trim() || null,
                 shippingFee: fee,
                 shippedAt,
-                ...(deliveredAt ? { deliveredAt } : {}),
               }).unwrap();
               setEditingDetailsId(null);
-              setEditingId(
-                nextShipmentStatuses(shipment.status).includes('DELIVERED')
-                  ? shipment.shipment_id
-                  : null,
-              );
-              if (nextShipmentStatuses(shipment.status).includes('DELIVERED')) {
-                setDeliveredAtDraft(formatDateTimeInput(new Date().toISOString()));
-              }
+              setEditingId(null);
               AppAlert.alert(
                 'Đã cập nhật',
                 'Thông tin vận đơn đã được lưu. Trạng thái giao hàng được giữ nguyên.',
@@ -299,23 +246,13 @@ export function ShipmentTracking({ orderId, disabled = false, onCompleted }: { o
         <AppText weight="bold" style={{ flex: 1 }}>Vận đơn giao hàng</AppText>
         <AppButton title="Tải lại" variant="ghost" size="sm" disabled={busy} onPress={() => { void refetch(); }} />
       </View>
-      {canManage ? (
-        <AppText variant="caption" color={theme.colors.text.secondary}>Theo dõi theo đơn hàng; một vận đơn có thể dùng chung cho nhiều phiên.</AppText>
-      ) : null}
-      {(isFetching || syncing) && <ActivityIndicator color={theme.colors.primary[600]} />}
-      {syncing && <AppText variant="caption">Đang hoàn tất các phiên giao hàng...</AppText>}
-      {canManage && syncError && latest?.status === 'DELIVERED' && (
-        <View style={styles.container}>
-          <AppText color={theme.colors.error.main}>Đã ghi nhận giao hàng thành công nhưng chưa hoàn tất đồng bộ phiên. Vui lòng thử lại.</AppText>
-          <AppButton title="Thử lại hoàn tất phiên" disabled={busy} onPress={() => { void syncDelivery(); }} />
-        </View>
-      )}
+      {isFetching && <ActivityIndicator color={theme.colors.primary[600]} />}
       {isError ? (
         <AppText color={theme.colors.error.main}>Chưa tải được trạng thái giao hàng. Bấm Tải lại để thử lại.</AppText>
       ) : shipments?.length === 0 ? (
-        <AppText color={theme.colors.text.secondary}>Chưa có vận đơn. Vận đơn được tạo khi lưu phương thức giao hàng tận nhà. Khách đến nhận tại nông trại không cần vận đơn.</AppText>
+        <AppText color={theme.colors.text.secondary}>Chưa có vận đơn. Với đơn thu hoạch, vận đơn được tạo khi trang trại hoàn tất thu hoạch. Khách đến nhận tại nông trại không cần vận đơn.</AppText>
       ) : null}
-      {!isError && shipments?.length === 0 && canManage && (
+      {!isError && shipments?.length === 0 && canManage && !cultivationOrder && (
         <View style={styles.container}>
           <AppButton title={showCreate ? 'Đóng biểu mẫu' : 'Bổ sung vận đơn cho đơn giao tận nhà'} variant="outline" disabled={busy} onPress={() => setShowCreate(!showCreate)} />
           {showCreate && <>
@@ -339,6 +276,7 @@ export function ShipmentTracking({ orderId, disabled = false, onCompleted }: { o
           {shipment.status === 'CANCELLED' && <AppText variant="caption">Vận đơn đã hủy; không có nghĩa là đơn nuôi trồng đã bị hủy.</AppText>}
           <AppText>{shipment.recipient_name} · {shipment.recipient_phone}</AppText>
           <AppText color={theme.colors.text.secondary}>{shipment.address}</AppText>
+          {!!shipment.harvest_request_id && shipment.status === 'PENDING' && <AppText>Chờ khách xác nhận đã nhận nấm · Yêu cầu #{shipment.harvest_request_id}</AppText>}
           {canManage ? (
             <>
               <AppText variant="caption">Đơn vị vận chuyển: {shipment.carrier || 'Chưa cập nhật'}</AppText>
@@ -348,7 +286,7 @@ export function ShipmentTracking({ orderId, disabled = false, onCompleted }: { o
           <AppText variant="caption">Phí giao hàng: {formatVND(Number(shipment.shipping_fee))}</AppText>
           {shipment.shipped_at && <AppText variant="caption">Bàn giao vận chuyển: {formatTimestamp(shipment.shipped_at)}</AppText>}
           {shipment.delivered_at && <AppText variant="caption">{shipment.status === 'RETURNED' ? 'Lần giao trước' : 'Đã giao lúc'}: {formatTimestamp(shipment.delivered_at)}</AppText>}
-          {canManage && shipment.shipment_id === latest?.shipment_id && (
+          {canManage && !cultivationOrder && !shipment.harvest_request_id && shipment.shipment_id === latest?.shipment_id && (
             <>
               <AppButton
                 title={editingDetailsId === shipment.shipment_id ? 'Đóng cập nhật thông tin' : 'Cập nhật thông tin vận đơn'}
@@ -393,17 +331,9 @@ export function ShipmentTracking({ orderId, disabled = false, onCompleted }: { o
               {editingId === shipment.shipment_id && (
                 <View style={styles.container}>
                   <AppText variant="caption">Chọn trạng thái theo kết quả giao hàng thực tế:</AppText>
-                  {shipment.status === 'SHIPPED' && nextShipmentStatuses(shipment.status).includes('DELIVERED') && (
-                    <ShipmentDateTimeField
-                      label="Thời gian giao thành công"
-                      value={deliveredAtDraft}
-                      onChange={setDeliveredAtDraft}
-                      disabled={busy}
-                    />
-                  )}
                   {nextShipmentStatuses(shipment.status).map((status) => (
                     <AppButton key={status} title={shipmentLabel(status)} variant={status === 'CANCELLED' || status === 'RETURNED' ? 'danger' : 'secondary'}
-                      disabled={busy || (status === 'DELIVERED' && !parseDateTimeInput(deliveredAtDraft))}
+                      disabled={busy}
                       onPress={() => confirmStatus(shipment, status)} />
                   ))}
                 </View>

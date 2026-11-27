@@ -170,7 +170,7 @@ function DeliveryOrdersScreen({ headerAccessory }: { headerAccessory: React.Reac
                 </View>
               ))}
               {item.requests.some((request) => request.harvest_method === 'DELIVERY') ? (
-                <ShipmentTrackingButton orderId={item.orderId} />
+                <ShipmentTrackingButton cultivationOrder orderId={item.orderId} />
               ) : null}
             </AppCard>
           )}

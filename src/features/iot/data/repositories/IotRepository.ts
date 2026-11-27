@@ -27,7 +27,6 @@ import {
   RecordYieldRequest,
   SessionProgressResponse,
   SpawnInspection,
-  UpdateGrowthRequest,
   UpdateHarvestReadinessRequest,
 } from '../../domain/entities/Iot';
 
@@ -1217,36 +1216,6 @@ export class IotRepository {
   }
 
   /**
-   * Update growth stage, percent progress, observation condition and notes
-   * PATCH /api/cultivation-sessions/admin/:sessionId/growth
-   */
-  async updateSessionGrowth(
-    sessionId: number | string,
-    data: UpdateGrowthRequest
-  ): Promise<void> {
-    try {
-      const payload: Record<string, any> = {
-        growthStatus: data.growthStatus,
-        progressPercent: Number(data.progressPercent),
-        condition: data.condition.trim(),
-      };
-      if (data.notes?.trim()) {
-        payload.notes = data.notes.trim();
-      }
-      if (data.expectedHarvestDate?.trim()) {
-        payload.expectedHarvestDate = data.expectedHarvestDate.trim();
-      }
-
-      await axiosClient.patch(
-        API_ENDPOINTS.CULTIVATION_SESSIONS.ADMIN_GROWTH(sessionId),
-        payload
-      );
-    } catch (error) {
-      throw error instanceof AppError ? error : handleApiError(error);
-    }
-  }
-
-  /**
    * Assess and update harvest readiness (ready: true/false)
    * PATCH /api/cultivation-sessions/admin/:sessionId/harvest-readiness
    */
@@ -1276,11 +1245,11 @@ export class IotRepository {
    * POST /api/harvests
    * Body: { sessionId: number }
    */
-  async createHarvest(sessionId: number | string): Promise<HarvestItem> {
+  async createHarvest(sessionId: number | string, data: RecordYieldRequest): Promise<HarvestItem> {
     try {
       const response = await axiosClient.post<{ data: HarvestItem; message?: string } | HarvestItem>(
         API_ENDPOINTS.HARVESTS.CREATE,
-        { sessionId: Number(sessionId) }
+        { sessionId: Number(sessionId), ...data }
       );
       if ('data' in response.data && response.data.data) {
         return response.data.data;

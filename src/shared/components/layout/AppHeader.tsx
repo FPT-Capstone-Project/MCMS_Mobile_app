@@ -14,6 +14,7 @@ export interface AppHeaderProps {
   showHome?: boolean;
   showBack?: boolean;
   onBack?: () => void;
+  backDisabled?: boolean;
   leftAction?: ReactNode;
   rightAction?: ReactNode;
   transparent?: boolean;
@@ -26,6 +27,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   subtitle,
   showHome = true,
   showBack = false,
+  backDisabled = false,
   onBack,
   leftAction,
   rightAction,
@@ -94,6 +96,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                   color={theme.colors.text.primary}
                 />
               }
+              disabled={backDisabled}
               onPress={handleBack}
               accessibilityLabel="Quay lại"
               size="sm"
