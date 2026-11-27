@@ -2,7 +2,7 @@ import { AppAlert as Alert, AppModal as Modal } from '../../../../shared/compone
 import { ShipmentTracking } from '../../../order/presentation/components/ShipmentTracking';
 import { canTrackSessionShipment } from '../../../order/domain/shipment';
 import { PickupSchedulePicker } from '../../../order/presentation/components/PickupSchedulePicker';
-import { canCustomerUpdateHarvestMethod, getCustomerPickupDateKeys, getCustomerPickupTimeOptions, getVietnamDateKey } from '../../../order/domain/harvestSchedule';
+import { getCustomerPickupDateKeys, getCustomerPickupTimeOptions, getVietnamDateKey } from '../../../order/domain/harvestSchedule';
 import { receivingBlocker, parsePickupTime, harvestError } from '../../domain/harvestReceiving';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -120,8 +120,8 @@ const HarvestActionModalContent: React.FC<{
   const isPickup = (receiving?.harvest_method || harvest?.harvest_method) === 'PICKUP';
   const isDelivery = (receiving?.harvest_method || harvest?.harvest_method) === 'DELIVERY';
   const [deliveryAddress, setDeliveryAddress] = useState('');
-  const canEditReceiving = !canCustomerUpdateHarvestMethod(session.harvest_ready_at);
-  const dateOptions = getCustomerPickupDateKeys(new Date().toISOString());
+  const canEditReceiving = !!receiving?.harvest_request_id && !harvest && !['CANCELLED', 'COMPLETED'].includes(receiving.harvest_request_status ?? '');
+  const dateOptions = getCustomerPickupDateKeys(session.harvest_ready_at);
   const [receivingMethod, setReceivingMethod] = useState<'PICKUP' | 'DELIVERY' | null>(null);
   const [pickupDate, setPickupDate] = useState('');
   const [pickupTime, setPickupTime] = useState('');
@@ -214,10 +214,9 @@ const HarvestActionModalContent: React.FC<{
     if (!receivingMethod || actionLoading || !canEditReceiving) return;
     const scheduledAt = receivingMethod === 'PICKUP' ? parsePickupTime(pickupDate, pickupTime) : undefined;
     if (receivingMethod === 'PICKUP' && (!scheduledAt || !dateKey || !dateOptions.includes(dateKey) || Date.parse(scheduledAt) <= new Date().getTime() || !getCustomerPickupTimeOptions(dateKey).includes(pickupTime))) {
-      Alert.alert('Lịch hẹn chưa hợp lệ', 'Chọn ngày từ hôm nay đến 3 ngày tới, giờ từ 07:00 đến 17:00 theo mốc 15 phút và sau thời điểm hiện tại.');
+      Alert.alert('Lịch hẹn chưa hợp lệ', 'Chọn ngày trong vòng 3 ngày từ khi phiên sẵn sàng, giờ từ 07:00 đến 17:00 theo mốc 15 phút và sau thời điểm hiện tại.');
       return;
     }
-    if (receivingMethod === 'DELIVERY' && !deliveryAddress.trim()) { Alert.alert('Thiếu địa chỉ', 'Vui lòng nhập địa chỉ giao hàng.'); return; }
     setActionLoading(true); setErrorMessage(null);
     try {
       await iotRepository.saveHarvestReceiving(session.session_id, receiving?.harvest_request_id, {
@@ -240,9 +239,8 @@ const HarvestActionModalContent: React.FC<{
     setActionLoading(true);
     setErrorMessage(null);
     try {
-      const planned = harvest || await iotRepository.createHarvest(session.session_id);
-      setHarvest(planned);
-      const harvestId = planned.harvest_id;
+      if (!harvest) return;
+      const harvestId = harvest.harvest_id;
       await iotRepository.startHarvest(harvestId);
       Alert.alert(
         'Bắt đầu thu hoạch',
@@ -261,9 +259,7 @@ const HarvestActionModalContent: React.FC<{
 
   // 3. Record Yield
   const handleRecordYield = async () => {
-    if (!harvest) return;
-    const harvestId = harvest.harvest_id || (harvest as any).id;
-
+    if (actionLoading || (!harvest && (blocker || receivingChanged))) return;
     const total = parseFloat(totalWeight.replace(',', '.'));
     const usable = parseFloat(usableWeight.replace(',', '.'));
     const rejected = parseFloat(rejectedWeight.replace(',', '.'));
@@ -293,13 +289,15 @@ const HarvestActionModalContent: React.FC<{
     setActionLoading(true);
     setErrorMessage(null);
     try {
-      await iotRepository.recordHarvestYield(harvestId, {
+      const weights = {
         totalWeightKg: total,
         usableWeightKg: usable,
         rejectedWeightKg: rejected,
         qualityGrade: qualityGrade.trim().toUpperCase() || undefined,
         notes: yieldNotes.trim() || undefined,
-      });
+      };
+      if (harvest) await iotRepository.recordHarvestYield(harvest.harvest_id, weights);
+      else setHarvest(await iotRepository.createHarvest(session.session_id, weights));
 
       Alert.alert('Thành công', 'Đã ghi nhận sản lượng thực tế thành công.');
       await fetchHarvestInfo();
@@ -325,7 +323,7 @@ const HarvestActionModalContent: React.FC<{
 
     Alert.alert(
       'Xác nhận hoàn thành thu hoạch',
-      `Bạn có chắc chắn muốn kết thúc đợt thu hoạch #${harvestId}? Sau khi hoàn thành, nhân viên sẽ tiến hành bàn giao nông sản cho khách hàng.`,
+      `Bạn có chắc chắn muốn kết thúc đợt thu hoạch #${harvestId}? Nếu khách đến nhận, thao tác này xác nhận bàn giao. Nếu giao tận nơi, hệ thống sẽ tạo vận đơn.`,
       [
         { text: 'Kiểm tra lại', style: 'cancel' },
         {
@@ -338,7 +336,7 @@ const HarvestActionModalContent: React.FC<{
               await iotRepository.completeHarvest(harvestId);
               Alert.alert(
                 'Hoàn thành thu hoạch',
-                `Đợt thu hoạch #${harvestId} đã hoàn thành. Vui lòng thực hiện thủ tục bàn giao nông sản cho khách.`
+                `Đợt thu hoạch #${harvestId} đã hoàn thành. ${isPickup ? 'Đã xác nhận bàn giao cho khách.' : 'Đã tạo vận đơn chờ khách xác nhận.'}`
               );
               await fetchHarvestInfo();
               await onSuccess();
@@ -483,7 +481,7 @@ const HarvestActionModalContent: React.FC<{
                         <AppButton title="Khách đến nhận tại nông trại" variant={receivingMethod === 'PICKUP' ? 'primary' : 'outline'} disabled={actionLoading} onPress={() => setReceivingMethod('PICKUP')} />
                         <AppButton title="Giao hàng tận nơi" variant={receivingMethod === 'DELIVERY' ? 'primary' : 'outline'} disabled={actionLoading} onPress={() => setReceivingMethod('DELIVERY')} />
                         {receivingMethod === 'PICKUP' && <>
-                          <AppText variant="caption">Chọn ngày từ hôm nay đến 3 ngày tới.</AppText>
+                          <AppText variant="caption">Chọn ngày trong vòng 3 ngày từ khi phiên sẵn sàng.</AppText>
                           <PickupSchedulePicker
                             dates={dateOptions}
                             date={dateKey || ''}
@@ -500,75 +498,7 @@ const HarvestActionModalContent: React.FC<{
                         <AppButton title="Lưu phương thức nhận" variant="outline" loading={actionLoading} disabled={!receivingMethod} onPress={handleSaveReceiving} />
                       </View>
                     )}
-                {!harvest && !errorMessage && <AppButton title="Bắt đầu thu hoạch" loading={actionLoading} disabled={!!blocker || receivingChanged} onPress={handleStartHarvest} />}
-
-                {/* CASE 2: Harvest Exists */}
-                {harvest && (
-                  <View style={styles.harvestDetailBox}>
-                    {/* Harvest status summary */}
-                    <View style={styles.harvestStatusHeader}>
-                      <View>
-                        <AppText variant="bodySmall" weight="bold">
-                          Đợt thu hoạch #{harvest.harvest_id || (harvest as any).id}
-                        </AppText>
-                        <AppText variant="caption" color={theme.colors.text.muted}>
-                          Phương thức nhận: {harvest.harvest_method === 'PICKUP' ? 'Khách đến nhận tại nông trại' : harvest.harvest_method === 'DELIVERY' ? 'Giao hàng tận nơi' : 'Chưa chọn'}
-                        </AppText>
-                        {harvest.scheduled_at && (
-                          <AppText variant="caption" color={theme.colors.text.muted}>
-                            Lịch hẹn: {new Date(harvest.scheduled_at).toLocaleString('vi-VN')}
-                          </AppText>
-                        )}
-                      </View>
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          harvest.status === 'PLANNED'
-                            ? styles.badgePlanned
-                            : harvest.status === 'IN_PROGRESS'
-                            ? styles.badgeInProgress
-                            : styles.badgeCompleted,
-                        ]}
-                      >
-                        <AppText
-                          variant="caption"
-                          weight="bold"
-                          color={
-                            harvest.status === 'PLANNED'
-                              ? theme.colors.warning.dark
-                              : harvest.status === 'IN_PROGRESS'
-                              ? theme.colors.info.dark
-                              : theme.colors.success.dark
-                          }
-                        >
-                          {handoverCompleted ? 'Đã bàn giao' : formatHarvestActionStatus(harvest.status)}
-                        </AppText>
-                      </View>
-                    </View>
-
-                    <AppDivider spacing="sm" />
-
-                    {receivingChanged && !blocker && harvest.status === 'PLANNED' && <AppText color={theme.colors.warning.dark}>Có thay đổi chưa lưu. Bấm Lưu phương thức nhận để áp dụng.</AppText>}
-                    {!!blocker && harvest.status === 'PLANNED' && <AppText color={theme.colors.warning.dark}>{blocker}</AppText>}
-                    {/* SUB-STEP A: Start Harvest (if PLANNED) */}
-                    {harvest.status === 'PLANNED' && (
-                      <View style={styles.actionSection}>
-                        <AppText variant="caption" color={theme.colors.text.secondary}>
-                          Bắt đầu quy trình thu hoạch sẽ chuyển trạng thái phiên nuôi trồng sang Đang thu hoạch.
-                        </AppText>
-                        <AppButton
-                          title={actionLoading ? 'Đang khởi động...' : 'Bắt đầu thu hoạch ngay'}
-                          variant="primary"
-                          size="md"
-                          onPress={handleStartHarvest}
-                          disabled={actionLoading || !!blocker || receivingChanged}
-                          leftIcon={<Ionicons name="play" size={18} color="#FFFFFF" />}
-                        />
-                      </View>
-                    )}
-
-                    {/* SUB-STEP B: In Progress -> Yield Recording Form & Complete */}
-                    {harvest.status === 'IN_PROGRESS' && (
+                {(!harvest || (harvest.status === 'IN_PROGRESS' && harvest.total_weight_kg == null)) && !errorMessage && (
                       <View style={styles.yieldFormBox}>
                         <AppText variant="label" weight="bold" style={styles.sectionLabel}>
                           GHI NHẬN SẢN LƯỢNG THỰC TẾ
@@ -688,16 +618,85 @@ const HarvestActionModalContent: React.FC<{
                         </View>
 
                         <AppButton
-                          title={actionLoading ? 'Đang lưu...' : 'Lưu sản lượng'}
+                          title={actionLoading ? 'Đang lưu...' : 'Ghi nhận thu hoạch'}
                           variant="secondary"
                           size="sm"
                           onPress={handleRecordYield}
-                          disabled={actionLoading || !isYieldBalanced}
+                          disabled={actionLoading || !isYieldBalanced || !!blocker || receivingChanged}
                           leftIcon={<Ionicons name="save-outline" size={16} color={theme.colors.primary[600]} />}
                         />
 
-                        <AppDivider spacing="sm" />
+                      </View>
+                )}
 
+                {/* CASE 2: Harvest Exists */}
+                {harvest && (
+                  <View style={styles.harvestDetailBox}>
+                    {/* Harvest status summary */}
+                    <View style={styles.harvestStatusHeader}>
+                      <View>
+                        <AppText variant="bodySmall" weight="bold">
+                          Đợt thu hoạch #{harvest.harvest_id || (harvest as any).id}
+                        </AppText>
+                        <AppText variant="caption" color={theme.colors.text.muted}>
+                          Phương thức nhận: {harvest.harvest_method === 'PICKUP' ? 'Khách đến nhận tại nông trại' : harvest.harvest_method === 'DELIVERY' ? 'Giao hàng tận nơi' : 'Chưa chọn'}
+                        </AppText>
+                        {harvest.scheduled_at && (
+                          <AppText variant="caption" color={theme.colors.text.muted}>
+                            Lịch hẹn: {new Date(harvest.scheduled_at).toLocaleString('vi-VN')}
+                          </AppText>
+                        )}
+                      </View>
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          harvest.status === 'PLANNED'
+                            ? styles.badgePlanned
+                            : harvest.status === 'IN_PROGRESS'
+                            ? styles.badgeInProgress
+                            : styles.badgeCompleted,
+                        ]}
+                      >
+                        <AppText
+                          variant="caption"
+                          weight="bold"
+                          color={
+                            harvest.status === 'PLANNED'
+                              ? theme.colors.warning.dark
+                              : harvest.status === 'IN_PROGRESS'
+                              ? theme.colors.info.dark
+                              : theme.colors.success.dark
+                          }
+                        >
+                          {handoverCompleted ? 'Đã bàn giao' : formatHarvestActionStatus(harvest.status)}
+                        </AppText>
+                      </View>
+                    </View>
+
+                    <AppDivider spacing="sm" />
+
+                    {receivingChanged && !blocker && harvest.status === 'PLANNED' && <AppText color={theme.colors.warning.dark}>Có thay đổi chưa lưu. Bấm Lưu phương thức nhận để áp dụng.</AppText>}
+                    {!!blocker && harvest.status === 'PLANNED' && <AppText color={theme.colors.warning.dark}>{blocker}</AppText>}
+                    {/* SUB-STEP A: Start Harvest (if PLANNED) */}
+                    {harvest.status === 'PLANNED' && (
+                      <View style={styles.actionSection}>
+                        <AppText variant="caption" color={theme.colors.text.secondary}>
+                          Bắt đầu quy trình thu hoạch sẽ chuyển trạng thái phiên nuôi trồng sang Đang thu hoạch.
+                        </AppText>
+                        <AppButton
+                          title={actionLoading ? 'Đang khởi động...' : 'Bắt đầu thu hoạch ngay'}
+                          variant="primary"
+                          size="md"
+                          onPress={handleStartHarvest}
+                          disabled={actionLoading || !!blocker || receivingChanged}
+                          leftIcon={<Ionicons name="play" size={18} color="#FFFFFF" />}
+                        />
+                      </View>
+                    )}
+
+                    {/* SUB-STEP B: In Progress -> Yield Recording Form & Complete */}
+                    {harvest.status === 'IN_PROGRESS' && (
+                      <View>
                         {/* Complete Harvest */}
                         <View style={styles.completeBox}>
                           <AppText variant="caption" color={theme.colors.text.secondary}>
@@ -708,7 +707,7 @@ const HarvestActionModalContent: React.FC<{
                             variant="primary"
                             size="md"
                             onPress={handleCompleteHarvest}
-                            disabled={actionLoading || (!harvest.total_weight_kg && !isYieldBalanced)}
+                            disabled={actionLoading || harvest.total_weight_kg == null}
                             leftIcon={<Ionicons name="checkmark-done" size={18} color="#FFFFFF" />}
                           />
                         </View>
@@ -788,7 +787,7 @@ const HarvestActionModalContent: React.FC<{
 
             {isDelivery && deliveryOrderId && canTrackSessionShipment({ ...session, status: currentSessionStatus, harvest_status: harvest?.harvest_status ?? session.harvest_status }) ? (
               <View style={{ marginTop: 16 }}>
-                <ShipmentTracking orderId={deliveryOrderId} disabled={actionLoading} onCompleted={async () => { await fetchHarvestInfo(); await onSuccess(); }} />
+                <ShipmentTracking orderId={deliveryOrderId} disabled={actionLoading} cultivationOrder />
               </View>
             ) : null}
             <View style={{ height: 20 }} />

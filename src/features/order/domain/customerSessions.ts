@@ -19,7 +19,7 @@ export function customerCanChooseHarvestMethod(session: CustomerCultivationSessi
     customerSessionIsHarvestReady(session) &&
     !['COMPLETED', 'CANCELLED'].includes(status) &&
     session.harvest_request_status?.toUpperCase() !== 'COMPLETED' &&
-    !session.harvest_method
+    (!session.harvest_method || session.harvest_request_status === 'CANCELLED')
   );
 }
 

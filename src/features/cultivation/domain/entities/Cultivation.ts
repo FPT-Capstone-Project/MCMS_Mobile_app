@@ -129,12 +129,6 @@ export interface DailyTrayInspection {
   images: DailyTrayInspectionImage[];
 }
 
-export interface CreateDailyTrayInspectionRequest {
-  trayCondition: string;
-  mushroomCondition: string;
-  notes?: string;
-}
-
 export interface DailyInspectionHistoryResponse {
   session?: {
     sessionId: number;

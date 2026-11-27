@@ -36,7 +36,7 @@ export function HarvestReceivingModal({ visible, session, profileAddress, profil
   onConfirm: (data: { method: Method; address?: string; scheduledAt?: string }) => Promise<void>;
 }) {
   const [method, setMethod] = useState<Method | null>(null);
-  const [step, setStep] = useState<'phone' | 'choose' | 'address' | 'schedule' | 'review'>(profilePhone.trim() ? 'choose' : 'phone');
+  const [step, setStep] = useState<'phone' | 'choose' | 'address' | 'schedule' | 'review'>('choose');
   const [addressParts, setAddressParts] = useState(() => parseAddress(profileAddress));
   const [phone, setPhone] = useState(profilePhone);
   const [pickupDate, setPickupDate] = useState('');
@@ -46,7 +46,7 @@ export function HarvestReceivingModal({ visible, session, profileAddress, profil
 
   const close = () => {
     setMethod(null);
-    setStep(profilePhone.trim() ? 'choose' : 'phone');
+    setStep('choose');
     setAddressParts(parseAddress(profileAddress));
     setPhone(profilePhone);
     setPickupDate('');
@@ -66,7 +66,7 @@ export function HarvestReceivingModal({ visible, session, profileAddress, profil
     try {
       await onSavePhone(normalizedPhone);
       setPhone(normalizedPhone);
-      setStep('choose');
+      setStep('address');
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Không thể lưu số điện thoại. Vui lòng thử lại.');
     } finally {
@@ -89,7 +89,7 @@ export function HarvestReceivingModal({ visible, session, profileAddress, profil
       setPickupTime(existingDate === nextDate ? existingTime : '');
       setStep('schedule');
     } else {
-      setStep('address');
+      setStep(phone.trim() || profilePhone.trim() ? 'address' : 'phone');
     }
   };
 
@@ -140,7 +140,7 @@ export function HarvestReceivingModal({ visible, session, profileAddress, profil
           {step === 'phone' ? (
             <AppCard variant="outlined" style={styles.panel}>
               <AppText variant="bodySmall" color={theme.colors.text.secondary}>
-                Hồ sơ của bạn chưa có số điện thoại. Vui lòng bổ sung số điện thoại để tiếp tục chọn phương thức nhận hàng.
+                Hồ sơ của bạn chưa có số điện thoại. Vui lòng bổ sung số điện thoại để nhận nấm qua giao hàng.
               </AppText>
               <AppInput
                 label="Số điện thoại"

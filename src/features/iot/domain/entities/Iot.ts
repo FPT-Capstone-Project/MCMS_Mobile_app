@@ -272,14 +272,6 @@ export interface SessionProgressResponse {
   progress_history: ProgressHistoryItem[];
 }
 
-export interface UpdateGrowthRequest {
-  growthStatus: GrowthStage;
-  progressPercent: number;
-  condition: string;
-  notes?: string;
-  expectedHarvestDate?: string;
-}
-
 export interface UpdateHarvestReadinessRequest {
   harvestReady: boolean;
   notes?: string;

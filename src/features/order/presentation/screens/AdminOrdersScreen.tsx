@@ -17,12 +17,10 @@ import {
 import { theme } from '../../../../core/theme';
 import {
   CultivationSessionAdmin,
-  ProgressHistoryItem,
 } from '../../../iot/domain/entities/Iot';
 import { iotRepository } from '../../../iot/data/repositories/IotRepository';
 import { SpawnInspectionModal } from '../../../iot/presentation/components/SpawnInspectionModal';
 import { SpawnInspectionHistoryModal } from '../../../iot/presentation/components/SpawnInspectionHistoryModal';
-import { GrowthUpdateModal } from '../../../cultivation/presentation/components/GrowthUpdateModal';
 import { HarvestReadinessModal } from '../../../cultivation/presentation/components/HarvestReadinessModal';
 import { HarvestActionModal } from '../../../cultivation/presentation/components/HarvestActionModal';
 import { SessionDetailModal } from '../../../cultivation/presentation/components/SessionDetailModal';
@@ -111,9 +109,6 @@ export const AdminOrdersScreen: React.FC<{
   const [detailSession, setDetailSession] = useState<CultivationSessionAdmin | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
 
-  const [growthSession, setGrowthSession] = useState<CultivationSessionAdmin | null>(null);
-  const [latestProgressForGrowth, setLatestProgressForGrowth] = useState<ProgressHistoryItem | null>(null);
-  const [growthModalVisible, setGrowthModalVisible] = useState(false);
 
   const [readinessSession, setReadinessSession] = useState<CultivationSessionAdmin | null>(null);
   const [readinessModalVisible, setReadinessModalVisible] = useState(false);
@@ -124,6 +119,15 @@ export const AdminOrdersScreen: React.FC<{
   // Daily Tray Inspection Modals State
   const [dailyTraySession, setDailyTraySession] = useState<CultivationSessionAdmin | null>(null);
   const [dailyTraySessionTrayId, setDailyTraySessionTrayId] = useState<number | null>(null);
+  const [qrOrigin, setQrOrigin] = useState<'detail' | 'history' | null>(null);
+  const [initialQrAction, setInitialQrAction] = useState<'issue' | 'growth'>();
+  function openGrowthUpdate(target: CultivationSessionAdmin) {
+    setInitialQrAction('growth');
+    setDailyTraySession(target);
+    setDailyTraySessionTrayId(null);
+    setDailyTrayModalVisible(true);
+  }
+
   const [dailyTrayModalVisible, setDailyTrayModalVisible] = useState(false);
 
   const [dailyHistorySession, setDailyHistorySession] = useState<CultivationSessionAdmin | null>(null);
@@ -679,12 +683,13 @@ export const AdminOrdersScreen: React.FC<{
                         {/* Daily Tray Report Buttons */}
                         <View style={styles.spawnActionsSubrow}>
                           <AppButton style={styles.pairedAction} textStyle={{ flexShrink: 1 }}
-                            title="Báo cáo khay"
+                            title="Báo cáo sự cố"
                             variant="primary"
                             size="sm"
                             leftIcon={<Ionicons name="camera" size={16} color="#FFFFFF" />}
                             disabled={!session.trays || session.trays.length === 0}
                             onPress={() => {
+                              setInitialQrAction('issue');
                               setDailyTraySession(session);
                               setDailyTraySessionTrayId(null);
                               setDailyTrayModalVisible(true);
@@ -710,30 +715,7 @@ export const AdminOrdersScreen: React.FC<{
                             size="sm"
                             leftIcon={<Ionicons name="trending-up" size={16} color={theme.colors.primary[600]} />}
                             onPress={() => {
-                              setGrowthSession(session);
-                              const synthProg: ProgressHistoryItem | null =
-                                session.progress_percent != null || session.growth_status
-                                  ? {
-                                      progress_id: 0,
-                                      session_id: session.session_id,
-                                      current_stage: (session.current_stage ||
-                                        session.growth_status ||
-                                        'FRUITING_INITIATION') as string,
-                                      progress_percent:
-                                        session.progress_percent != null
-                                          ? Number(session.progress_percent)
-                                          : 0,
-                                      condition:
-                                        session.condition && session.condition !== 'NORMAL'
-                                          ? session.condition
-                                          : 'Bình thường, phát triển ổn định',
-                                      description: '',
-                                      expected_harvest_date: session.harvest_date,
-                                      created_at: new Date().toISOString(),
-                                    }
-                                  : null;
-                              setLatestProgressForGrowth(synthProg);
-                              setGrowthModalVisible(true);
+                              openGrowthUpdate(session);
                             }}
                           />
                           <AppButton style={styles.pairedAction} textStyle={{ flexShrink: 1 }}
@@ -818,7 +800,7 @@ export const AdminOrdersScreen: React.FC<{
                       />
                     )}
                   </View>
-                  {!!session.order_id && canTrackSessionShipment(session) && <ShipmentTrackingButton orderId={session.order_id} />}
+                  {!!session.order_id && canTrackSessionShipment(session) && <ShipmentTrackingButton cultivationOrder orderId={session.order_id} />}
                 </AppCard>
                 </React.Fragment>
               );
@@ -863,10 +845,9 @@ export const AdminOrdersScreen: React.FC<{
           setDetailSession(null);
         }}
         onRefreshParent={fetchData}
-        onOpenGrowthUpdate={(sess, latestProg) => {
-          setGrowthSession(sess);
-          setLatestProgressForGrowth(latestProg || null);
-          setGrowthModalVisible(true);
+        onOpenGrowthUpdate={(target) => {
+          setQrOrigin('detail');
+          openGrowthUpdate(target);
         }}
         onOpenHarvestReadiness={(sess) => {
           setReadinessSession(sess);
@@ -885,6 +866,8 @@ export const AdminOrdersScreen: React.FC<{
           setHistoryModalVisible(true);
         }}
         onOpenDailyTrayInspection={(sess, trayId) => {
+          setQrOrigin('detail');
+          setInitialQrAction('issue');
           setDailyTraySession(sess);
           setDailyTraySessionTrayId(trayId || null);
           setDailyTrayModalVisible(true);
@@ -910,23 +893,6 @@ export const AdminOrdersScreen: React.FC<{
           }
         }}
       />
-
-      {/* Growth Update Modal */}
-      {growthSession && (
-        <GrowthUpdateModal
-          visible={growthModalVisible}
-          session={growthSession}
-          latestProgress={latestProgressForGrowth}
-          onClose={() => {
-            setGrowthModalVisible(false);
-            setGrowthSession(null);
-            setLatestProgressForGrowth(null);
-          }}
-          onSuccess={async () => {
-            await fetchData();
-          }}
-        />
-      )}
 
       {/* Harvest Readiness Modal */}
       <HarvestReadinessModal
@@ -955,19 +921,24 @@ export const AdminOrdersScreen: React.FC<{
       />
 
       {/* Daily Tray Inspection Modal */}
-      <DailyTrayInspectionModal
+      <DailyTrayInspectionModal initialAction={initialQrAction}
         visible={dailyTrayModalVisible}
         session={dailyTraySession}
         initialSessionTrayId={dailyTraySessionTrayId}
         onClose={() => {
           setDailyTrayModalVisible(false);
+          if (qrOrigin === 'detail' && dailyTraySession) {
+            setDetailSession(dailyTraySession);
+            setDetailModalVisible(true);
+          } else if (qrOrigin === 'history') {
+            setDailyHistoryModalVisible(true);
+          }
+          setQrOrigin(null);
+          setInitialQrAction(undefined);
           setDailyTraySession(null);
           setDailyTraySessionTrayId(null);
         }}
         onSuccess={() => {
-          setDailyTrayModalVisible(false);
-          setDailyTraySession(null);
-          setDailyTraySessionTrayId(null);
           void fetchData();
         }}
       />
@@ -982,7 +953,9 @@ export const AdminOrdersScreen: React.FC<{
           setDailyHistorySession(null);
           setDailyHistorySessionTrayId(null);
         }}
-        onOpenCreateReport={(trayId) => {
+        onOpenCreateReport={(trayId, action) => {
+          setQrOrigin('history');
+            setInitialQrAction(action ?? 'growth');
           setDailyHistoryModalVisible(false);
           setDailyTraySession(dailyHistorySession);
           setDailyTraySessionTrayId(trayId || null);

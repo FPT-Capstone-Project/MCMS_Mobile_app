@@ -229,6 +229,20 @@ export function ExpertConsultationsScreen() {
     }
   };
 
+  const closeConsultation = async () => {
+    if (!selectedConsultation || !diagnosis.trim() || actionLoading) return;
+    setActionLoading(true);
+    setDetailError(null);
+    try {
+      await expertConsultationRepository.close(selectedConsultation.consultation_id, diagnosis.trim());
+      await Promise.all([refreshSelectedDetails(), loadConsultations(true)]);
+    } catch (error) {
+      setDetailError(getErrorMessage(error, 'Chưa thể đóng tư vấn.'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleRespond = async (needsMoreInfo: boolean) => {
     if (!selectedConsultation) return;
     if (!diagnosis.trim()) {
@@ -767,6 +781,8 @@ export function ExpertConsultationsScreen() {
                       multiline
                       inputStyle={styles.multilineInput}
                     />
+                    {!selectedConsultation.treatments?.length && !['WAITING_REVIEW', 'MONITORING', 'RESOLVED'].includes(selectedIssue.status) &&
+                      <AppButton title="Đóng tư vấn · Không cần xử lý thêm" variant="outline" disabled={!diagnosis.trim() || actionLoading} onPress={closeConsultation} />}
                     <AppInput
                       label="Hướng xử lý"
                       placeholder="Đề xuất biện pháp xử lý cho trang trại"

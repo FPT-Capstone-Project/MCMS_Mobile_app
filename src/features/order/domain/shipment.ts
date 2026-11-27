@@ -21,7 +21,7 @@ export function canTrackSessionShipment(session: {
 
 const NEXT_SHIPMENT_STATUSES: Record<ShipmentStatus, readonly ShipmentStatus[]> = {
   PENDING: ['SHIPPED', 'CANCELLED'],
-  SHIPPED: ['DELIVERED', 'RETURNED'],
+  SHIPPED: ['RETURNED'],
   DELIVERED: ['RETURNED'],
   CANCELLED: [],
   RETURNED: [],
@@ -50,6 +50,7 @@ export interface UpdateShipmentDetails {
 }
 
 export interface Shipment {
+  harvest_request_id?: number | null;
   shipment_id: number;
   order_id: number;
   status: string;
@@ -73,6 +74,10 @@ export function latestShipment(shipments: readonly Shipment[]): Shipment | undef
     !latest || shipment.shipment_id > latest.shipment_id ? shipment : latest, undefined);
 }
 
+export function shipmentForRequest(shipments: readonly Shipment[], requestId?: number | null): Shipment | undefined {
+  return shipments.find(item => item.harvest_request_id != null && Number(item.harvest_request_id) === Number(requestId));
+}
+
 export function canCustomerConfirmDeliveryReceipt(
   session: {
     status?: string;
@@ -82,7 +87,7 @@ export function canCustomerConfirmDeliveryReceipt(
   },
   shipments: readonly Shipment[],
 ): boolean {
-  const shipment = latestShipment(shipments);
+  const shipment = shipmentForRequest(shipments, session.harvest_request_id);
   if (
     session.harvest_method !== 'DELIVERY' ||
     !session.harvest_request_id ||
@@ -92,9 +97,7 @@ export function canCustomerConfirmDeliveryReceipt(
   ) {
     return false;
   }
-  return ['PENDING', 'SHIPPED', 'IN_TRANSIT', 'DELIVERED'].includes(
-    shipment.status.toUpperCase(),
-  );
+  return shipment.status === 'PENDING';
 }
 
 // Shipments belong to an order, not an individual cultivation session.

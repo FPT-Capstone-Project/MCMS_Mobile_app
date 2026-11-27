@@ -2,7 +2,7 @@ import { AppAlert as Alert, AppModal as Modal } from '../../src/shared/component
 import { TrayMushroomImage } from '../../src/features/iot/presentation/components/TrayMushroomImage';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -62,10 +62,7 @@ export default function TrayScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ sessionId?: string; floorId?: string }>();
   const { canControlIot } = useAuth();
-  const [cleaningTrayId, setCleaningTrayId] = useState<number | null>(null);
-  const cleaningInFlight = useRef(false);
-
-
+  const [expectedTrayId, setExpectedTrayId] = useState<number | null>(null);
   const [racks, setRacks] = useState<CustomerFloorRack[]>([]);
   const [loadState, setLoadState] = useState<TrayLoadState>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -86,8 +83,17 @@ export default function TrayScreen() {
   const [inspectedTrayIdsToday, setInspectedTrayIdsToday] = useState<Set<number>>(new Set());
   const [dailyReportSession, setDailyReportSession] = useState<CultivationSessionAdmin | null>(null);
   const [dailyReportSessionTrayId, setDailyReportSessionTrayId] = useState<number | null>(null);
+  const [initialQrAction, setInitialQrAction] = useState<'issue' | 'growth'>();
   const [dailyModalVisible, setDailyModalVisible] = useState(false);
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
+
+  const openScanner = (trayId: number | null = null, mode?: 'growth') => {
+    setInitialQrAction(mode);
+    setExpectedTrayId(trayId);
+    setDailyReportSession(null);
+    setDailyReportSessionTrayId(null);
+    setDailyModalVisible(true);
+  };
 
   const loadRacks = useCallback(async () => {
     try {
@@ -151,30 +157,6 @@ export default function TrayScreen() {
       setLoadState('error');
     }
   }, [canControlIot]);
-  const handleCompleteSanitation = (tray: CustomerTrayCard) => {
-    if (!canControlIot || cleaningInFlight.current) return;
-    Alert.alert('Xác nhận đã vệ sinh xong', `Khay ${tray.code} đã được vệ sinh và sẵn sàng sử dụng cho phiên trồng mới?`, [
-      { text: 'Hủy', style: 'cancel' },
-      { text: 'Đã vệ sinh xong', onPress: () => {
-        if (cleaningInFlight.current) return;
-        cleaningInFlight.current = true;
-        setCleaningTrayId(tray.id);
-        void (async () => {
-          try {
-            await cultivationRepository.completeTraySanitation(tray.id);
-            await loadRacks();
-            Alert.alert('Đã hoàn tất', `Khay ${tray.code} đã được trả về trạng thái sẵn sàng.`);
-          } catch (error) {
-            Alert.alert('Chưa thể xác nhận', error instanceof Error ? error.message : 'Vui lòng thử lại.');
-          } finally {
-            cleaningInFlight.current = false;
-            setCleaningTrayId(null);
-          }
-        })();
-      } },
-    ]);
-  };
-
   useFocusEffect(
     useCallback(() => {
       void loadRacks();
@@ -369,54 +351,7 @@ export default function TrayScreen() {
   };
 
   // Daily Report actions
-  const handleOpenDailyReport = (tray: CustomerTrayCard) => {
-    if (!tray.sessionId) return;
-    let sess = cultivatingSessionsMap.get(tray.sessionId);
-    if (!sess) {
-      sess = {
-        session_id: tray.sessionId,
-        mushroom_name: tray.mushroomName || 'Nấm giống',
-        mushroom_type_id: 1,
-        status: 'CULTIVATING',
-        customer_name: 'Khách hàng',
-        trays: [
-          {
-            session_tray_id: tray.sessionTrayId || tray.id,
-            tray_id: tray.id,
-            tray_code: tray.code,
-            floor_id: tray.floorId ?? null,
-            floor_number: tray.floorNumber ?? null,
-            status: 'ACTIVE',
-          },
-        ],
-      };
-    } else {
-      const existingTrays = sess.trays || [];
-      const hasTray = existingTrays.some(
-        (t) => t.session_tray_id === tray.sessionTrayId || t.tray_id === tray.id
-      );
-      if (!hasTray) {
-        sess = {
-          ...sess,
-          trays: [
-            ...existingTrays,
-            {
-              session_tray_id: tray.sessionTrayId || tray.id,
-              tray_id: tray.id,
-              tray_code: tray.code,
-              floor_id: tray.floorId ?? null,
-              floor_number: tray.floorNumber ?? null,
-              status: 'ACTIVE',
-            },
-          ],
-        };
-      }
-    }
-
-    setDailyReportSession(sess);
-    setDailyReportSessionTrayId(tray.sessionTrayId || tray.id);
-    setDailyModalVisible(true);
-  };
+  const handleOpenDailyReport = (tray: CustomerTrayCard) => openScanner(tray.id, 'growth');
 
   const handleOpenDailyHistory = (tray: CustomerTrayCard) => {
     if (!tray.sessionId) return;
@@ -506,6 +441,8 @@ export default function TrayScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        {canControlIot && !assigningSession && <AppButton title="Cập nhật tiến độ" onPress={() => openScanner(null, 'growth')} />}
+        {canControlIot && !assigningSession && <AppButton title="Quét QR khay" leftIcon={<Ionicons name="qr-code-outline" size={22} color="white" />} onPress={() => openScanner()} />}
         {/* Assign Mode Sticky Banner */}
         {assigningSession && (
           <AppCard elevation="sm" style={styles.assignBanner}>
@@ -572,7 +509,7 @@ export default function TrayScreen() {
                   Có {uninspectedTraysCount} khay chưa báo cáo hôm nay
                 </AppText>
                 <AppText variant="caption" color="#B45309" style={{ marginTop: 1 }}>
-                  Nhấn nút &quot;Báo cáo ngay&quot; trên từng khay để cập nhật giai đoạn nấm và tình trạng quả thể.
+                  Chọn giai đoạn sinh trưởng rồi quét QR trên khay để cập nhật.
                 </AppText>
               </View>
             </View>
@@ -687,9 +624,7 @@ export default function TrayScreen() {
                         onViewDetails={handleViewDetails}
                         onOpenReport={handleOpenDailyReport}
                         onOpenHistory={handleOpenDailyHistory}
-                        onCompleteSanitation={handleCompleteSanitation}
-                        isCleaning={cleaningTrayId === tray.id}
-                        sanitationDisabled={cleaningTrayId !== null}
+                        onCompleteSanitation={(tray) => openScanner(tray.id)}
                         onStartAssignOnFloor={() => handleStartAssignWorkflow(rack.id)}
                       />
                     );
@@ -759,25 +694,9 @@ export default function TrayScreen() {
       />
 
       {/* Daily Inspection Modal */}
-      {dailyReportSession && (
-        <DailyTrayInspectionModal
-          visible={dailyModalVisible}
-          session={dailyReportSession}
-          initialSessionTrayId={dailyReportSessionTrayId}
-          onClose={() => {
-            setDailyModalVisible(false);
-          }}
-          onSuccess={() => {
-            setDailyModalVisible(false);
-            if (dailyReportSessionTrayId) {
-              setInspectedSessionTrayIdsToday((prev) =>
-                new Set(prev).add(dailyReportSessionTrayId)
-              );
-            }
-            void loadRacks();
-          }}
-        />
-      )}
+      <DailyTrayInspectionModal initialAction={initialQrAction} visible={dailyModalVisible} session={dailyReportSession}
+        expectedTrayId={dailyReportSession ? null : expectedTrayId} initialSessionTrayId={dailyReportSessionTrayId}
+        onClose={() => { setDailyModalVisible(false); setInitialQrAction(undefined); if (dailyReportSession) setHistoryModalVisible(true); }} onSuccess={() => { void loadRacks(); }} />
 
       {/* Daily Inspection History Modal */}
       {dailyReportSession && (
@@ -786,7 +705,8 @@ export default function TrayScreen() {
           session={dailyReportSession}
           initialSessionTrayId={dailyReportSessionTrayId}
           onClose={() => setHistoryModalVisible(false)}
-          onOpenCreateReport={(sessionTrayId) => {
+          onOpenCreateReport={(sessionTrayId, action) => {
+            setInitialQrAction(action ?? 'growth');
             setHistoryModalVisible(false);
             if (sessionTrayId) {
               setDailyReportSessionTrayId(sessionTrayId);
@@ -822,8 +742,6 @@ function getCameraIdForFloor(floorNumber: number): string | null {
 
 interface TrayTileProps {
   onCompleteSanitation: (tray: CustomerTrayCard) => void;
-  isCleaning: boolean;
-  sanitationDisabled: boolean;
   tray: CustomerTrayCard;
   isStaff: boolean;
   isAssignMode: boolean;
@@ -839,8 +757,6 @@ interface TrayTileProps {
 
 const TrayTile: React.FC<TrayTileProps> = ({
   onCompleteSanitation,
-  isCleaning,
-  sanitationDisabled,
   tray,
   isStaff,
   isAssignMode,
@@ -1035,12 +951,10 @@ const TrayTile: React.FC<TrayTileProps> = ({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Xác nhận đã vệ sinh xong khay ${tray.code}`}
-          disabled={sanitationDisabled}
           onPress={e => { e.stopPropagation(); onCompleteSanitation(tray); }}
-          style={[styles.reportNowButton, { minHeight: 40, opacity: sanitationDisabled ? 0.5 : 1 }]}
+          style={[styles.reportNowButton, { minHeight: 40 }]}
         >
-          {isCleaning ? <ActivityIndicator color="#FFFFFF" size="small" /> :
-            <AppText variant="caption" color="#FFFFFF" weight="bold" align="center">Đã vệ sinh xong</AppText>}
+          <AppText variant="caption" color="#FFFFFF" weight="bold" align="center">Quét QR vệ sinh</AppText>
         </Pressable>
       )}
       {!isAssignMode && isInUse ? (
@@ -1049,7 +963,7 @@ const TrayTile: React.FC<TrayTileProps> = ({
             {!isReportedToday ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Báo cáo ngay cho khay ${tray.code}`}
+                accessibilityLabel={`Cập nhật tiến độ khay ${tray.code}`}
                 onPress={(e) => {
                   e.stopPropagation?.();
                   onOpenReport(tray);
@@ -1061,7 +975,7 @@ const TrayTile: React.FC<TrayTileProps> = ({
               >
                 <Ionicons name="create-outline" size={13} color="#FFFFFF" />
                 <AppText variant="caption" weight="bold" color="#FFFFFF" style={{ fontSize: 11 }}>
-                  Báo cáo ngay
+                  Cập nhật tiến độ
                 </AppText>
               </Pressable>
             ) : (

@@ -1,912 +1,568 @@
-import { AppAlert as Alert, AppModal as Modal } from '../../../../shared/components/feedback/AppDialog';
-import { RequestExpertModal } from '../../../expert/presentation/RequestExpertModal';
-import type { ExpertRequestContext } from '../../../expert/domain/entities/expert-consultation';
-import { cultivationNote } from '../../domain/cultivationNotes';
-import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Image,
-  Pressable,
+  Linking,
   ScrollView,
   StyleSheet,
-  TextInput,
   View,
 } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppAlert, AppModal } from '../../../../shared/components/feedback/AppDialog';
+import { AppButton, AppCard, AppHeader, AppInput, AppText } from '../../../../shared/components';
 import { theme } from '../../../../core/theme';
-import {
-  CultivationSessionAdmin,
-} from '../../../iot/domain/entities/Iot';
-import {
-  CreateDailyTrayInspectionRequest,
-} from '../../domain/entities/Cultivation';
+import { GROWTH_STAGE_LABELS } from '../../../../core/constants/growthStages';
+import type { CultivationSessionAdmin } from '../../../iot/domain/entities/Iot';
+import { operatorConsultationRepository } from '../../../expert/data/repositories/operator-consultation-repository';
+import { trayQr, type GrowthStage, type TrayScan, type GrowthOverview } from '../../data/trayQr';
 import { cultivationRepository } from '../../data/repositories/CultivationRepository';
-import {
-  AppButton,
-  AppCard,
-  AppDivider,
-  AppIconButton,
-  AppText,
-} from '../../../../shared/components';
+import { AppError } from '../../../../core/errors/appError';
 
-interface SelectedImageItem {
-  uri: string;
-  caption?: string;
-  uploaded?: boolean;
-}
-
-interface DailyTrayInspectionModalProps {
+interface Props {
   visible: boolean;
   session: CultivationSessionAdmin | null;
   initialSessionTrayId?: number | null;
+  initialAction?: 'issue' | 'growth';
+  expectedTrayId?: number | null;
   onClose: () => void;
   onSuccess: () => void;
 }
-
-const TRAY_CONDITION_PRESETS = [
-  'Khay sạch, độ ẩm đạt tiêu chuẩn',
-  'Khay thông thoáng, thoát nước tốt',
-  'Độ ẩm cao, cần giảm phun sương',
-  'Khay khô, cần tăng độ ẩm',
-];
-
-const MUSHROOM_CONDITION_PRESETS = [
-  'Nấm phát triển đều, không phát hiện sâu bệnh',
-  'Mũ nấm dày, màu sắc tự nhiên, mọc cụm đẹp',
-  'Tai nấm non mọc nhiều, phát triển nhanh',
-  'Nấm mọc thưa, cần kiểm tra điều kiện ra quả thể',
-];
-
-function sanitizeConditionToVietnamese(
-  val?: string | null,
-  fallback = 'Khay sạch, độ ẩm đạt tiêu chuẩn'
-): string {
-  if (!val) return fallback;
-  const trimmed = val.trim();
-  const upper = trimmed.toUpperCase();
-  if (upper === 'NORMAL') return 'Khay sạch, độ ẩm đạt tiêu chuẩn';
-  if (upper === 'GOOD' || upper === 'OPTIMAL') return 'Khay phát triển tốt, điều kiện tối ưu';
-  if (upper === 'WARNING') return 'Cần theo dõi, độ ẩm chưa tối ưu';
-  if (upper === 'ABNORMAL') return 'Bất thường, cần can thiệp xử lý';
-  if (upper === 'POOR') return 'Kém phát triển, thiếu ẩm';
-  return cultivationNote(trimmed);
+export function DailyTrayInspectionModal(props: Props) {
+  return props.visible ? <TrayWorkflow {...props} /> : null;
 }
-
-function sanitizeMushroomConditionToVietnamese(
-  val?: string | null,
-  fallback = 'Nấm phát triển đều, không phát hiện sâu bệnh'
-): string {
-  if (!val) return fallback;
-  const trimmed = val.trim();
-  const upper = trimmed.toUpperCase();
-  if (upper === 'NORMAL') return 'Nấm phát triển đều, không phát hiện sâu bệnh';
-  if (upper === 'GOOD' || upper === 'HEALTHY' || upper === 'OPTIMAL')
-    return 'Nấm phát triển khỏe mạnh, đồng đều';
-  if (upper === 'WARNING') return 'Nấm phát triển chậm, cần theo dõi';
-  if (upper === 'ABNORMAL') return 'Nấm có dấu hiệu dị hình hoặc sâu bệnh';
-  if (upper === 'POOR') return 'Nấm còi cọc, phát triển kém';
-  return cultivationNote(trimmed);
-}
-
-export const DailyTrayInspectionModal: React.FC<DailyTrayInspectionModalProps> = ({
-  visible,
+function TrayWorkflow({
+  initialAction,
   session,
+  expectedTrayId,
   initialSessionTrayId,
   onClose,
   onSuccess,
-}) => {
-  if (!visible || !session) return null;
-
-  return (
-    <DailyTrayInspectionModalContent
-      key={`${session.session_id}_${initialSessionTrayId ?? 'default'}`}
-      visible={visible}
-      session={session}
-      initialSessionTrayId={initialSessionTrayId}
-      onClose={onClose}
-      onSuccess={onSuccess}
-    />
+}: Props) {
+  const [permission, ask, checkPermission] = useCameraPermissions({
+    request: initialAction !== 'growth',
+  });
+  const [scan, setScan] = useState<TrayScan | null>(null);
+  const [token, setToken] = useState('');
+  const [overview, setOverview] = useState<GrowthOverview | null>(null);
+  const [action, setAction] = useState<'growth' | 'issue' | null>(
+    initialAction === 'growth' ? 'growth' : null
   );
-};
-
-const DailyTrayInspectionModalContent: React.FC<{
-  visible: boolean;
-  session: CultivationSessionAdmin;
-  initialSessionTrayId?: number | null;
-  onClose: () => void;
-  onSuccess: () => void;
-}> = ({ visible, session, initialSessionTrayId, onClose, onSuccess }) => {
-  const trays = useMemo(() => {
-    const raw = session.trays || [];
-    return raw.filter((t) => {
-      const st = String(t.status || '').trim().toUpperCase();
-      return st !== 'RELEASE' && st !== 'RELEASED';
-    });
-  }, [session.trays]);
-  const defaultTrayId =
-    initialSessionTrayId ||
-    (trays.length > 0 ? trays[0].session_tray_id : null);
-
-  const [expertContext, setExpertContext] = useState<ExpertRequestContext | null>(null);
-  const [selectedSessionTrayId, setSelectedSessionTrayId] = useState<number | null>(defaultTrayId);
-  const [trayCondition, setTrayCondition] = useState<string>(
-    sanitizeConditionToVietnamese(session.condition)
-  );
-  const [mushroomCondition, setMushroomCondition] = useState<string>(
-    sanitizeMushroomConditionToVietnamese(session.condition)
-  );
+  const [stage, setStage] = useState<GrowthStage | null>(null);
+  const [trayCondition, setTrayCondition] = useState('');
+  const [mushroomCondition, setMushroomCondition] = useState('');
   const [notes, setNotes] = useState('');
-  const [loadingTrayData, setLoadingTrayData] = useState(false);
-
-  // Selected Images
-  const [images, setImages] = useState<SelectedImageItem[]>([]);
-  const [editingCaptionIndex, setEditingCaptionIndex] = useState<number | null>(null);
-  const [captionInput, setCaptionInput] = useState('');
-
-  // Submission state
-  const [submitting, setSubmitting] = useState(false);
-  const [createdInspectionId, setCreatedInspectionId] = useState<number | null>(null);
-  const [uploadProgressText, setUploadProgressText] = useState<string | null>(null);
-  const [failedImageIndices, setFailedImageIndices] = useState<number[]>([]);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // Load real data for the session and selected tray
+  const [title, setTitle] = useState('');
+  const [type, setType] = useState('DISEASE');
+  const [severity, setSeverity] = useState('MEDIUM');
+  const [question, setQuestion] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
+  const [issueId, setIssueId] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const lock = useRef(false);
+  const scanned = useRef(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [scanningGrowth, setScanningGrowth] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [existingReport, setExistingReport] = useState(false);
+  const [attachmentId, setAttachmentId] = useState<number | null>(null);
+  const active = scan?.sessions[0];
+  const latest = overview?.trays.find(
+    (item) => Number(item.tray_id) === Number(scan?.tray.tray_id)
+  )?.growth_status;
   useEffect(() => {
-    if (!visible || !session?.session_id) return;
-    let isMounted = true;
+    const listener = AppState.addEventListener('change', (state) => {
+      if (state === 'active')
+        void checkPermission().catch(() => setError('Không đọc được quyền camera.'));
+    });
+    return () => listener.remove();
+  }, [checkPermission]);
 
-    const loadRealData = async () => {
-      setLoadingTrayData(true);
-      try {
-        const history = selectedSessionTrayId
-          ? await cultivationRepository.getTrayDailyInspectionHistory(
-              session.session_id, selectedSessionTrayId, 1, 1
-            )
-          : null;
-        if (!isMounted) return;
-        const latest = history?.inspections[0];
-        setTrayCondition(sanitizeConditionToVietnamese(latest?.trayCondition ?? session.condition));
-        setMushroomCondition(sanitizeMushroomConditionToVietnamese(latest?.mushroomCondition ?? session.condition));
-      } catch {
-        // Fallback gracefully
-      } finally {
-        if (isMounted) {
-          setLoadingTrayData(false);
-        }
-      }
-    };
-
-    void loadRealData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [
-    visible,
-    session.session_id,
-    session.condition,
-    selectedSessionTrayId,
-  ]);
-
-  const selectedTray = trays.find((t) => t.session_tray_id === selectedSessionTrayId);
-
-  // Pick image from Library
-  const handlePickLibrary = async () => {
+  async function work(fn: () => Promise<void>) {
+    if (lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    setError('');
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('Quyền truy cập', 'Vui lòng cấp quyền truy cập thư viện ảnh để tiếp tục.');
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsMultipleSelection: true,
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const newItems: SelectedImageItem[] = result.assets.map((asset) => ({
-          uri: asset.uri,
-          caption: '',
-          uploaded: false,
-        }));
-        setImages((prev) => [...prev, ...newItems]);
-      }
-    } catch (err: any) {
-      Alert.alert('Lỗi chọn ảnh', err?.message || 'Không thể mở thư viện ảnh.');
-    }
-  };
-
-  // Capture image from Camera
-  const handleTakePhoto = async () => {
-    try {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('Quyền truy cập', 'Vui lòng cấp quyền mở máy ảnh để tiếp tục.');
-        return;
-      }
-      const result = await ImagePicker.launchCameraAsync({
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const newItems: SelectedImageItem[] = result.assets.map((asset) => ({
-          uri: asset.uri,
-          caption: '',
-          uploaded: false,
-        }));
-        setImages((prev) => [...prev, ...newItems]);
-      }
-    } catch (err: any) {
-      Alert.alert('Lỗi máy ảnh', err?.message || 'Không thể chụp ảnh.');
-    }
-  };
-
-  const handleRemoveImage = (index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index));
-    setFailedImageIndices((prev) =>
-      prev.filter((i) => i !== index).map((i) => (i > index ? i - 1 : i))
-    );
-  };
-
-  const handleOpenCaptionEditor = (index: number) => {
-    setEditingCaptionIndex(index);
-    setCaptionInput(images[index]?.caption || '');
-  };
-
-  const handleSaveCaption = () => {
-    if (editingCaptionIndex !== null) {
-      setImages((prev) =>
-        prev.map((img, i) => (i === editingCaptionIndex ? { ...img, caption: captionInput } : img))
-      );
-      setEditingCaptionIndex(null);
-      setCaptionInput('');
-    }
-  };
-
-  // Submit Report
-  const handleSubmit = async () => {
-    if (!selectedSessionTrayId) {
-      Alert.alert('Chưa chọn khay', 'Vui lòng chọn khay vật lý cần lập báo cáo.');
-      return;
-    }
-    if (!trayCondition.trim()) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng nhập tình trạng khay.');
-      return;
-    }
-    if (!mushroomCondition.trim()) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng nhập tình trạng nấm.');
-      return;
-    }
-
-    setSubmitting(true);
-    setErrorMessage(null);
-    setFailedImageIndices([]);
-
-    let inspectionId = createdInspectionId;
-
-    try {
-      // 1. Create inspection if not already created
-      if (!inspectionId) {
-        setUploadProgressText('Đang lưu thông tin báo cáo...');
-        const payload: CreateDailyTrayInspectionRequest = {
-          trayCondition: trayCondition.trim(),
-          mushroomCondition: mushroomCondition.trim(),
-          notes: notes.trim() || undefined,
-        };
-        inspectionId = await cultivationRepository.createDailyTrayInspection(
-          selectedSessionTrayId,
-          payload
-        );
-        setCreatedInspectionId(inspectionId);
-      }
-
-      // 2. Upload images one by one
-      if (images.length > 0 && inspectionId) {
-        const failed: number[] = [];
-        for (let i = 0; i < images.length; i++) {
-          if (images[i].uploaded) continue;
-          try {
-            setUploadProgressText(`Đang tải ảnh ${i + 1}/${images.length}...`);
-            await cultivationRepository.uploadDailyTrayInspectionImage(
-              inspectionId,
-              images[i].uri,
-              images[i].caption
-            );
-            // Mark uploaded
-            setImages((prev) =>
-              prev.map((item, idx) => (idx === i ? { ...item, uploaded: true } : item))
-            );
-          } catch {
-            failed.push(i);
-          }
-        }
-
-        if (failed.length > 0) {
-          setFailedImageIndices(failed);
-          setErrorMessage(
-            `Đã lưu báo cáo thành công (Mã #${inspectionId}), nhưng còn ${failed.length} ảnh chưa tải lên được do lỗi kết nối. Bạn có thể nhấn 'Tải lại ảnh lỗi' bên dưới.`
-          );
-          setSubmitting(false);
-          setUploadProgressText(null);
-          return;
-        }
-      }
-
-      setUploadProgressText(null);
-      Alert.alert(
-        'Thành công',
-        `Báo cáo khay hằng ngày #${inspectionId} đã được ghi nhận đầy đủ kèm ${images.length} ảnh.`,
-        [{ text: 'Đóng', onPress: onSuccess }, { text: 'Nhờ chuyên gia', onPress: () => {
-          if (inspectionId && selectedSessionTrayId) setExpertContext({ sessionId: session.session_id,
-            sessionTrayId: selectedSessionTrayId, inspectionId, label: `Báo cáo khay #${inspectionId}` });
-        } }]
-      );
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Không thể tạo báo cáo khay. Vui lòng kiểm tra lại.');
+      await fn();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Chưa thực hiện được. Vui lòng thử lại.');
     } finally {
-      setSubmitting(false);
-      setUploadProgressText(null);
+      lock.current = false;
+      setBusy(false);
     }
-  };
-
-  // Retry uploading failed images
-  const handleRetryFailedImages = async () => {
-    if (!createdInspectionId || failedImageIndices.length === 0) return;
-    setSubmitting(true);
-    setErrorMessage(null);
-
-    const remainingFailed: number[] = [];
-    for (const idx of failedImageIndices) {
+  }
+  function resetForm() {
+    setAction(null);
+    setIssueId(null);
+    setPhotos([]);
+    setQuestion(null);
+    setTitle('');
+    setType('DISEASE');
+    setSeverity('MEDIUM');
+    setNotes('');
+    setTrayCondition('');
+    setMushroomCondition('');
+    setStage(null);
+    setExistingReport(false);
+    setAttachmentId(null);
+    setError('');
+  }
+  function restart() {
+    resetForm();
+    setScan(null);
+    setOverview(null);
+    setNotice('');
+    setPaused(false);
+    scanned.current = false;
+  }
+  async function read(data: string) {
+    if (scanned.current || lock.current) return;
+    scanned.current = true;
+    setPaused(true);
+    await work(async () => {
+      const result = await trayQr.scan(data);
+      const current = result.sessions[0];
+      if (
+        (expectedTrayId && Number(result.tray.tray_id) !== Number(expectedTrayId)) ||
+        (session && Number(current?.session_id) !== Number(session.session_id)) ||
+        (initialSessionTrayId && Number(current?.session_tray_id) !== Number(initialSessionTrayId))
+      ) {
+        throw new Error('Mã QR không khớp với khay hoặc phiên đang mở.');
+      }
+      if (scanningGrowth) {
+        if (!current || current.status !== 'CULTIVATING')
+          throw new Error('Khay này không có phiên đang trồng. Hãy quét khay khác.');
+        setToken(data);
+        setScan(result);
+        setScanningGrowth(false);
+        await saveGrowth(result, data);
+        return;
+      }
+      const progress = current
+        ? await trayQr.overview(current.session_id).catch(() => {
+            setNotice('Chưa tải được giai đoạn gần nhất.');
+            return null;
+          })
+        : null;
+      setToken(data);
+      setOverview(progress);
+      setScan(result);
+      if (initialAction === 'issue' && current) setAction('issue');
+    });
+  }
+  async function selectPhotos(camera: boolean) {
+    await work(async () => {
+      const access = camera ? await ImagePicker.requestCameraPermissionsAsync() : { granted: true };
+      if (!access.granted) {
+        setError('Cần quyền camera để chụp ảnh.');
+        return;
+      }
+      const result = camera
+        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 })
+        : await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsMultipleSelection: true,
+            selectionLimit: 10 - photos.length,
+            quality: 0.8,
+          });
+      if (!result.canceled) setPhotos((prev) => [...prev, ...result.assets].slice(0, 10));
+    });
+  }
+  async function finishGrowth(result: TrayScan, qrToken: string, savedStage: GrowthStage) {
+    resetForm();
+    setNotice('Đã cập nhật ' + result.tray.tray_code + ' · ' + GROWTH_STAGE_LABELS[savedStage]);
+    onSuccess();
+    const sessionId = result.sessions[0].session_id;
+    setOverview(await trayQr.overview(sessionId).catch(() => null));
+    setScan(await trayQr.scan(qrToken).catch(() => result));
+  }
+  async function saveGrowth(scan: TrayScan, qrToken: string) {
+    const active = scan.sessions[0];
+    if (!stage || !active) return;
+    const fields = {
+      qr_token: qrToken,
+      growth_status: stage,
+      notes,
+      trayCondition,
+      mushroomCondition,
+    };
+    if (!existingReport) {
       try {
-        setUploadProgressText(`Đang tải lại ảnh ${idx + 1}...`);
-        await cultivationRepository.uploadDailyTrayInspectionImage(
-          createdInspectionId,
-          images[idx].uri,
-          images[idx].caption
-        );
-        setImages((prev) =>
-          prev.map((item, i) => (i === idx ? { ...item, uploaded: true } : item))
-        );
-      } catch {
-        remainingFailed.push(idx);
+        await trayQr.growth(fields, photos);
+        await finishGrowth(scan, qrToken, stage);
+        return;
+      } catch (err) {
+        if (!(
+          err instanceof AppError &&
+          (err.code === 'DUPLICATE_DAILY_INSPECTION' || /already been recorded/.test(err.message))
+        ))
+          throw err;
+        setExistingReport(true);
       }
     }
-
-    setSubmitting(false);
-    setUploadProgressText(null);
-    setFailedImageIndices(remainingFailed);
-
-    if (remainingFailed.length === 0) {
-      Alert.alert(
-        'Hoàn tất',
-        `Toàn bộ ảnh đã được tải lên báo cáo #${createdInspectionId} thành công!`,
-        [{ text: 'Đóng', onPress: onSuccess }, { text: 'Nhờ chuyên gia', onPress: () => {
-          if (createdInspectionId && selectedSessionTrayId) setExpertContext({ sessionId: session.session_id,
-            sessionTrayId: selectedSessionTrayId, inspectionId: createdInspectionId, label: `Báo cáo khay #${createdInspectionId}` });
-        } }]
+    let id = attachmentId;
+    if (!id) {
+      await trayQr.growth(fields, []);
+      setNotice('Đã lưu giai đoạn. Đang bổ sung ảnh vào biên bản.');
+      const progress = await trayQr.overview(active.session_id);
+      const updated = progress.trays.find((t) => Number(t.tray_id) === Number(scan.tray.tray_id));
+      const history = await cultivationRepository.getTrayDailyInspectionHistory(
+        active.session_id,
+        active.session_tray_id
       );
-    } else {
-      setErrorMessage(
-        `Vẫn còn ${remainingFailed.length} ảnh chưa tải lên được. Vui lòng kiểm tra lại kết nối mạng.`
+      const matches = history.inspections.filter(
+        (i) =>
+          updated?.last_inspection_at &&
+          new Date(i.inspectionDate).getTime() === new Date(updated.last_inspection_at).getTime()
       );
+      if (matches.length !== 1 || updated?.growth_status !== stage)
+        throw new Error('Đã lưu giai đoạn. Chưa xác định được biên bản để bổ sung ảnh.');
+      id = matches[0].inspectionId;
+      setAttachmentId(id);
     }
-  };
-
+    for (const image of photos) {
+      await trayQr.attachPhoto(id, image);
+      setPhotos((prev) => prev.slice(1));
+    }
+    await finishGrowth(scan, qrToken, stage);
+  }
+  async function submit() {
+    await work(async () => {
+      if (!active || !scan) return;
+      if (action === 'issue') {
+        let id = issueId;
+        if (!id) {
+          const issue = await trayQr.issue(
+            { qr_token: token, issue_type: type, severity, title, description: notes },
+            photos
+          );
+          id = issue.issue_id;
+          setIssueId(id);
+        }
+        try {
+          await operatorConsultationRepository.requestForQrIssue(id, (question ?? notes).trim());
+        } catch {
+          throw new Error('Đã lưu sự cố #' + id + '. Kiểm tra kết nối và gửi lại yêu cầu tư vấn.');
+        }
+        setNotice('Đã gửi yêu cầu tư vấn cho chuyên gia.');
+      }
+      resetForm();
+      onSuccess();
+      setOverview(await trayQr.overview(active.session_id));
+      setScan(await trayQr.scan(token));
+    });
+  }
+  const lockedForm = busy || !!issueId || !!attachmentId || (action === 'growth' && !!scan);
+  function goBack() {
+    if (lock.current) return;
+    if (scanningGrowth) {
+      setScanningGrowth(false);
+      setPaused(false);
+      setError('');
+      scanned.current = false;
+    } else if (scan && action === 'issue' && !issueId && initialAction !== 'issue') {
+      resetForm();
+    } else {
+      onClose();
+    }
+  }
+  const headerTitle = scanningGrowth ? 'Quét QR khay'
+    : action === 'growth' ? 'Cập nhật tiến độ'
+    : action === 'issue' ? 'Báo cáo sự cố'
+    : scan ? 'Khay ' + scan.tray.tray_code : 'Quét QR khay';
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        {expertContext && <RequestExpertModal context={expertContext} onClose={() => { setExpertContext(null); onSuccess(); onClose(); }} />}
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={styles.sheetContainer}>
-          <View style={styles.dragHandle} />
-
-          {/* Header */}
-          <View style={styles.headerRow}>
-            <View style={{ flex: 1 }}>
-              <AppText variant="title" weight="bold">
-                Báo cáo khay hằng ngày
+    <AppModal visible statusBarTranslucent presentationStyle="fullScreen" animationType="slide" onRequestClose={goBack}>
+      <SafeAreaView style={styles.page} edges={['left', 'right', 'bottom']}>
+        <AppHeader title={headerTitle} subtitle={action && scan ? 'Khay ' + scan.tray.tray_code : undefined}
+          showBack backDisabled={busy} onBack={goBack} />
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
+          {!scan && (action !== 'growth' || scanningGrowth) && (
+            <>
+              <AppText>
+                {scanningGrowth && stage
+                  ? 'Quét khay để ghi nhận: ' + GROWTH_STAGE_LABELS[stage]
+                  : 'Đưa tem QR trên khay vào khung camera.'}
               </AppText>
-              <AppText variant="caption" color={theme.colors.text.secondary}>
-                Phiên #{session.session_id} • {session.mushroom_name}
+              {permission?.granted && !paused ? (
+                <View style={styles.camera}>
+                  <CameraView
+                    style={StyleSheet.absoluteFill}
+                    facing="back"
+                    barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                    onBarcodeScanned={({ data }) => void read(data)}
+                    onMountError={() => {
+                      setPaused(true);
+                      setError('Không mở được camera. Vui lòng thử lại.');
+                    }}
+                  />
+                  <View pointerEvents="none" style={styles.frame} />
+                </View>
+              ) : null}
+              {permission && !permission.granted && (
+                <AppButton
+                  title={permission.canAskAgain ? 'Cho phép dùng camera' : 'Mở cài đặt camera'}
+                  onPress={() => {
+                    if (permission.canAskAgain) void ask();
+                    else void Linking.openSettings();
+                  }}
+                />
+              )}
+              {paused && !busy && (
+                <AppButton
+                  title="Quét lại"
+                  onPress={() => {
+                    setPaused(false);
+                    setError('');
+                    scanned.current = false;
+                  }}
+                />
+              )}
+            </>
+          )}
+          {scan && (
+            <AppCard variant="outlined">
+              <AppText weight="bold">
+                {active
+                  ? active.mushroom_name + ' · Phiên #' + active.session_id
+                  : 'Khay chưa gắn phiên trồng'}
               </AppText>
-            </View>
-            <AppIconButton
-              accessibilityLabel="Đóng"
-              icon={<Ionicons name="close" size={20} color={theme.colors.text.secondary} />}
-              onPress={onClose}
-              size="sm"
-            />
-          </View>
-
-          <AppDivider spacing="sm" />
-
-          <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
-            {/* Warning if no trays assigned */}
-            {trays.length === 0 ? (
-              <AppCard elevation="xs" style={styles.warningCard}>
-                <Ionicons name="alert-circle" size={24} color={theme.colors.warning.dark} />
-                <View style={{ flex: 1, marginLeft: 8 }}>
-                  <AppText variant="bodySmall" weight="bold" color={theme.colors.warning.dark}>
-                    Chưa gán khay vật lý
-                  </AppText>
-                  <AppText variant="caption" color={theme.colors.warning.dark}>
-                    Phiên nuôi trồng này chưa có khay vật lý nào được gán trên tầng. Vui lòng thực hiện xếp khay vào tầng trước khi lập báo cáo quan sát khay.
-                  </AppText>
-                </View>
-              </AppCard>
-            ) : (
-              <>
-                {/* Error Banner */}
-                {errorMessage && (
-                  <View style={styles.errorBanner}>
-                    <Ionicons name="alert-circle" size={16} color={theme.colors.error.dark} />
-                    <AppText variant="caption" color={theme.colors.error.dark} style={{ flex: 1, marginLeft: 6 }}>
-                      {errorMessage}
-                    </AppText>
-                  </View>
-                )}
-
-                {/* Progress bar text if submitting */}
-                {uploadProgressText && (
-                  <View style={styles.progressBanner}>
-                    <ActivityIndicator size="small" color={theme.colors.primary[600]} />
-                    <AppText variant="caption" weight="medium" color={theme.colors.primary[700]} style={{ marginLeft: 8 }}>
-                      {uploadProgressText}
-                    </AppText>
-                  </View>
-                )}
-
-                {/* 1. Select Tray to Inspect */}
-                <View style={styles.inputGroup}>
-                  <AppText variant="caption" weight="bold">
-                    Chọn khay vật lý báo cáo ({trays.length} khay trong phiên):
-                  </AppText>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.trayPillsRow}>
-                    {trays.map((t) => {
-                      const isSelected = t.session_tray_id === selectedSessionTrayId;
-                      return (
-                        <Pressable
-                          key={t.session_tray_id}
-                          onPress={() => !createdInspectionId && setSelectedSessionTrayId(t.session_tray_id)}
-                          style={[styles.trayPill, isSelected && styles.trayPillActive]}
-                        >
-                          <Ionicons
-                            name="cube"
-                            size={14}
-                            color={isSelected ? '#FFFFFF' : theme.colors.primary[600]}
-                          />
-                          <AppText
-                            variant="caption"
-                            weight={isSelected ? 'bold' : 'normal'}
-                            color={isSelected ? '#FFFFFF' : theme.colors.text.primary}
-                            style={{ marginLeft: 4 }}
-                          >
-                            {t.tray_code} {t.floor_name ? `(${t.floor_name})` : ''}
-                          </AppText>
-                        </Pressable>
-                      );
-                    })}
-                  </ScrollView>
-                  {selectedTray && (
-                    <AppText variant="caption" color={theme.colors.text.muted} style={{ marginTop: 4 }}>
-                      Đang lập báo cáo cho khay {selectedTray.tray_code} • sessionTrayId: #{selectedTray.session_tray_id}
-                    </AppText>
-                  )}
-
-                  {loadingTrayData ? (
-                    <View style={styles.loadingBanner}>
-                      <ActivityIndicator size="small" color={theme.colors.primary[600]} />
-                      <AppText variant="caption" weight="medium" color={theme.colors.primary[700]} style={{ marginLeft: 6 }}>
-                        Đang nạp dữ liệu thực tế của khay...
-                      </AppText>
-                    </View>
-                  ) : null}
-                </View>
-
-                <AppText variant="caption" color={theme.colors.text.secondary} style={{ marginBottom: 12 }}>
-                  Giai đoạn và tiến độ sinh trưởng được quản lý tại Cập nhật phiên.
-                </AppText>
-
-                {/* 4. Tray condition */}
-                <View style={styles.inputGroup}>
-                  <AppText variant="caption" weight="bold">
-                    Tình trạng khay:
-                  </AppText>
-                  <View style={styles.conditionPresetsRow}>
-                    {TRAY_CONDITION_PRESETS.map((preset) => {
-                      const isChosen = trayCondition === preset;
-                      return (
-                        <Pressable
-                          key={preset}
-                          style={[styles.presetChip, isChosen && styles.presetChipActive]}
-                          onPress={() => setTrayCondition(preset)}
-                        >
-                          <AppText
-                            variant="caption"
-                            weight={isChosen ? 'bold' : 'normal'}
-                            color={isChosen ? theme.colors.primary[700] : theme.colors.text.secondary}
-                            style={{ fontSize: 11 }}
-                          >
-                            {preset}
-                          </AppText>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                  <TextInput
-                    style={styles.textInput}
+              <AppText>
+                {latest
+                  ? GROWTH_STAGE_LABELS[latest]
+                  : scan.tray.status === 'MAINTENANCE'
+                    ? 'Chờ vệ sinh'
+                    : active
+                      ? overview
+                        ? 'Chưa ghi giai đoạn'
+                        : 'Đang canh tác'
+                      : 'Khay trống'}
+              </AppText>
+              {active?.harvest_status === 'HARVEST_READY' && (
+                <AppText color={theme.colors.success.dark}>Sẵn sàng thu hoạch</AppText>
+              )}
+            </AppCard>
+          )}
+          {!!notice && (
+            <AppText weight="bold" color={theme.colors.success.dark}>
+              {notice}
+            </AppText>
+          )}
+          {scan && !action && (
+            <>
+              {active && (
+                <AppButton
+                  title="Báo cáo sự cố"
+                  variant="outline"
+                  disabled={busy}
+                  onPress={() => {
+                    resetForm();
+                    setNotice('');
+                    setAction('issue');
+                  }}
+                />
+              )}
+              {!active && scan.tray.status === 'MAINTENANCE' && (
+                <AppButton
+                  title="Xác nhận đã vệ sinh"
+                  disabled={busy}
+                  onPress={() =>
+                    AppAlert.alert(
+                      'Hoàn tất vệ sinh',
+                      'Trả khay ' + scan.tray.tray_code + ' về trạng thái sẵn sàng?',
+                      [
+                        { text: 'Quay lại', style: 'cancel' },
+                        {
+                          text: 'Xác nhận',
+                          onPress: () =>
+                            void work(async () => {
+                              await trayQr.sanitize(token);
+                              setNotice('Đã xác nhận vệ sinh khay.');
+                              onSuccess();
+                              setScan(await trayQr.scan(token));
+                            }),
+                        },
+                      ]
+                    )
+                  }
+                />
+              )}
+              {!expectedTrayId && !session && (
+                <AppButton
+                  title="Quét khay tiếp theo"
+                  disabled={busy}
+                  variant="ghost"
+                  onPress={() => {
+                    restart();
+                    if (initialAction === 'growth') setAction('growth');
+                  }}
+                />
+              )}
+            </>
+          )}
+          {action && !scanningGrowth && (
+            <>
+              {action === 'growth' ? (
+                <>
+                  <AppText weight="bold">Giai đoạn sinh trưởng</AppText>
+                  {Object.entries(GROWTH_STAGE_LABELS).map(([key, label]) => (
+                    <AppButton
+                      key={key}
+                      title={label}
+                      disabled={lockedForm}
+                      variant={stage === key ? 'primary' : 'outline'}
+                      onPress={() => setStage(key as GrowthStage)}
+                    />
+                  ))}
+                  <AppInput
+                    label="Tình trạng khay"
+                    editable={!lockedForm}
                     value={trayCondition}
                     onChangeText={setTrayCondition}
-                    placeholder="Ví dụ: Khay sạch, đủ ẩm, thoát nước tốt..."
-                    placeholderTextColor={theme.colors.text.muted}
+                    maxLength={500}
                   />
-                </View>
-
-                {/* 5. Mushroom condition */}
-                <View style={styles.inputGroup}>
-                  <AppText variant="caption" weight="bold">
-                    Tình trạng nấm:
-                  </AppText>
-                  <View style={styles.conditionPresetsRow}>
-                    {MUSHROOM_CONDITION_PRESETS.map((preset) => {
-                      const isChosen = mushroomCondition === preset;
-                      return (
-                        <Pressable
-                          key={preset}
-                          style={[styles.presetChip, isChosen && styles.presetChipActive]}
-                          onPress={() => setMushroomCondition(preset)}
-                        >
-                          <AppText
-                            variant="caption"
-                            weight={isChosen ? 'bold' : 'normal'}
-                            color={isChosen ? theme.colors.primary[700] : theme.colors.text.secondary}
-                            style={{ fontSize: 11 }}
-                          >
-                            {preset}
-                          </AppText>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                  <TextInput
-                    style={styles.textInput}
+                  <AppInput
+                    label="Tình trạng nấm"
+                    editable={!lockedForm}
                     value={mushroomCondition}
                     onChangeText={setMushroomCondition}
-                    placeholder="Ví dụ: Nấm mọc đồng đều, tai nấm dày, màu sắc tự nhiên..."
-                    placeholderTextColor={theme.colors.text.muted}
+                    maxLength={500}
                   />
-                </View>
-
-                {/* 6. Notes */}
-                <View style={styles.inputGroup}>
-                  <AppText variant="caption" weight="bold">
-                    Ghi chú chi tiết:
-                  </AppText>
-                  <TextInput
-                    style={[styles.textInput, styles.textArea]}
-                    value={notes}
-                    onChangeText={setNotes}
-                    placeholder="Ghi chú thêm về quan sát thực tế (tùy chọn)..."
-                    placeholderTextColor={theme.colors.text.muted}
-                    multiline
-                    numberOfLines={3}
+                </>
+              ) : (
+                <>
+                  <AppInput
+                    label="Tiêu đề sự cố"
+                    editable={!lockedForm}
+                    value={title}
+                    onChangeText={setTitle}
+                    maxLength={255}
                   />
-                </View>
-
-                {/* 7. Photos Section */}
-                <View style={styles.inputGroup}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <AppText variant="caption" weight="bold">
-                      Ảnh chụp thực tế ({images.length} ảnh):
-                    </AppText>
-                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <AppText weight="bold">Loại sự cố</AppText>
+                  <View style={styles.row}>
+                    {Object.entries({
+                      DISEASE: 'Bệnh nấm',
+                      CONTAMINATION: 'Nhiễm tạp',
+                      QUALITY_FAILURE: 'Chất lượng',
+                      DAMAGE: 'Hư hại',
+                      OTHER: 'Khác',
+                    }).map(([key, label]) => (
                       <AppButton
-                        title="Chụp ảnh"
-                        variant="outline"
+                        key={key}
                         size="sm"
-                        leftIcon={<Ionicons name="camera" size={14} color={theme.colors.primary[600]} />}
-                        onPress={handleTakePhoto}
+                        title={label}
+                        variant={type === key ? 'primary' : 'outline'}
+                        disabled={lockedForm}
+                        onPress={() => setType(key)}
                       />
-                      <AppButton
-                        title="Thư viện"
-                        variant="outline"
-                        size="sm"
-                        leftIcon={<Ionicons name="images" size={14} color={theme.colors.primary[600]} />}
-                        onPress={handlePickLibrary}
-                      />
-                    </View>
+                    ))}
                   </View>
-
-                  {images.length === 0 ? (
-                    <View style={styles.emptyImageBox}>
-                      <Ionicons name="image-outline" size={32} color={theme.colors.neutral[300]} />
-                      <AppText variant="caption" color={theme.colors.text.muted} align="center" style={{ marginTop: 4 }}>
-                        Chưa chọn ảnh nào. Khuyến khích chụp ít nhất 1 ảnh khay nấm để khách hàng theo dõi.
-                      </AppText>
-                    </View>
-                  ) : (
-                    <View style={styles.imagesGrid}>
-                      {images.map((item, idx) => {
-                        const isFailed = failedImageIndices.includes(idx);
-                        return (
-                          <View key={idx} style={styles.imageItemCard}>
-                            <Image source={{ uri: item.uri }} style={styles.imageThumbnail} />
-                            {item.uploaded && (
-                              <View style={styles.uploadedBadge}>
-                                <Ionicons name="checkmark-circle" size={16} color={theme.colors.success.dark} />
-                              </View>
-                            )}
-                            {isFailed && (
-                              <View style={styles.failedBadge}>
-                                <Ionicons name="close-circle" size={16} color={theme.colors.error.dark} />
-                              </View>
-                            )}
-                            <Pressable style={styles.removeImageBtn} onPress={() => handleRemoveImage(idx)}>
-                              <Ionicons name="trash" size={12} color="#FFFFFF" />
-                            </Pressable>
-                            <Pressable style={styles.captionRow} onPress={() => handleOpenCaptionEditor(idx)}>
-                              <AppText variant="caption" numberOfLines={1} style={{ fontSize: 10 }}>
-                                {item.caption ? item.caption : 'Thêm chú thích...'}
-                              </AppText>
-                              <Ionicons name="pencil" size={10} color={theme.colors.text.muted} />
-                            </Pressable>
-                          </View>
-                        );
-                      })}
-                    </View>
-                  )}
-                </View>
-
-                {/* Caption editing bottom sub-sheet */}
-                {editingCaptionIndex !== null && (
-                  <AppCard elevation="xs" style={styles.captionEditCard}>
-                    <AppText variant="caption" weight="bold">
-                      Chú thích ảnh #{editingCaptionIndex + 1}:
-                    </AppText>
-                    <TextInput
-                      style={styles.textInput}
-                      value={captionInput}
-                      onChangeText={setCaptionInput}
-                      placeholder="Ví dụ: Cận cảnh mật độ nấm non ở góc khay..."
-                      maxLength={500}
-                    />
-                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-                      <AppButton
-                        title="Hủy"
-                        variant="ghost"
-                        size="sm"
-                        onPress={() => setEditingCaptionIndex(null)}
-                      />
-                      <AppButton
-                        title="Lưu chú thích"
-                        variant="primary"
-                        size="sm"
-                        onPress={handleSaveCaption}
-                      />
-                    </View>
-                  </AppCard>
-                )}
-
-                {/* Retry failed images button */}
-                {failedImageIndices.length > 0 && createdInspectionId && (
-                  <AppButton
-                    title={`Tải lại ${failedImageIndices.length} ảnh bị lỗi`}
-                    variant="secondary"
-                    loading={submitting}
-                    onPress={handleRetryFailedImages}
-                    style={{ marginBottom: 12 }}
-                  />
-                )}
-
-                {/* Submit button */}
-                <AppButton
-                  title={
-                    createdInspectionId
-                      ? 'Hoàn tất báo cáo'
-                      : 'Lưu báo cáo khay hằng ngày'
-                  }
-                  variant="primary"
-                  loading={submitting}
-                  disabled={submitting || trays.length === 0}
-                  onPress={handleSubmit}
-                  style={{ marginTop: 8, marginBottom: 24 }}
+                  <AppText weight="bold">Mức độ</AppText>
+                  <View style={styles.row}>
+                    {Object.entries({ LOW: 'Nhẹ', MEDIUM: 'Vừa', HIGH: 'Nghiêm trọng' }).map(
+                      ([key, label]) => (
+                        <AppButton
+                          key={key}
+                          title={label}
+                          disabled={lockedForm}
+                          variant={severity === key ? 'primary' : 'outline'}
+                          onPress={() => setSeverity(key)}
+                        />
+                      )
+                    )}
+                  </View>
+                </>
+              )}
+              <AppInput
+                multiline
+                label={action === 'growth' ? 'Ghi chú' : 'Mô tả sự cố'}
+                value={notes}
+                editable={!lockedForm}
+                onChangeText={setNotes}
+                maxLength={action === 'growth' ? 1000 : 5000}
+              />
+              {action === 'issue' && (
+                <AppInput
+                  label="Câu hỏi cho chuyên gia"
+                  value={question ?? notes}
+                  editable={!busy}
+                  onChangeText={setQuestion}
+                  multiline
                 />
-              </>
-            )}
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
+              )}
+              <View style={styles.row}>
+                {photos.map((p, i) => (
+                  <View key={p.uri + i}>
+                    <Image source={{ uri: p.uri }} style={styles.photo} />
+                    <AppButton
+                      title="Bỏ ảnh"
+                      size="sm"
+                      variant="ghost"
+                      disabled={lockedForm}
+                      onPress={() => setPhotos((prev) => prev.filter((_, index) => index !== i))}
+                    />
+                  </View>
+                ))}
+              </View>
+              <AppButton
+                title={'Chụp ảnh (' + photos.length + '/10)'}
+                variant="outline"
+                disabled={lockedForm || photos.length >= 10}
+                onPress={() => void selectPhotos(true)}
+              />
+              <AppButton
+                title="Chọn ảnh từ thư viện"
+                variant="ghost"
+                disabled={lockedForm || photos.length >= 10}
+                onPress={() => void selectPhotos(false)}
+              />
+              <AppButton
+                title={
+                  action === 'issue'
+                    ? issueId
+                      ? 'Gửi lại yêu cầu tư vấn'
+                      : 'Gửi cho chuyên gia'
+                    : scan
+                      ? 'Thử lại với khay này'
+                      : 'Quét QR để cập nhật'
+                }
+                loading={busy}
+                disabled={
+                  busy ||
+                  (action === 'growth'
+                    ? !stage
+                    : !title.trim() || !type.trim() || !notes.trim() || !(question ?? notes).trim())
+                }
+                onPress={() => {
+                  if (action === 'issue') return void submit();
+                  if (scan) return void work(() => saveGrowth(scan, token));
+                  setScanningGrowth(true);
+                  if (permission?.canAskAgain && !permission.granted) void ask();
+                }}
+              />
+            </>
+          )}
+          {busy && !action && <ActivityIndicator />}
+          {!!error && <AppText color={theme.colors.error.dark}>{error}</AppText>}
+        </ScrollView>
+      </SafeAreaView>
+    </AppModal>
   );
-};
-
+}
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  sheetContainer: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
-    maxHeight: '92%',
-    paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.sm,
-    paddingBottom: theme.spacing.lg,
-  },
-  dragHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: theme.colors.neutral[300],
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  scrollArea: {
-    marginTop: theme.spacing.xs,
-  },
-  warningCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.warning.light,
-    borderColor: theme.colors.warning.main,
-    padding: theme.spacing.md,
-    marginVertical: theme.spacing.md,
-  },
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.error.light,
-    padding: theme.spacing.sm,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.sm,
-  },
-  progressBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.primary[50],
-    padding: theme.spacing.sm,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.sm,
-  },
-  inputGroup: {
-    marginBottom: theme.spacing.md,
-  },
-  trayPillsRow: {
-    flexDirection: 'row',
-    marginVertical: theme.spacing.xs,
-  },
-  trayPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: theme.borderRadius.full,
-    borderWidth: 1,
-    borderColor: theme.colors.primary[300],
-    backgroundColor: '#FFFFFF',
-    marginRight: 8,
-  },
-  trayPillActive: {
-    backgroundColor: theme.colors.primary[600],
-    borderColor: theme.colors.primary[600],
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: theme.colors.neutral[300],
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 8,
-    fontSize: 14,
-    color: theme.colors.text.primary,
-    backgroundColor: '#FFFFFF',
-    marginTop: 4,
-  },
-  textArea: {
-    height: 70,
-    textAlignVertical: 'top',
-  },
-  emptyImageBox: {
-    padding: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.neutral[200],
-    borderStyle: 'dashed',
-    borderRadius: theme.borderRadius.md,
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  imagesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 8,
-  },
-  imageItemCard: {
-    width: 100,
-    borderRadius: theme.borderRadius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.neutral[200],
+  page: { flex: 1, backgroundColor: theme.colors.background.default },
+  body: { padding: 20, gap: 14, paddingBottom: 40 },
+  camera: {
+    height: 310,
+    borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
-    position: 'relative',
-  },
-  imageThumbnail: {
-    width: '100%',
-    height: 80,
-  },
-  uploadedBadge: {
-    position: 'absolute',
-    top: 4,
-    left: 4,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-  },
-  failedBadge: {
-    position: 'absolute',
-    top: 4,
-    left: 4,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-  },
-  removeImageBtn: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  captionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 4,
-    backgroundColor: theme.colors.neutral[50],
-  },
-  captionEditCard: {
-    padding: theme.spacing.sm,
-    marginVertical: theme.spacing.sm,
-    backgroundColor: theme.colors.neutral[50],
-    borderColor: theme.colors.primary[300],
-  },
-  loadingBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.primary[50],
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 6,
-    borderRadius: theme.borderRadius.sm,
-    marginTop: 6,
-  },
-  conditionPresetsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 6,
-    marginTop: 2,
-  },
-  presetChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: theme.borderRadius.full,
-    borderWidth: 1,
-    borderColor: theme.colors.border.light,
-    backgroundColor: theme.colors.neutral[50],
-  },
-  presetChipActive: {
-    borderColor: theme.colors.primary[500],
-    backgroundColor: theme.colors.primary[50],
-  },
+  frame: { width: 200, height: 200, borderRadius: 16, borderWidth: 2, borderColor: 'white' },
+  photo: { width: 92, height: 92, borderRadius: 10 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });
-

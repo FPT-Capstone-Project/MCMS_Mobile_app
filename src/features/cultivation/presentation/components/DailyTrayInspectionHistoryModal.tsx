@@ -1,7 +1,5 @@
 import { AppModal as Modal } from '../../../../shared/components/feedback/AppDialog';
 import { GROWTH_STAGE_LABELS } from '../../../../core/constants/growthStages';
-import { RequestExpertModal } from '../../../expert/presentation/RequestExpertModal';
-import type { ExpertRequestContext } from '../../../expert/domain/entities/expert-consultation';
 import { cultivationNote } from '../../domain/cultivationNotes';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -33,7 +31,7 @@ interface DailyTrayInspectionHistoryModalProps {
   session: CultivationSessionAdmin | null;
   initialSessionTrayId?: number | null;
   onClose: () => void;
-  onOpenCreateReport?: (sessionTrayId?: number | null) => void;
+  onOpenCreateReport?: (sessionTrayId?: number | null, action?: 'issue') => void;
 }
 
 const STAGE_LABELS: Record<GrowthStage, { label: string; color: string; bg: string }> = {
@@ -98,7 +96,7 @@ const DailyTrayInspectionHistoryModalContent: React.FC<{
   session: CultivationSessionAdmin;
   initialSessionTrayId?: number | null;
   onClose: () => void;
-  onOpenCreateReport?: (sessionTrayId?: number | null) => void;
+  onOpenCreateReport?: (sessionTrayId?: number | null, action?: 'issue') => void;
 }> = ({ visible, session, initialSessionTrayId, onClose, onOpenCreateReport }) => {
   const trays = useMemo(() => {
     const raw: NonNullable<CultivationSessionAdmin['trays']> = session.trays || [];
@@ -113,7 +111,6 @@ const DailyTrayInspectionHistoryModalContent: React.FC<{
     initialSessionTrayId || null
   );
 
-  const [expertContext, setExpertContext] = useState<ExpertRequestContext | null>(null);
   const [inspections, setInspections] = useState<DailyTrayInspection[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -191,7 +188,6 @@ const DailyTrayInspectionHistoryModalContent: React.FC<{
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        {expertContext && <RequestExpertModal context={expertContext} onClose={() => { setExpertContext(null); onClose(); }} />}
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={styles.sheetContainer}>
           <View style={styles.dragHandle} />
@@ -384,10 +380,7 @@ const DailyTrayInspectionHistoryModalContent: React.FC<{
                     ) : null}
 
                     {['CULTIVATING', 'HARVEST_READY', 'HARVESTING'].includes(session.status) && !!item.inspectionId && !!item.sessionTrayId && (
-                      <AppButton title="Nhờ chuyên gia" variant="outline" size="sm" onPress={() => setExpertContext({
-                        sessionId: session.session_id, sessionTrayId: item.sessionTrayId,
-                        inspectionId: item.inspectionId, label: `${item.trayCode || 'Khay'} · Báo cáo #${item.inspectionId}`,
-                      })} />
+                      <AppButton title="Quét QR báo sự cố" variant="outline" size="sm" onPress={() => onOpenCreateReport?.(item.sessionTrayId, 'issue')} />
                     )}
                     {/* Inspector info */}
                     {item.inspectedByName ? (
